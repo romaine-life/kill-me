@@ -158,7 +158,7 @@ export function ListTab({ onWorkoutClick, onCardioClick, currentDay = 1 }) {
   ];
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '20px 24px 80px', display: 'flex', flexDirection: 'column', gap: 28, fontFamily: 'var(--font-primary)' }}>
+    <div className="list-tab-page" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 80px', display: 'flex', flexDirection: 'column', gap: 28, fontFamily: 'var(--font-primary)' }}>
       <Hero today={todayInfo} design={todayDesign} dayN={currentDay} streak={streak} />
       <StatsStrip workouts={workouts} cardio={cardioSessions} cycles={cyclesCompleted} activeDays={new Set(allDates).size} />
 
@@ -216,6 +216,7 @@ function Hero({ today, design, dayN, streak }) {
   if (!today || !design) return null;
   return (
     <div
+      className="list-hero"
       style={{
         position: 'relative',
         borderRadius: 14,
@@ -265,7 +266,7 @@ function Hero({ today, design, dayN, streak }) {
           </button>
         </div>
       </div>
-      <div style={{ position: 'relative', width: 200, height: 220, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+      <div className="list-hero-anatomy" style={{ position: 'relative', width: 200, height: 220, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
         <div
           style={{
             position: 'absolute',
@@ -321,6 +322,7 @@ function StatsStrip({ workouts, cardio, cycles, activeDays }) {
   ];
   return (
     <div
+      className="stats-strip"
       style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(4, 1fr)',
@@ -347,7 +349,7 @@ function DateGroup({ date, items, onWorkoutClick, onCardioClick }) {
   const ds = daysSince(date);
   const rel = ds === 0 ? 'today' : ds === 1 ? 'yesterday' : `${ds} days ago`;
   return (
-    <div style={{ display: 'flex', gap: 20 }}>
+    <div className="date-group" style={{ display: 'flex', gap: 20 }}>
       <div style={{ width: 110, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2, paddingTop: 4 }}>
         <span className="display tnum" style={{ fontSize: 26, color: 'var(--fg-primary)' }}>{fmtDate(date)}</span>
         <span className="eyebrow">{rel}</span>

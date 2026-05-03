@@ -9,6 +9,7 @@
 //
 // Auth model: anyone can view (History/Today tabs load publicly). Only the
 // admin user (whitelisted Microsoft email) sees the Log tab and the Admin tab.
+/* global __BUILD_NUMBER__ */
 
 import { useState, useEffect, useCallback } from 'react';
 import { useWorkouts } from './hooks/useWorkouts';
@@ -25,8 +26,7 @@ import { ExercisesTab } from './components/ExercisesTab';
 import { ListTab } from './components/ListTab';
 import { CycleDial } from './components/CycleDial';
 import { isAdminMode } from './utils/adminMode';
-import { colors } from './colors';
-import { CalendarDays, Dumbbell, RefreshCw, Activity, PenLine, Wrench, ListChecks, List } from 'lucide-react';
+import { CalendarDays, Dumbbell, RefreshCw, Activity, PenLine, Wrench, ListChecks, List, Menu, UserCircle } from 'lucide-react';
 
 // Map URL path to tab id. Unknown paths fall back to 'list' (the landing page).
 const tabFromPath = (path) => {
@@ -46,7 +46,8 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [logViewWorkout, setLogViewWorkout] = useState(null);
   const [logViewCardio, setLogViewCardio] = useState(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(window.innerWidth < 640);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 760);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [exercisesInitialDay, setExercisesInitialDay] = useState(null);
   const [exercisesInitialName, setExercisesInitialName] = useState(null);
 
@@ -64,6 +65,12 @@ function App() {
     const onPopState = () => setActiveTab(tabFromPath(window.location.pathname));
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 760);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   // Admin tab requires both localhost dev mode AND admin role
@@ -122,6 +129,11 @@ function App() {
     navigateTab('exercises');
   };
 
+  const handleNav = (tab) => {
+    navigateTab(tab);
+    setMobileNavOpen(false);
+  };
+
   const tabs = [
     { id: 'list', label: 'List', icon: List },
     { id: 'history', label: 'History', icon: CalendarDays },
@@ -136,62 +148,46 @@ function App() {
   if (loading) {
     return (
       <div style={{ ...styles.app, alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: colors.text.tertiary, fontSize: 16 }}>Loading...</div>
+        <div style={{ color: 'var(--fg-muted)', fontSize: 16 }}>Loading...</div>
       </div>
     );
   }
 
   return (
     <div style={styles.app}>
-      {/* ═══════════════════════════════════════════════ */}
-      {/* STICKY TOP SECTION                             */}
-      {/* ═══════════════════════════════════════════════ */}
-      <div style={styles.stickyTop}>
-        <header style={styles.header}>
-          <div style={styles.headerLeft}>
-            <h1 style={styles.title}>SYNERGY 12</h1>
-            <p style={styles.subtitle}>12-day training cycle</p>
-          </div>
-          <div style={styles.headerRight}>
-            <UserProfile />
-            {showAdminTab && (
-              <div style={styles.adminBadge}>
-                <span style={{ color: colors.accent.amber, fontSize: 11, fontWeight: 'bold' }}>ADMIN</span>
-              </div>
-            )}
-            <div style={{ fontSize: 10, color: colors.text.disabled, fontFamily: 'monospace' }}>
-              {__BUILD_NUMBER__}
-            </div>
-          </div>
-        </header>
-      </div>
+      <TopBar
+        activeTab={activeTab}
+        isMobile={isMobile}
+        showAdminTab={showAdminTab}
+        mobileNavOpen={mobileNavOpen}
+        onToggleMobileNav={() => setMobileNavOpen((open) => !open)}
+      />
 
-      {/* ═══════════════════════════════════════════════ */}
-      {/* MAIN CONTENT                                   */}
-      {/* ═══════════════════════════════════════════════ */}
       <div style={styles.main}>
-        {/* Left sidebar: cycle dial + vertical tabs */}
-        <div style={{
-          ...styles.leftSidebar,
-          width: sidebarCollapsed ? 36 : 220,
-          transition: 'width 0.15s ease',
-        }}>
-          {!sidebarCollapsed && (
-            <div style={{ borderBottom: `1px solid ${colors.border.subtle}`, padding: '6px 4px 8px' }}>
-              <CycleDial
-                currentDay={currentDay}
-                onDay={isAdmin ? setDay : undefined}
-              />
-            </div>
-          )}
-          <TabBar
+        {!isMobile && (
+          <AppSidebar
             tabs={tabs}
             activeTab={activeTab}
-            onTabChange={navigateTab}
-            collapsed={sidebarCollapsed}
-            onToggleCollapse={() => setSidebarCollapsed(c => !c)}
+            onTabChange={handleNav}
+            currentDay={currentDay}
+            onDay={isAdmin ? setDay : undefined}
+            isAdmin={isAdmin}
           />
-        </div>
+        )}
+
+        {isMobile && mobileNavOpen && (
+          <div style={styles.mobileDrawer}>
+            <AppSidebar
+              tabs={tabs}
+              activeTab={activeTab}
+              onTabChange={handleNav}
+              currentDay={currentDay}
+              onDay={isAdmin ? setDay : undefined}
+              isAdmin={isAdmin}
+              compact
+            />
+          </div>
+        )}
 
         {/* Tab content area */}
         <div style={styles.tabContent}>
@@ -261,11 +257,109 @@ function App() {
         </div>
       </div>
 
+      {isMobile && (
+        <BottomNav tabs={tabs} activeTab={activeTab} onTabChange={handleNav} />
+      )}
+
     </div>
   );
 }
 
 export default App;
+
+function TopBar({ activeTab, isMobile, showAdminTab, mobileNavOpen, onToggleMobileNav }) {
+  const title = activeTab === 'list' ? 'List' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
+
+  return (
+    <header style={{ ...styles.topBar, ...(isMobile ? styles.topBarMobile : {}) }}>
+      <div style={styles.topBarLeft}>
+        {isMobile && (
+          <button
+            onClick={onToggleMobileNav}
+            aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
+            style={styles.mobileMenuButton}
+          >
+            <Menu size={17} />
+          </button>
+        )}
+        {isMobile && <BrandMark />}
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0 }}>
+          <span className="display" style={styles.topTitle}>{isMobile ? 'synergy-12' : title}</span>
+          {!isMobile && <span style={styles.topSubtitle}>activity feed · public view</span>}
+        </div>
+      </div>
+      <div style={styles.topBarRight}>
+        <span style={styles.livePill}>
+          <span style={styles.liveDot} />
+          live
+        </span>
+        {showAdminTab && <span style={styles.adminPill}>admin</span>}
+        {!isMobile && <span style={styles.buildNumber}>{__BUILD_NUMBER__}</span>}
+        {!isMobile && <UserProfile />}
+      </div>
+    </header>
+  );
+}
+
+function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, isAdmin, compact = false }) {
+  return (
+    <aside style={{ ...styles.sidebar, ...(compact ? styles.sidebarCompact : {}) }}>
+      <div style={styles.brand}>
+        <BrandMark />
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1, minWidth: 0 }}>
+          <span style={styles.brandName}>synergy-12</span>
+          <span style={styles.brandHost}>workout.romaine.life</span>
+        </div>
+      </div>
+
+      <CycleDial currentDay={currentDay} onDay={onDay} />
+
+      <TabBar tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
+
+      <div style={{ flex: 1 }} />
+
+      <div style={styles.profileFooter}>
+        <div style={styles.profileAvatar}>
+          {isAdmin ? 'N' : <UserCircle size={15} />}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2, minWidth: 0 }}>
+          <span style={styles.profileName}>{isAdmin ? 'nelsong6' : 'Guest'}</span>
+          <span style={styles.profileMeta}>{isAdmin ? 'signed in · admin' : 'public view'}</span>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function BottomNav({ tabs, activeTab, onTabChange }) {
+  const visibleTabs = tabs.filter((tab) => ['list', 'today', 'cycle', 'soreness'].includes(tab.id));
+
+  return (
+    <nav style={{ ...styles.bottomNav, gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)` }}>
+      {visibleTabs.map((tab) => {
+        const active = tab.id === activeTab;
+        const Icon = tab.icon;
+        return (
+          <button
+            key={tab.id}
+            onClick={() => onTabChange(tab.id)}
+            style={{ ...styles.bottomNavButton, color: active ? 'var(--fg-primary)' : 'var(--fg-faint)' }}
+          >
+            {active && <span style={styles.bottomNavIndicator} />}
+            <span style={{ display: 'flex', color: active ? 'var(--muscle-red)' : 'currentColor' }}>
+              <Icon size={15} />
+            </span>
+            <span>{tab.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function BrandMark() {
+  return <div style={styles.brandMark}>S12</div>;
+}
 
 // ---------------------------------------------------------------------------
 // Styles
@@ -274,57 +368,104 @@ export default App;
 const styles = {
   app: {
     height: '100vh',
-    backgroundColor: colors.bg.base,
-    color: colors.text.primary,
-    fontFamily: "'Segoe UI', 'Roboto', monospace",
+    background: 'var(--bg-app)',
+    color: 'var(--fg-body)',
+    fontFamily: 'var(--font-primary)',
     padding: 0,
     margin: 0,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
   },
-  stickyTop: {
-    flexShrink: 0,
-    zIndex: 160,
-  },
-  header: {
+  topBar: {
     display: 'flex',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    padding: '14px 32px',
+    borderBottom: '1px solid var(--border-subtle)',
+    background: 'var(--bg-app)',
+    flexShrink: 0,
+    gap: 12,
+    zIndex: 40,
+  },
+  topBarMobile: {
+    padding: '12px 16px',
+  },
+  topBarLeft: {
+    display: 'flex',
     alignItems: 'center',
-    padding: '12px 24px',
-    backgroundColor: colors.bg.raised,
-    borderBottom: `1px solid ${colors.border.subtle}`,
-    flexWrap: 'wrap',
+    gap: 14,
+    minWidth: 0,
+  },
+  topBarRight: {
+    display: 'flex',
+    alignItems: 'center',
     gap: 12,
   },
-  headerLeft: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  headerRight: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-  },
-  title: {
-    margin: 0,
+  topTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    fontFamily: 'monospace',
-    letterSpacing: -0.5,
+    color: 'var(--fg-primary)',
+    letterSpacing: 0,
   },
-  subtitle: {
-    margin: '3px 0 0 0',
+  topSubtitle: {
     fontSize: 11,
-    color: colors.text.tertiary,
-    fontFamily: 'monospace',
+    color: 'var(--fg-faint)',
+    fontFamily: 'var(--font-mono)',
   },
-  adminBadge: {
-    padding: '2px 8px',
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    border: '1px solid rgba(245, 158, 11, 0.3)',
-    borderRadius: 4,
+  livePill: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '5px 10px',
+    borderRadius: 9999,
+    background: 'var(--status-active-bg)',
+    color: 'var(--status-active)',
+    fontSize: 11,
+    fontFamily: 'var(--font-mono)',
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: '50%',
+    background: 'var(--status-active)',
+  },
+  adminPill: {
+    padding: '5px 9px',
+    borderRadius: 9999,
+    background: 'rgba(240,197,96,0.10)',
+    color: 'var(--status-warn)',
+    fontSize: 11,
+    fontFamily: 'var(--font-mono)',
+  },
+  buildNumber: {
+    fontSize: 10,
+    color: 'var(--fg-faint)',
+    fontFamily: 'var(--font-mono)',
+  },
+  mobileMenuButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    border: '1px solid var(--border-subtle)',
+    background: 'var(--bg-raised)',
+    color: 'var(--fg-secondary)',
+    display: 'grid',
+    placeItems: 'center',
+    cursor: 'pointer',
+  },
+  brandMark: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    background: 'linear-gradient(135deg, #2a2a2a, #0d0d0d)',
+    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.06)',
+    display: 'grid',
+    placeItems: 'center',
+    fontFamily: 'var(--font-primary)',
+    fontWeight: 900,
+    fontSize: 13,
+    letterSpacing: 0,
+    color: 'var(--muscle-red)',
   },
   main: {
     display: 'flex',
@@ -332,13 +473,91 @@ const styles = {
     flex: 1,
     minHeight: 0,
     width: '100%',
+    position: 'relative',
   },
-  leftSidebar: {
+  sidebar: {
+    width: 260,
     flexShrink: 0,
+    background: 'var(--bg-sidebar)',
+    borderRight: '1px solid var(--border-subtle)',
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: colors.bg.raised,
-    borderRight: `1px solid ${colors.border.subtle}`,
+    padding: '16px 12px 12px',
+    gap: 14,
+  },
+  sidebarCompact: {
+    width: '100%',
+    minHeight: '100%',
+    borderRight: 'none',
+    padding: '12px 12px 16px',
+  },
+  brand: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '0 6px',
+  },
+  brandName: {
+    fontFamily: 'var(--font-primary)',
+    fontWeight: 600,
+    fontSize: 13,
+    color: 'var(--fg-primary)',
+    letterSpacing: 0,
+  },
+  brandHost: {
+    fontSize: 10,
+    color: 'var(--fg-faint)',
+    fontFamily: 'var(--font-mono)',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  profileFooter: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '8px 8px',
+    borderRadius: 12,
+    background: 'rgba(255,255,255,0.02)',
+    border: '1px solid var(--border-subtle)',
+  },
+  profileAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #3a3a3f, #1f1f22)',
+    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.04)',
+    display: 'grid',
+    placeItems: 'center',
+    fontFamily: 'var(--font-primary)',
+    fontWeight: 700,
+    fontSize: 12,
+    color: 'var(--fg-secondary)',
+  },
+  profileName: {
+    fontSize: 12,
+    color: 'var(--fg-body)',
+    fontWeight: 500,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  profileMeta: {
+    fontSize: 10,
+    color: 'var(--fg-faint)',
+    fontFamily: 'var(--font-mono)',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
+  mobileDrawer: {
+    position: 'absolute',
+    inset: '0 auto 0 0',
+    width: 280,
+    maxWidth: '86vw',
+    zIndex: 30,
+    background: 'var(--bg-sidebar)',
+    boxShadow: '18px 0 36px rgba(0,0,0,0.45)',
   },
   tabContent: {
     display: 'flex',
@@ -346,8 +565,41 @@ const styles = {
     flex: 1,
     minWidth: 0,
     minHeight: 0,
-    padding: '12px 12px',
     boxSizing: 'border-box',
     overflowY: 'auto',
+    background: 'var(--bg-app)',
+  },
+  bottomNav: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    display: 'grid',
+    background: 'var(--bg-sidebar)',
+    borderTop: '1px solid var(--border-subtle)',
+    padding: '8px 8px 16px',
+    zIndex: 35,
+  },
+  bottomNavButton: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 3,
+    padding: '6px 4px',
+    fontSize: 10,
+    fontFamily: 'var(--font-primary)',
+    fontWeight: 600,
+    position: 'relative',
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+  },
+  bottomNavIndicator: {
+    position: 'absolute',
+    top: -8,
+    width: 24,
+    height: 2,
+    background: 'var(--muscle-red)',
+    borderRadius: 2,
   },
 };
