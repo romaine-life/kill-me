@@ -11,4 +11,4 @@ resources:
 images:
 - name: romainecr.azurecr.io/kill-me
   newName: romainecr.azurecr.io/kill-me
-  newTag: 849cba3
+  newTag: 546bdc9
