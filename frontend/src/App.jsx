@@ -190,7 +190,7 @@ function App() {
         )}
 
         {/* Tab content area */}
-        <div style={styles.tabContent}>
+        <div className="app-tab-content" style={styles.tabContent}>
           {activeTab === 'today' && (
             <TodayTab currentDay={currentDay} isAdmin={isAdmin} onNavigateExercises={handleNavigateExercises} />
           )}
