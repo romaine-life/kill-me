@@ -1,4 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,100..900;1,100..900&display=swap');
 @import "tailwindcss";
+
+:root {
+  /* Design tokens — workout-tracker / Tank Operator base + Anatomy accent */
+  --font-primary: 'Archivo', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace;
+
+  --bg-app: #0e0e0e;
+  --bg-sidebar: #0a0a0a;
+  --bg-elevated: #1a1a1a;
+  --bg-raised: #161616;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.08);
+
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  --fg-primary: #ffffff;
+  --fg-body: #e4e4e4;
+  --fg-secondary: #b4b4b4;
+  --fg-muted: #8a8a8a;
+  --fg-faint: #666666;
+  --fg-disabled: #4a4a4a;
+
+  --day-1:  #4f8cf7;
+  --day-2:  #7fb98a;
+  --day-3:  #b48bf0;
+  --day-4:  #f0c560;
+  --day-5:  #6c8df5;
+  --day-6:  #f08bb8;
+  --day-7:  #5fc7c7;
+  --day-8:  #ef6f6f;
+  --day-9:  #f59e6f;
+  --day-10: #67e8f9;
+  --day-11: #a06ff5;
+  --day-12: #c8e85e;
+
+  --muscle-red: #c83838;
+  --muscle-red-dim: rgba(200, 56, 56, 0.18);
+
+  --status-active: #34d399;
+  --status-active-bg: rgba(52, 211, 153, 0.12);
+  --status-warn: #f0c560;
+
+  --t-fast: 120ms;
+  --t-mid: 200ms;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
 
 @layer base {
   body {
@@ -7,3 +55,30 @@
   }
 }
 
+/* PNGs are red muscle on white skeleton on white bg.
+   `mix-blend-mode: lighten` over a dark surface drops the white. */
+.anatomy {
+  mix-blend-mode: lighten;
+  filter: contrast(1.1) saturate(1.15);
+  pointer-events: none;
+  user-select: none;
+}
+
+.tnum { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+
+.display {
+  font-family: var(--font-primary);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 0.85;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  font-family: var(--font-primary);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
