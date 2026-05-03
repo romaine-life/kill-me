@@ -210,7 +210,6 @@ export function TodayTab({ currentDay, isAdmin, onNavigateExercises }) {
       {loading && (
         <div className="flex items-center justify-center min-h-[30vh]">
           <div className="text-center">
-            <div className="text-6xl mb-4 animate-pulse">🏋️</div>
             <p className="text-slate-400">Loading workout...</p>
           </div>
         </div>
@@ -278,7 +277,6 @@ export function TodayTab({ currentDay, isAdmin, onNavigateExercises }) {
                   {workoutDay?.focus}
                 </p>
               </div>
-              <div className="text-5xl">🏋️</div>
             </div>
 
             {/* Description */}
