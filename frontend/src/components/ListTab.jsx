@@ -8,6 +8,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { DAY_CONFIG } from '../utils/dayConfig';
 import { useDataSource } from '../api/snapshotContext.jsx';
 import { formatTime12h, todayLocal } from '../utils/dateUtils';
+import { formatIntervalSummary } from '../utils/cardioTemplates.js';
 import {
   DAY_DESIGN,
   dayColor,
@@ -558,6 +559,10 @@ function WorkoutCard({ w, onClick }) {
 // ── Cardio card ────────────────────────────────────────────────────────
 function CardioCard({ c, onClick }) {
   const isBike = c.activity === 'bike';
+  const intervalSummary = Array.isArray(c.treadmill?.intervals)
+    ? formatIntervalSummary(c.treadmill.intervals)
+    : c.treadmill?.intervals;
+
   return (
     <div
       onClick={() => onClick?.(c)}
@@ -600,7 +605,7 @@ function CardioCard({ c, onClick }) {
         <div style={{ fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
           {c.time && <>{formatTime12h(c.time)} · </>}
           {c.durationMinutes} min
-          {c.treadmill?.intervals && <span> · {c.treadmill.intervals}</span>}
+          {intervalSummary && <span> · {intervalSummary}</span>}
         </div>
       </div>
       <div style={{ display: 'flex', gap: 16, alignItems: 'baseline' }}>
