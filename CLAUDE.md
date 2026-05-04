@@ -5,6 +5,15 @@ Personal workout tracker built around a custom 12-day training cycle called **Sy
 The repo name comes from a Tom Platz video where he screams "KILL ME" during an
 agonizing set of leg extensions under hypnotherapy coaching.
 
+## Container Build Verification
+
+Agent pods are not expected to have Docker. Do not report missing local Docker
+as a blocker. Run available repo checks first, then use PR CI as the normal
+container build gate: `.github/workflows/docker-build-check.yml` performs a
+throwaway Docker build with `push: false`. If image-packaging feedback is
+needed before a PR is ready, manually dispatch that workflow with `git_ref`.
+Release/deploy workflows are the only path that publishes images.
+
 ## The 12-Day Synergy System
 
 The cycle is Nelson's own design, optimized for **consistent daily activity** rather
