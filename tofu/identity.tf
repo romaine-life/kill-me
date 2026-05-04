@@ -22,11 +22,6 @@ data "azurerm_resource_group" "infra" {
   name = local.infra.resource_group_name
 }
 
-data "azurerm_kubernetes_cluster" "infra" {
-  name                = "infra-aks"
-  resource_group_name = local.infra.resource_group_name
-}
-
 resource "azurerm_user_assigned_identity" "kill_me" {
   name                = "kill-me-identity"
   resource_group_name = data.azurerm_resource_group.infra.name
@@ -70,7 +65,7 @@ resource "azurerm_federated_identity_credential" "kill_me" {
   resource_group_name = local.infra.resource_group_name
   parent_id           = azurerm_user_assigned_identity.kill_me.id
   audience            = ["api://AzureADTokenExchange"]
-  issuer              = data.azurerm_kubernetes_cluster.infra.oidc_issuer_url
+  issuer              = var.cluster_oidc_issuer_url
   subject             = "system:serviceaccount:kill-me:infra-shared"
 }
 
