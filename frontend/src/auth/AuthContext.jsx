@@ -1,85 +1,34 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { msalInstance, msalReady } from './msal';
-
-/** Retry fetch with exponential backoff (handles cold-start 503s). */
-async function fetchWithRetry(url, options, retries = 2) {
-  for (let i = 0; i <= retries; i++) {
-    try {
-      return await fetch(url, options);
-    } catch (err) {
-      if (i === retries) throw err;
-      await new Promise((r) => setTimeout(r, 1000 * 2 ** i));
-    }
-  }
-  throw new Error('unreachable');
-}
+import { createContext, useContext, useState, useEffect } from 'react';
+import { bootstrapAuth, logout as authLogout, getStoredToken, clearStoredToken } from './index.js';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => localStorage.getItem('token'));
+  const [token, setToken] = useState(() => getStoredToken());
   const [loading, setLoading] = useState(true);
 
-  // Parse existing JWT on mount
+  // Boot-time auth check: try stored session → silent exchange via
+  // .romaine.life cookie → fall through unauthenticated. Mirrors the
+  // canonical pattern in tank-operator's frontend/src/auth.ts (the
+  // template for all .romaine.life apps' delegation).
   useEffect(() => {
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setUser({ id: payload.sub, name: payload.name, email: payload.email, role: payload.role });
-      } catch {
-        setToken(null);
-        localStorage.removeItem('token');
-      }
-    }
-  }, [token]);
-
-  // Handle MSAL redirect response (runs on any page after Microsoft redirects back).
-  // Guard with a ref to prevent StrictMode double-fire from calling
-  // handleRedirectPromise() twice — concurrent calls cause MSAL to hang.
-  const redirectHandled = useRef(false);
-  useEffect(() => {
-    if (redirectHandled.current) return;
-    redirectHandled.current = true;
-
-    // Timeout fallback — if MSAL hangs (token exchange stall, network issue),
-    // force past the loading screen so the app is still usable as a viewer.
-    const timeout = setTimeout(() => {
-      console.warn('Auth initialization timed out — continuing without auth');
-      setLoading(false);
-    }, 8000);
-
+    let cancelled = false;
     (async () => {
       try {
-        await msalReady;
-        const response = await msalInstance.handleRedirectPromise();
-
-        if (response?.idToken) {
-          try {
-            const res = await fetchWithRetry('/auth/microsoft/login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ credential: response.idToken }),
-            });
-
-            if (!res.ok) {
-              const body = await res.json().catch(() => ({}));
-              console.error('Login failed:', res.status, body.error);
-            } else {
-              const data = await res.json();
-              setSession(data.token, data.user);
-            }
-          } catch (err) {
-            console.error('Login failed:', err);
-          }
+        const u = await bootstrapAuth();
+        if (cancelled) return;
+        if (u) {
+          setUser(u);
+          setToken(getStoredToken());
         }
       } catch (err) {
-        console.error('MSAL initialization failed:', err);
+        console.error('bootstrapAuth threw:', err);
       } finally {
-        clearTimeout(timeout);
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => { cancelled = true; };
   }, []);
 
   function setSession(newToken, newUser) {
@@ -88,8 +37,9 @@ export function AuthProvider({ children }) {
     setUser(newUser);
   }
 
-  function logout() {
-    localStorage.removeItem('token');
+  async function logout() {
+    await authLogout();
+    clearStoredToken();
     setToken(null);
     setUser(null);
   }

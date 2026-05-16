@@ -9,10 +9,9 @@
 #
 #   - Cosmos DB Data Contributor on dbs/WorkoutTrackerDB
 #   - Key Vault Secrets User on the one secret config.js reads
-#     (api-jwt-signing-secret) — narrow, not vault-wide
-#   - App Configuration Data Reader at the store level — necessary
-#     because config.js calls listConfigurationSettings() to enumerate
-#     `*/microsoft_oauth_client_id` keys and there's no per-key RBAC
+#     (kill-me-jwt-signing-secret) — narrow, not vault-wide
+#   - App Configuration Data Reader at the store level — config.js reads
+#     `cosmos_db_endpoint` from there
 #
 # Pattern mirrors tank-operator/infra/{api_proxy,credential_refresher}.tf
 # and glimmung/tofu/identity.tf.
@@ -45,15 +44,14 @@ resource "azurerm_cosmosdb_sql_role_assignment" "kill_me_cosmos" {
 # reads another secret, add a sibling role assignment here rather than
 # widening to vault scope.
 resource "azurerm_role_assignment" "kill_me_kv_jwt_secret" {
-  scope                = "${data.azurerm_key_vault.main.id}/secrets/api-jwt-signing-secret"
+  scope                = "${data.azurerm_key_vault.main.id}/secrets/kill-me-jwt-signing-secret"
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_user_assigned_identity.kill_me.principal_id
 }
 
-# App Config: store-level Data Reader. Narrowing isn't possible because
-# config.js enumerates keys via listConfigurationSettings() to discover
-# every `*/microsoft_oauth_client_id` registration — App Configuration
-# RBAC doesn't have a "read keys matching prefix" primitive.
+# App Config: store-level Data Reader for the single `cosmos_db_endpoint`
+# key config.js reads. (Microsoft sign-in moved to auth.romaine.life;
+# config.js no longer enumerates per-app OAuth client keys.)
 resource "azurerm_role_assignment" "kill_me_appconfig" {
   scope                = data.azurerm_app_configuration.infra.id
   role_definition_name = "App Configuration Data Reader"
