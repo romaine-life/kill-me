@@ -55,7 +55,7 @@ frontend/          React 19 SPA (Vite + Tailwind CSS 4)
   ├── Left sidebar tab navigation (inline styles, collapsible, lucide-react icons)
   ├── Client-side URL routing via History API (pushState/popstate, no library)
   ├── Centralized color palette (src/colors.js)
-  ├── Microsoft sign-in via MSAL.js (redirect flow)
+  ├── Sign-in delegated to auth.romaine.life (no MSAL in-app)
   ├── Public viewing, admin-only editing
   ├── In-browser SQLite via sql.js/WASM for anonymous visitors (instant loads)
   ├── Deployed to Azure Static Web App
@@ -76,11 +76,13 @@ tofu/              OpenTofu infrastructure-as-code
 
 ### Auth model
 
-"Everyone can view, only Nelson can edit." Anonymous visitors get instant page
+"Everyone can view, only admins can edit." Anonymous visitors get instant page
 loads from an in-browser SQLite snapshot (sql.js/WASM) — no backend cold start.
-Authenticated users switch to the live API. Logging workouts, changing the current
-day, and admin actions require signing in with the whitelisted Microsoft account
-(`nelson-devops-project@outlook.com`).
+Authenticated users switch to the live API. Logging workouts, changing the
+current day, and admin actions require signing in via auth.romaine.life — the
+central identity service that owns the user table and the role claim
+(`admin`/`user`/`pending`). Admins are promoted manually via
+https://auth.romaine.life/admin.
 
 ### Data flow
 
@@ -88,13 +90,13 @@ day, and admin actions require signing in with the whitelisted Microsoft account
 2. On sign-in, snapshot is discarded and all reads switch to the live backend API
 
 **Critical `useDataSource()` contract:** Every consumer of `useDataSource()` MUST check `isReady` before calling any fetch function. The snapshot loads asynchronously (WASM init + network fetch). Until it's ready, `db` is null, `isLive` evaluates to true, and fetches silently hit the live API — which doesn't exist for anonymous visitors, causing a permanent loading spinner. Pattern: `const { fetchFoo, isReady } = useDataSource(); useEffect(() => { if (!isReady) return; fetchFoo()... }, [isReady]);`
-3. To edit, user signs in with Microsoft via MSAL.js redirect flow
-4. Frontend sends Microsoft ID token to backend `/auth/microsoft/login`
-5. Backend verifies ID token against Microsoft JWKS, assigns admin/viewer role
-6. Backend issues self-signed 7-day JWT; frontend stores it in localStorage
-7. Frontend attaches JWT as Bearer token on write requests
-8. Backend validates JWT, extracts `sub` claim as userId
-9. Backend queries/writes Cosmos DB, partitioned by userId
+3. To edit, user clicks Sign in → redirects to `auth.romaine.life/sign-in/microsoft?callbackURL=...`
+4. After Microsoft completes, auth.romaine.life sets a `.romaine.life` session cookie and bounces back here
+5. Frontend's `bootstrapAuth()` (frontend/src/auth/index.js) fetches an RS256 JWT from `auth.romaine.life/api/auth/token` (cookie auto-attached cross-origin)
+6. Frontend POSTs that JWT to `/api/auth/exchange`; backend verifies it against the auth.romaine.life JWKS, checks `role ∈ {admin, user}` (403 for `pending`), and mints a kill-me-signed HS256 JWT
+7. Frontend stores the kill-me JWT in localStorage, attaches it as `Bearer` on writes
+8. Backend's `requireAuth` middleware verifies the local JWT, exposes `req.user = { sub, email, name, role }`; `requireAdmin` gates admin-only routes on `role === 'admin'`
+9. Backend queries/writes Cosmos DB, partitioned by userId (= JWT `sub`)
 
 ### Shared infrastructure
 
@@ -108,12 +110,12 @@ This repo builds on shared resources provisioned by **infra-bootstrap**:
 - Key Vault (`romaine-kv`)
 
 App-specific resources created by this repo: the Cosmos DB database and container,
-JWT signing secret in Key Vault, the Microsoft sign-in app registration, and a
-per-app App Config key (`workout:microsoft_client_id`). The frontend + backend
-run as a single Node+Express pod in the `kill-me` namespace, served from
-`workout.romaine.life` via HTTPRoute on the shared Envoy Gateway. The prior
-shared-API-at-`api.romaine.life/workout` mount was retired when the api repo
-was archived and deleted on 2026-04-20.
+and the per-app HS256 signing secret in Key Vault (`kill-me-jwt-signing-secret`).
+Microsoft sign-in is delegated to **auth.romaine.life** — kill-me holds no Entra
+app registration of its own. The frontend + backend run as a single Node+Express
+pod in the `kill-me` namespace, served from `workout.romaine.life` via HTTPRoute
+on the shared Envoy Gateway. The prior shared-API-at-`api.romaine.life/workout`
+mount was retired when the api repo was archived and deleted on 2026-04-20.
 
 See also: **pipeline-templates** for reusable GitHub Actions workflows, and
 **shell-config** for the global Claude config chain and DevOps tooling.
@@ -157,8 +159,8 @@ All workflows delegate to **nelsong6/pipeline-templates** reusable templates:
 
 - Node 20+
 - Azure CLI (`az login` for local Cosmos DB and Key Vault access)
-- Backend `.env` with `AZURE_APP_CONFIG_ENDPOINT`, `APP_CONFIG_PREFIX`, and `KEY_VAULT_URL`
-- Frontend `.env` with `VITE_MICROSOFT_CLIENT_ID` and `VITE_API_URL`
+- Backend `.env` with `AZURE_APP_CONFIG_ENDPOINT` and `KEY_VAULT_URL`
+- Frontend `.env` with `VITE_API_URL` (Microsoft sign-in is delegated upstream to auth.romaine.life)
 
 ### Running locally
 
@@ -168,7 +170,7 @@ cd backend && npm run dev   # Backend only (Express :3000)
 cd frontend && npm run dev  # Frontend only (Vite :5173)
 ```
 
-The frontend reads `VITE_MICROSOFT_CLIENT_ID` and `VITE_API_URL` environment variables.
+The frontend reads `VITE_API_URL`. The auth service URL is fetched at runtime from the backend's `/api/config` endpoint.
 
 Admin mode (database init, data migration) is available only on localhost in dev
 mode when signed in as admin.

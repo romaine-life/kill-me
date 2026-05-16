@@ -24,7 +24,8 @@ export async function apiFetch(path, options = {}) {
     localStorage.removeItem('token');
     // Only redirect for authenticated actions, not public reads
     if (options.method && options.method !== 'GET') {
-      import('../auth/msal.js').then(({ loginWithMicrosoft }) => loginWithMicrosoft());
+      const { startLogin } = await import('../auth/index.js');
+      await startLogin();
     }
     throw new Error('Unauthorized');
   }

@@ -1,7 +1,6 @@
 // Loads runtime config from Azure App Configuration + Key Vault at startup.
-// Workload identity: the pod's ServiceAccount is federated to the shared
-// managed identity (infra-shared-identity) which has App Config Data Reader,
-// Key Vault Secrets User, and Cosmos DB Data Contributor roles.
+// Workload identity: the pod's ServiceAccount is federated to kill-me-identity
+// (tofu/identity.tf) which has narrow Cosmos + KV + App Config grants.
 import { AppConfigurationClient } from '@azure/app-configuration';
 import { SecretClient } from '@azure/keyvault-secrets';
 import { DefaultAzureCredential } from '@azure/identity';
@@ -18,31 +17,13 @@ export async function fetchConfig() {
 
   const cosmosEndpoint = await appConfig.getConfigurationSetting({ key: 'cosmos_db_endpoint' });
 
-  // Accept tokens from every Microsoft OAuth app registration — same
-  // enumeration logic as the shared api. Filter for `*/microsoft_oauth_client_id`.
-  const microsoftClientIds = [];
-  const sharedMs = await appConfig
-    .getConfigurationSetting({ key: 'microsoft_oauth_client_id_plain' })
-    .catch(() => null);
-  if (sharedMs?.value) microsoftClientIds.push(sharedMs.value);
-  for await (const setting of appConfig.listConfigurationSettings()) {
-    if (
-      setting.key?.endsWith('/microsoft_oauth_client_id') &&
-      setting.value &&
-      !microsoftClientIds.includes(setting.value)
-    ) {
-      microsoftClientIds.push(setting.value);
-    }
-  }
-  if (!microsoftClientIds.length) {
-    throw new Error('No Microsoft OAuth client IDs found in App Configuration.');
-  }
-
-  const jwtSigningSecret = (await kv.getSecret('api-jwt-signing-secret')).value;
+  // Per-app signing secret. Microsoft sign-in happens upstream at
+  // auth.romaine.life — this secret only signs kill-me's own session JWTs
+  // (minted at /api/auth/exchange after we've verified the upstream JWT).
+  const jwtSigningSecret = (await kv.getSecret('kill-me-jwt-signing-secret')).value;
 
   return {
     cosmosDbEndpoint: cosmosEndpoint.value,
     jwtSigningSecret,
-    microsoftClientIds,
   };
 }

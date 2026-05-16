@@ -37,17 +37,6 @@ jobs:
           tenant-id: ${{ vars.ARM_TENANT_ID }}
           subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
 
-      - name: Fetch MICROSOFT_CLIENT_ID from App Configuration
-        # This repo's tofu/oauth.tf publishes the key
-        # `workout/microsoft_oauth_client_id` — fetched here so the tofu-managed
-        # value is the source of truth for the build.
-        run: |
-          MICROSOFT_CLIENT_ID=$(az appconfig kv show \
-            --name infra-appconfig \
-            --key workout/microsoft_oauth_client_id \
-            --query value -o tsv)
-          echo "MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}" >> $GITHUB_ENV
-
       - name: ACR login
         run: az acr login --name romainecr
 
@@ -57,7 +46,6 @@ jobs:
           IMAGE="romainecr.azurecr.io/kill-me:${TAG}"
           docker build \
             --build-arg BUILD_NUMBER="${TAG}" \
-            --build-arg VITE_MICROSOFT_CLIENT_ID="${MICROSOFT_CLIENT_ID}" \
             -t "$IMAGE" .
           docker push "$IMAGE"
           echo "TAG=${TAG}" >> $GITHUB_ENV
