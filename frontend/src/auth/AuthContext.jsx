@@ -1,29 +1,21 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { bootstrapAuth, logout as authLogout, getStoredToken, clearStoredToken } from './index.js';
+import { bootstrapAuth, logout as authLogout } from './index.js';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => getStoredToken());
   const [loading, setLoading] = useState(true);
 
-  // Boot-time auth check: try stored session → silent exchange via
-  // .romaine.life cookie → fall through unauthenticated. Mirrors the
-  // canonical pattern in tank-operator's frontend/src/auth.ts (the
-  // template for all .romaine.life apps' delegation).
+  // Boot: ask the backend "am I signed in?". The backend forwards the
+  // .romaine.life session cookie to auth.romaine.life's get-session
+  // endpoint and returns the user record (or null). No token storage.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const u = await bootstrapAuth();
-        if (cancelled) return;
-        if (u) {
-          setUser(u);
-          setToken(getStoredToken());
-        }
-      } catch (err) {
-        console.error('bootstrapAuth threw:', err);
+        if (!cancelled) setUser(u);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -31,21 +23,13 @@ export function AuthProvider({ children }) {
     return () => { cancelled = true; };
   }, []);
 
-  function setSession(newToken, newUser) {
-    localStorage.setItem('token', newToken);
-    setToken(newToken);
-    setUser(newUser);
-  }
-
   async function logout() {
     await authLogout();
-    clearStoredToken();
-    setToken(null);
     setUser(null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, isAdmin: user?.role === 'admin', setSession, logout }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin: user?.role === 'admin', logout }}>
       {children}
     </AuthContext.Provider>
   );
