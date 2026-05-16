@@ -1,14 +1,13 @@
 import { useAuth } from '../auth/AuthContext.jsx';
-import { loginWithMicrosoft } from '../auth/msal.js';
 import { colors } from '../colors';
 
 export function UserProfile() {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, logout, signIn } = useAuth();
 
   if (!user) {
     return (
       <button
-        onClick={loginWithMicrosoft}
+        onClick={signIn}
         style={styles.signInButton}
         onMouseEnter={e => { e.currentTarget.style.backgroundColor = colors.bg.overlay; }}
         onMouseLeave={e => { e.currentTarget.style.backgroundColor = colors.bg.surface; }}

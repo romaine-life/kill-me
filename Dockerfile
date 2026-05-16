@@ -10,13 +10,10 @@ RUN npm ci
 # Copy frontend source, then build.
 COPY frontend/ ./
 
-# Build-time env: Vite inlines VITE_* vars into the bundle.
 # BUILD_NUMBER overrides vite.config.js's `execSync('git rev-parse')` fallback
 # — git isn't available in this stage, and that's fine.
 ARG BUILD_NUMBER=dev
-ARG VITE_MICROSOFT_CLIENT_ID=
 ENV BUILD_NUMBER=$BUILD_NUMBER
-ENV VITE_MICROSOFT_CLIENT_ID=$VITE_MICROSOFT_CLIENT_ID
 
 RUN npm run build
 

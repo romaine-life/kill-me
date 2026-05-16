@@ -1,27 +1,25 @@
-import jwt from 'jsonwebtoken';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 
-/**
- * Creates Express middleware that verifies self-signed JWTs.
- * Populates `req.user` with `{ sub, email, name, role }`.
- */
-export function createRequireAuth({ jwtSecret }) {
-  return (req, res, next) => {
+// JWTs are issued and signed by auth.romaine.life (Better Auth's JWT plugin,
+// RS256). We verify against its JWKS endpoint instead of the old shared
+// HS256 secret. JWKS is fetched once and cached by `jose`; rotations are
+// picked up automatically when an unknown kid arrives.
+const JWKS = createRemoteJWKSet(new URL('https://auth.romaine.life/api/auth/jwks'));
+const ISSUER = 'https://auth.romaine.life';
+
+export function createRequireAuth() {
+  return async (req, res, next) => {
     let token;
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       token = authHeader.slice(7);
-    } else {
-      const cookies = req.headers.cookie || '';
-      const match = cookies.split(';').map(c => c.trim()).find(c => c.startsWith('auth_token='));
-      if (match) token = match.slice('auth_token='.length);
     }
-
     if (!token) {
       return res.status(401).json({ error: 'Missing authentication' });
     }
 
     try {
-      const payload = jwt.verify(token, jwtSecret);
+      const { payload } = await jwtVerify(token, JWKS, { issuer: ISSUER });
       req.user = {
         sub: payload.sub,
         email: payload.email,
@@ -35,10 +33,6 @@ export function createRequireAuth({ jwtSecret }) {
   };
 }
 
-/**
- * Middleware that requires the authenticated user to have the 'admin' role.
- * Must be used after requireAuth.
- */
 export function requireAdmin(req, res, next) {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });

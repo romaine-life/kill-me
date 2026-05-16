@@ -22,9 +22,11 @@ export async function apiFetch(path, options = {}) {
 
   if (res.status === 401) {
     localStorage.removeItem('token');
-    // Only redirect for authenticated actions, not public reads
+    // Only redirect for authenticated actions, not public reads. The auth
+    // service does the Microsoft dance and sends the user back here.
     if (options.method && options.method !== 'GET') {
-      import('../auth/msal.js').then(({ loginWithMicrosoft }) => loginWithMicrosoft());
+      const cb = encodeURIComponent(window.location.origin + window.location.pathname);
+      window.location.href = `https://auth.romaine.life/api/auth/sign-in/social/microsoft?callbackURL=${cb}`;
     }
     throw new Error('Unauthorized');
   }

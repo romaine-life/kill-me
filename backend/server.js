@@ -17,7 +17,6 @@ import {
   createAdminRoutes,
 } from './routes/index.js';
 import { createRequireAuth, requireAdmin } from './auth.js';
-import { createMicrosoftRoutes } from './microsoft-routes.js';
 import { fetchConfig } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -54,14 +53,8 @@ async function start() {
   });
   const workoutContainer = cosmosClient.database('WorkoutTrackerDB').container('workouts');
 
-  const requireAuth = createRequireAuth({ jwtSecret: config.jwtSigningSecret });
-  const msAuth = createMicrosoftRoutes({
-    jwtSecret: config.jwtSigningSecret,
-    microsoftClientIds: config.microsoftClientIds,
-    accountContainer: workoutContainer,
-  });
+  const requireAuth = createRequireAuth();
 
-  app.use(msAuth);
   app.use(createWorkoutRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
   app.use(createSorenessRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
   app.use(createCardioRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
