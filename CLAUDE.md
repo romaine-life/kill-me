@@ -91,12 +91,13 @@ https://auth.romaine.life/admin.
 
 **Critical `useDataSource()` contract:** Every consumer of `useDataSource()` MUST check `isReady` before calling any fetch function. The snapshot loads asynchronously (WASM init + network fetch). Until it's ready, `db` is null, `isLive` evaluates to true, and fetches silently hit the live API — which doesn't exist for anonymous visitors, causing a permanent loading spinner. Pattern: `const { fetchFoo, isReady } = useDataSource(); useEffect(() => { if (!isReady) return; fetchFoo()... }, [isReady]);`
 3. To edit, user clicks Sign in → redirects to `auth.romaine.life/sign-in/microsoft?callbackURL=...`
-4. After Microsoft completes, auth.romaine.life sets a `.romaine.life` session cookie and bounces back here
-5. Frontend's `bootstrapAuth()` (frontend/src/auth/index.js) fetches an RS256 JWT from `auth.romaine.life/api/auth/token` (cookie auto-attached cross-origin)
-6. Frontend POSTs that JWT to `/api/auth/exchange`; backend verifies it against the auth.romaine.life JWKS, checks `role ∈ {admin, user}` (403 for `pending`), and mints a kill-me-signed HS256 JWT
-7. Frontend stores the kill-me JWT in localStorage, attaches it as `Bearer` on writes
-8. Backend's `requireAuth` middleware verifies the local JWT, exposes `req.user = { sub, email, name, role }`; `requireAdmin` gates admin-only routes on `role === 'admin'`
-9. Backend queries/writes Cosmos DB, partitioned by userId (= JWT `sub`)
+4. After Microsoft completes, auth.romaine.life sets a `.romaine.life` session cookie and bounces back here. Browser auto-attaches that cookie on every request to `workout.romaine.life` because it's scoped to the parent `.romaine.life` domain.
+5. Frontend's `bootstrapAuth()` ([frontend/src/auth/index.js](frontend/src/auth/index.js)) asks the backend `GET /api/auth/me` — the backend forwards the cookie to `auth.romaine.life/api/auth/get-session` and returns the user record (or null). No tokens stored anywhere in the SPA.
+6. On every request to a protected route, `requireAuth` ([backend/auth.js](backend/auth.js)) does the same cookie-forward to `auth.romaine.life/api/auth/get-session` (60s in-process cache to amortize), and gates on `role ∈ {admin, user}` — `pending` returns 403.
+7. `requireAdmin` gates admin-only routes on `role === 'admin'`.
+8. Backend queries/writes Cosmos DB, partitioned by userId (= `req.user.sub`, i.e. the auth.romaine.life user id).
+
+No per-app HS256 signing, no Key Vault read, no Bearer-token handling on the frontend. auth.romaine.life is the single source of truth for sessions; this app just consults it.
 
 ### Shared infrastructure
 
@@ -109,10 +110,10 @@ This repo builds on shared resources provisioned by **infra-bootstrap**:
 - DNS zone (`romaine.life`) — ExternalDNS manages records from HTTPRoute
 - Key Vault (`romaine-kv`)
 
-App-specific resources created by this repo: the Cosmos DB database and container,
-and the per-app HS256 signing secret in Key Vault (`kill-me-jwt-signing-secret`).
+App-specific resources created by this repo: the Cosmos DB database and container.
 Microsoft sign-in is delegated to **auth.romaine.life** — kill-me holds no Entra
-app registration of its own. The frontend + backend run as a single Node+Express
+app registration of its own, and no per-app signing secret either (the cookie
+forward to auth.romaine.life is the only auth pathway). The frontend + backend run as a single Node+Express
 pod in the `kill-me` namespace, served from `workout.romaine.life` via HTTPRoute
 on the shared Envoy Gateway. The prior shared-API-at-`api.romaine.life/workout`
 mount was retired when the api repo was archived and deleted on 2026-04-20.

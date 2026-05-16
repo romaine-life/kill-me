@@ -1,104 +1,92 @@
-import jwt from 'jsonwebtoken';
-import { createRemoteJWKSet, jwtVerify, errors as joseErrors } from 'jose';
+// auth.romaine.life owns sessions. Each request comes in with the
+// .romaine.life session cookie auto-attached by the browser (Better Auth
+// sets the cookie on the parent domain via crossSubDomainCookies).
+//
+// requireAuth forwards the Cookie header to auth.romaine.life's
+// get-session endpoint and gates on the returned user's role claim. Result
+// is cached in-process for 60s per cookie value so a burst of requests
+// from the same logged-in user doesn't fan out into a round-trip per call.
+//
+// No local JWT signing, no per-app KV secret, no Bearer-token handling.
+// The frontend stores nothing — the cookie is the durable session state,
+// owned by auth.romaine.life.
 
-// Single upstream identity provider. auth.romaine.life's Better Auth JWT
-// plugin publishes RS256 keys at /api/auth/jwks; the issuer claim is the
-// service's baseURL. jose's createRemoteJWKSet caches per-kid with a 5min
-// stale-while-revalidate window — good enough that we don't roll our own.
-const AUTH_ROMAINE_LIFE_JWKS = createRemoteJWKSet(
-  new URL('https://auth.romaine.life/api/auth/jwks'),
-);
-const AUTH_ROMAINE_LIFE_ISSUER = 'https://auth.romaine.life';
+const AUTH_URL = 'https://auth.romaine.life';
+const SESSION_CACHE_TTL_MS = 60_000;
 const ALLOWED_ROLES = new Set(['admin', 'user']);
 
-/**
- * Verify a JWT issued by auth.romaine.life and return the user identity
- * plus role. Throws an Error with `status` (401|403) set so the caller can
- * surface the right HTTP code. Gating is solely on the role claim:
- * `pending` (auth.romaine.life's default for fresh Microsoft sign-ups)
- * gets a 403; an admin must promote the user via auth.romaine.life/admin
- * before they're useful here. No per-app email allowlist.
- */
-export async function exchangeRomaineLifeToken(authJWT) {
-  let payload;
+// Map<cookieHeader, {expiry, user|null}>. null user = negative cache (we
+// know this cookie didn't resolve, so we don't keep retrying for 60s).
+const sessionCache = new Map();
+
+async function fetchSessionFromAuth(cookie) {
   try {
-    ({ payload } = await jwtVerify(authJWT, AUTH_ROMAINE_LIFE_JWKS, {
-      issuer: AUTH_ROMAINE_LIFE_ISSUER,
-      algorithms: ['RS256'],
-      clockTolerance: '60s',
-    }));
+    const res = await fetch(`${AUTH_URL}/api/auth/get-session`, {
+      headers: { Cookie: cookie },
+    });
+    if (!res.ok) return null;
+    const body = await res.json();
+    return body?.user ?? null;
   } catch (err) {
-    const reason = err instanceof joseErrors.JOSEError ? err.message : 'invalid token';
-    const e = new Error(`invalid auth.romaine.life token: ${reason}`);
-    e.status = 401;
-    throw e;
+    console.warn('[auth] get-session call failed:', err.message);
+    return null;
   }
+}
 
-  const role = typeof payload.role === 'string' ? payload.role : '';
-  if (!ALLOWED_ROLES.has(role)) {
-    const e = new Error(`role not approved by auth.romaine.life: ${role || '(missing)'}`);
-    e.status = 403;
-    throw e;
+async function resolveCaller(cookie) {
+  if (!cookie) return null;
+  const now = Date.now();
+  const cached = sessionCache.get(cookie);
+  if (cached && cached.expiry > now) return cached.user;
+
+  const user = await fetchSessionFromAuth(cookie);
+  sessionCache.set(cookie, { expiry: now + SESSION_CACHE_TTL_MS, user });
+
+  // Opportunistic cleanup so the Map doesn't grow unbounded across hours
+  // of session churn. Cheap because we only walk on misses.
+  if (sessionCache.size > 200) {
+    for (const [key, entry] of sessionCache) {
+      if (entry.expiry <= now) sessionCache.delete(key);
+    }
   }
+  return user;
+}
 
-  const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
-  if (!email) {
-    const e = new Error('token missing email claim');
-    e.status = 401;
-    throw e;
-  }
-
-  return {
-    sub: typeof payload.sub === 'string' ? payload.sub : '',
-    email,
-    name: typeof payload.name === 'string' ? payload.name : '',
-    role,
+export function createRequireAuth() {
+  return async (req, res, next) => {
+    const cookie = req.headers.cookie || '';
+    const user = await resolveCaller(cookie);
+    if (!user) {
+      return res.status(401).json({ error: 'Not signed in' });
+    }
+    const role = user.role ?? 'pending';
+    if (!ALLOWED_ROLES.has(role)) {
+      return res.status(403).json({ error: `Role not approved by auth.romaine.life: ${role}` });
+    }
+    req.user = {
+      sub: user.id,
+      email: user.email,
+      name: user.name,
+      role,
+    };
+    next();
   };
 }
 
-/**
- * Creates Express middleware that verifies kill-me's own HS256 session JWTs
- * (minted by /api/auth/exchange). Populates `req.user` with
- * `{ sub, email, name, role }`.
- */
-export function createRequireAuth({ jwtSecret }) {
-  return (req, res, next) => {
-    let token;
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith('Bearer ')) {
-      token = authHeader.slice(7);
-    } else {
-      const cookies = req.headers.cookie || '';
-      const match = cookies.split(';').map(c => c.trim()).find(c => c.startsWith('auth_token='));
-      if (match) token = match.slice('auth_token='.length);
-    }
-
-    if (!token) {
-      return res.status(401).json({ error: 'Missing authentication' });
-    }
-
-    try {
-      const payload = jwt.verify(token, jwtSecret);
-      req.user = {
-        sub: payload.sub,
-        email: payload.email,
-        name: payload.name,
-        role: payload.role,
-      };
-      next();
-    } catch {
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-  };
-}
-
-/**
- * Middleware that requires the authenticated user to have the 'admin' role.
- * Must be used after requireAuth.
- */
 export function requireAdmin(req, res, next) {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin only' });
   }
   next();
+}
+
+// Used by the GET /api/auth/me handler to return the current user (or
+// null) without a 401 — useful for the boot-time "am I signed in?" probe.
+export async function currentCaller(req) {
+  const cookie = req.headers.cookie || '';
+  const user = await resolveCaller(cookie);
+  if (!user) return null;
+  const role = user.role ?? 'pending';
+  if (!ALLOWED_ROLES.has(role)) return null;
+  return { sub: user.id, email: user.email, name: user.name, role };
 }

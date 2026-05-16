@@ -1,6 +1,10 @@
-// Per-app backend for workout.romaine.life. Serves the Vite-built React frontend,
-// the kill-me route package under /*, and the auth.romaine.life delegation
-// exchange under /api/auth/* on the same origin.
+// Per-app backend for workout.romaine.life. Serves the Vite-built React
+// frontend + the kill-me route package on the same origin.
+//
+// Auth: the .romaine.life session cookie is the durable session, owned by
+// auth.romaine.life. requireAuth (backend/auth.js) forwards the cookie
+// upstream on each request and gates on role. No local JWT signing, no
+// per-app KV secret, no frontend token storage.
 import 'dotenv/config';
 import express from 'express';
 import helmet from 'helmet';
@@ -16,13 +20,10 @@ import {
   createCardioRoutes,
   createAdminRoutes,
 } from './routes/index.js';
-import { createRequireAuth, requireAdmin } from './auth.js';
-import { createAuthRoutes } from './auth-routes.js';
+import { createRequireAuth, requireAdmin, currentCaller } from './auth.js';
 import { fetchConfig } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Vite emits built assets to frontend/dist/. Multi-stage Dockerfile copies
-// that into /app/frontend/dist.
 const FRONTEND_DIR = path.join(__dirname, '..', 'frontend', 'dist');
 
 const app = express();
@@ -44,6 +45,14 @@ app.get('/health', (req, res) => {
   res.json({ status: 'healthy' });
 });
 
+// Boot-time "am I signed in?" probe used by the frontend. Returns null if
+// no valid session (rather than 401), so the SPA can simply render the
+// Sign-in button without treating the missing session as an error.
+app.get('/api/auth/me', async (req, res) => {
+  const user = await currentCaller(req);
+  res.json(user);
+});
+
 async function start() {
   const config = await fetchConfig();
 
@@ -54,9 +63,8 @@ async function start() {
   });
   const workoutContainer = cosmosClient.database('WorkoutTrackerDB').container('workouts');
 
-  const requireAuth = createRequireAuth({ jwtSecret: config.jwtSigningSecret });
+  const requireAuth = createRequireAuth();
 
-  app.use(createAuthRoutes({ jwtSecret: config.jwtSigningSecret, requireAuth }));
   app.use(createWorkoutRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
   app.use(createSorenessRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
   app.use(createCardioRoutes({ container: workoutContainer, requireAuth, requireAdmin }));

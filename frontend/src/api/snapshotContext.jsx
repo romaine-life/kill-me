@@ -1,8 +1,9 @@
 // Snapshot data layer — loads a SQLite snapshot for anonymous visitors.
 //
-// When no auth token is present, fetches /snapshot.db and opens it with sql.js
-// (SQLite compiled to WASM). Provides a useDataSource() hook that routes reads
-// to either the local snapshot or the live API depending on auth state.
+// When no signed-in user is detected, fetches /snapshot.db and opens it with
+// sql.js (SQLite compiled to WASM). Provides a useDataSource() hook that
+// routes reads to either the local snapshot or the live API depending on
+// auth state.
 //
 // If the snapshot is missing (404) or fails to load, falls back to live API
 // calls for all users.
@@ -37,14 +38,17 @@ async function loadSnapshot() {
 }
 
 export function SnapshotProvider({ children }) {
-  const { token } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [db, setDb] = useState(null);
-  const [loading, setLoading] = useState(!token);
+  const [loading, setLoading] = useState(true);
   const loadAttempted = useRef(false);
 
   useEffect(() => {
-    // Skip snapshot loading if user is authenticated or already attempted
-    if (token || loadAttempted.current) {
+    // Wait for the boot-time /api/auth/me probe to settle before deciding
+    // whether to spin up the snapshot. Once we know: signed-in → skip;
+    // anonymous → load snapshot (once).
+    if (authLoading) return;
+    if (user || loadAttempted.current) {
       setLoading(false);
       return;
     }
@@ -54,15 +58,15 @@ export function SnapshotProvider({ children }) {
       .then((database) => setDb(database))
       .catch((err) => console.warn('Snapshot load failed, using live API:', err))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [user, authLoading]);
 
   // Clean up the database when the user authenticates (switch to live API)
   useEffect(() => {
-    if (token && db) {
+    if (user && db) {
       db.close();
       setDb(null);
     }
-  }, [token]);
+  }, [user]);
 
   return (
     <SnapshotContext.Provider value={{ db, loading }}>
@@ -93,10 +97,10 @@ export function useSnapshot() {
 //   }, [isReady]);
 //
 export function useDataSource() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const { db, loading: snapshotLoading } = useSnapshot();
 
-  const isLive = !!token || !db;
+  const isLive = !!user || !db;
   const isReady = !snapshotLoading;
 
   async function fetchCurrentDay() {

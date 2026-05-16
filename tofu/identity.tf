@@ -8,10 +8,12 @@
 # is scoped to kill-me's actual surface only:
 #
 #   - Cosmos DB Data Contributor on dbs/WorkoutTrackerDB
-#   - Key Vault Secrets User on the one secret config.js reads
-#     (kill-me-jwt-signing-secret) — narrow, not vault-wide
 #   - App Configuration Data Reader at the store level — config.js reads
 #     `cosmos_db_endpoint` from there
+#
+# No Key Vault grant: sessions are delegated to auth.romaine.life via the
+# .romaine.life cookie, so this pod signs nothing locally and needs no
+# signing secret.
 #
 # Pattern mirrors tank-operator/infra/{api_proxy,credential_refresher}.tf
 # and glimmung/tofu/identity.tf.
@@ -38,15 +40,6 @@ resource "azurerm_cosmosdb_sql_role_assignment" "kill_me_cosmos" {
   role_definition_id  = "${data.azurerm_cosmosdb_account.infra.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
   principal_id        = azurerm_user_assigned_identity.kill_me.principal_id
   scope               = "${data.azurerm_cosmosdb_account.infra.id}/dbs/${azurerm_cosmosdb_sql_database.workout.name}"
-}
-
-# KV: narrowed to the single secret config.js reads. If the backend later
-# reads another secret, add a sibling role assignment here rather than
-# widening to vault scope.
-resource "azurerm_role_assignment" "kill_me_kv_jwt_secret" {
-  scope                = "${data.azurerm_key_vault.main.id}/secrets/kill-me-jwt-signing-secret"
-  role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_user_assigned_identity.kill_me.principal_id
 }
 
 # App Config: store-level Data Reader for the single `cosmos_db_endpoint`
