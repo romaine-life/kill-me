@@ -1,15 +1,16 @@
+{{- if eq (include "kill-me.renderHot" .) "true" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kill-me
-  namespace: kill-me
+  name: {{ include "kill-me.resourceName" . }}
+  namespace: {{ include "kill-me.namespace" . }}
   labels:
-    app: kill-me
+    app: {{ include "kill-me.resourceName" . }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: kill-me
+      app: {{ include "kill-me.resourceName" . }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -18,14 +19,14 @@ spec:
   template:
     metadata:
       labels:
-        app: kill-me
+        app: {{ include "kill-me.resourceName" . }}
         azure.workload.identity/use: "true"
     spec:
-      serviceAccountName: infra-shared
+      serviceAccountName: {{ .Values.serviceAccount }}
       containers:
-        - name: kill-me
+        - name: {{ include "kill-me.resourceName" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
               containerPort: 3000
@@ -59,3 +60,4 @@ spec:
               port: http
             periodSeconds: 30
             failureThreshold: 3
+{{- end }}

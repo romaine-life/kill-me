@@ -3,3 +3,22 @@
 image:
   repository: romainecr.azurecr.io/kill-me
   tag: 79104f4
+  pullPolicy: IfNotPresent
+
+name: kill-me
+namespace: kill-me
+
+hostname: workout.romaine.life
+renderMode: normal
+
+testEnv:
+  slotName: ""
+
+serviceAccount: infra-shared
+serviceAccountClientId: 2ba3e252-c553-4a57-8811-c29b51c06cd9
+
+ingress:
+  gatewayName: main
+  gatewayNamespace: envoy-gateway-system
+  certIssuer: letsencrypt-prod
+  tlsSecret: kill-me-tls
