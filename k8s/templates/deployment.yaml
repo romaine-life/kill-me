@@ -34,8 +34,6 @@ spec:
               value: "3000"
             - name: AZURE_APP_CONFIG_ENDPOINT
               value: https://infra-appconfig.azconfig.io
-            - name: KEY_VAULT_URL
-              value: https://romaine-kv.vault.azure.net/
           resources:
             requests:
               cpu: 50m
