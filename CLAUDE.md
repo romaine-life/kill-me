@@ -108,7 +108,6 @@ This repo builds on shared resources provisioned by **infra-bootstrap**:
 - Azure Container Registry (`romainecr`) — AcrPush granted per-app
 - Azure App Configuration (`infra-appconfig`)
 - DNS zone (`romaine.life`) — ExternalDNS manages records from HTTPRoute
-- Key Vault (`romaine-kv`)
 
 App-specific resources created by this repo: the Cosmos DB database and container.
 Microsoft sign-in is delegated to **auth.romaine.life** — kill-me holds no Entra
@@ -159,8 +158,8 @@ All workflows delegate to **nelsong6/pipeline-templates** reusable templates:
 ### Prerequisites
 
 - Node 20+
-- Azure CLI (`az login` for local Cosmos DB and Key Vault access)
-- Backend `.env` with `AZURE_APP_CONFIG_ENDPOINT` and `KEY_VAULT_URL`
+- Azure CLI (`az login` for local Cosmos DB access)
+- Backend `.env` with `AZURE_APP_CONFIG_ENDPOINT`
 - Frontend `.env` with `VITE_API_URL` (Microsoft sign-in is delegated upstream to auth.romaine.life)
 
 ### Running locally

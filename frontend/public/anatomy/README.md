@@ -9,7 +9,8 @@ Generated muscle anatomy illustrations for the soreness tracker.
 | OpenAI (`gpt-image-1`) | `openai-api-key` | Base anatomy illustrations (best prompt adherence) |
 | Replicate (Flux Dev) | `replicate-api-key` | Stylized variants, img2img, LoRA training (no content filter) |
 
-Keys stored in Azure Key Vault (`romaine-kv`).
+These API keys are used only for offline image-generation work and are not
+consumed by the deployed workout app.
 
 ## Image Set Per Muscle Group
 
