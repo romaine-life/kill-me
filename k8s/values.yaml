@@ -2,4 +2,4 @@
 # push to main (via `sed` on this file).
 image:
   repository: romainecr.azurecr.io/kill-me
-  tag: 11f73da
+  tag: 79104f4
