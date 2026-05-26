@@ -2,7 +2,7 @@
 # push to main (via `sed` on this file).
 image:
   repository: romainecr.azurecr.io/kill-me
-  tag: 79104f4
+  tag: fb74764
   pullPolicy: IfNotPresent
 
 name: kill-me
