@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
 import { todayLocal } from '../utils/dateUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDataSource } from '../api/snapshotContext.jsx';
+import { apiFetch } from '../api/client.js';
 import { DAY_CONFIG } from '../utils/dayConfig.js';
 import { colors } from '../colors.js';
 

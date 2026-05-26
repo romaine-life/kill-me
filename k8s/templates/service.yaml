@@ -1,16 +1,18 @@
+{{- if eq (include "kill-me.renderHot" .) "true" }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: kill-me
-  namespace: kill-me
+  name: {{ include "kill-me.resourceName" . }}
+  namespace: {{ include "kill-me.namespace" . }}
   labels:
-    app: kill-me
+    app: {{ include "kill-me.resourceName" . }}
 spec:
   type: ClusterIP
   selector:
-    app: kill-me
+    app: {{ include "kill-me.resourceName" . }}
   ports:
     - name: http
       port: 80
       targetPort: http
       protocol: TCP
+{{- end }}

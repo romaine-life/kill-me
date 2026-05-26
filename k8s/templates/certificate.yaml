@@ -1,12 +1,17 @@
+{{- if eq (include "kill-me.renderWarm" .) "true" }}
+{{- if not .Values.hostname -}}
+{{- fail "hostname is required" -}}
+{{- end -}}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: kill-me-tls
-  namespace: kill-me
+  name: {{ .Values.ingress.tlsSecret }}
+  namespace: {{ include "kill-me.namespace" . }}
 spec:
-  secretName: kill-me-tls
+  secretName: {{ .Values.ingress.tlsSecret }}
   issuerRef:
-    name: letsencrypt-prod
+    name: {{ .Values.ingress.certIssuer }}
     kind: ClusterIssuer
   dnsNames:
-    - workout.romaine.life
+    - {{ .Values.hostname | quote }}
+{{- end }}

@@ -1,30 +1,35 @@
+{{- if eq (include "kill-me.renderWarm" .) "true" }}
+{{- if not .Values.hostname -}}
+{{- fail "hostname is required" -}}
+{{- end -}}
 # Dual parentRef: XListenerSet for HTTPS serving, Gateway main for HTTP (and
 # so ExternalDNS creates the A record — external-dns#5694 tracks native
 # XListenerSet source support).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: kill-me
-  namespace: kill-me
+  name: {{ include "kill-me.resourceName" . }}
+  namespace: {{ include "kill-me.namespace" . }}
 spec:
   hostnames:
-    - workout.romaine.life
+    - {{ .Values.hostname | quote }}
   parentRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway
-      name: main
-      namespace: envoy-gateway-system
+      name: {{ .Values.ingress.gatewayName }}
+      namespace: {{ .Values.ingress.gatewayNamespace }}
     - group: gateway.networking.x-k8s.io
       kind: XListenerSet
-      name: kill-me
+      name: {{ include "kill-me.resourceName" . }}
   rules:
     - backendRefs:
         - group: ""
           kind: Service
-          name: kill-me
+          name: {{ include "kill-me.resourceName" . }}
           port: 80
           weight: 1
       matches:
         - path:
             type: PathPrefix
             value: /
+{{- end }}

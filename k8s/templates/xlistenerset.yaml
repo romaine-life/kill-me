@@ -1,22 +1,24 @@
+{{- if eq (include "kill-me.renderWarm" .) "true" }}
 apiVersion: gateway.networking.x-k8s.io/v1alpha1
 kind: XListenerSet
 metadata:
-  name: kill-me
-  namespace: kill-me
+  name: {{ include "kill-me.resourceName" . }}
+  namespace: {{ include "kill-me.namespace" . }}
 spec:
   parentRef:
     group: gateway.networking.k8s.io
     kind: Gateway
-    name: main
-    namespace: envoy-gateway-system
+    name: {{ .Values.ingress.gatewayName }}
+    namespace: {{ .Values.ingress.gatewayNamespace }}
   listeners:
     - name: https
       protocol: HTTPS
       port: 443
-      hostname: workout.romaine.life
+      hostname: {{ .Values.hostname | quote }}
       tls:
         mode: Terminate
         certificateRefs:
           - group: ""
             kind: Secret
-            name: kill-me-tls
+            name: {{ .Values.ingress.tlsSecret }}
+{{- end }}
