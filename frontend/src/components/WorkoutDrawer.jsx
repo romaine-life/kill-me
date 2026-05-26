@@ -14,7 +14,7 @@ import { getDayInfo, DAY_CONFIG } from '../utils/dayConfig';
 import { apiFetch } from '../api/client.js';
 import { todayLocal, nowLocalTime } from '../utils/dateUtils';
 import { useDataSource } from '../api/snapshotContext.jsx';
-import { TREADMILL_TEMPLATES, getTotalDuration, formatIntervalSummary } from '../utils/cardioTemplates.js';
+import { TREADMILL_TEMPLATES, getTotalDuration } from '../utils/cardioTemplates.js';
 import { CARDIO_CONFIG } from '../utils/cardioConfig.js';
 
 export function LogTab({
@@ -497,7 +497,7 @@ export function LogTab({
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             onClick={() => {
-              try { dateInputRef.current?.showPicker(); } catch {}
+              try { dateInputRef.current?.showPicker(); } catch { /* showPicker is optional */ }
             }}
             max={todayLocal()}
             className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 transition-all cursor-pointer"
@@ -952,7 +952,7 @@ export function LogTab({
               type="date"
               value={cardioDate}
               onChange={(e) => setCardioDate(e.target.value)}
-              onClick={() => { try { cardioDateRef.current?.showPicker(); } catch {} }}
+              onClick={() => { try { cardioDateRef.current?.showPicker(); } catch { /* showPicker is optional */ } }}
               max={todayLocal()}
               className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 transition-all cursor-pointer"
             />

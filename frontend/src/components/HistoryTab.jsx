@@ -160,15 +160,6 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick }) {
     });
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
   const getDayColor = (dayNumber) => {
     return DAY_CONFIG[dayNumber]?.color || 'bg-slate-500';
   };
