@@ -3,7 +3,7 @@
 image:
   repository: romainecr.azurecr.io/kill-me
   # Quoted on purpose: a bare SHA like 4255e97 is valid YAML scientific notation; keep the quotes.
-  tag: "fb74764"
+  tag: "b55a35c"
   pullPolicy: IfNotPresent
 
 name: kill-me
