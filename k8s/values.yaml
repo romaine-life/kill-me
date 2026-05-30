@@ -2,7 +2,8 @@
 # push to main (via `sed` on this file).
 image:
   repository: romainecr.azurecr.io/kill-me
-  tag: fb74764
+  # Quoted on purpose: a bare SHA like 4255e97 is valid YAML scientific notation; keep the quotes.
+  tag: "fb74764"
   pullPolicy: IfNotPresent
 
 name: kill-me
