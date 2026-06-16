@@ -23,10 +23,12 @@ jobs:
     name: Build app image
     runs-on: ubuntu-latest
     env:
-      # Default tag is the full commit SHA. The deploy-to-image resolver
-      # resolves git_ref to the FULL SHA, so we must publish the full SHA
-      # (not the short-7 form used by the post-merge build-and-deploy).
-      IMAGE_TAG: ${{ github.sha }}
+      # Default tag is the PR head commit's full SHA. github.sha on a
+      # pull_request event is the synthetic merge commit, which the
+      # deploy-to-image resolver never sees (it resolves git_ref to the head
+      # commit). Full SHA, not the short-7 form the post-merge build-and-deploy
+      # tag uses. Matches tank-operator #1256 / glimmung / ambience.
+      IMAGE_TAG: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -76,8 +78,8 @@ jobs:
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: az acr login --name romainecr
 
-      # Single build step: pushes the full-SHA-tagged image on trusted events,
-      # and stays build-only (push: false) on fork PRs.
+      # Single build step: pushes the full head-sha-tagged image on trusted
+      # events, and stays build-only (push: false) on fork PRs.
       - name: Build app image
         uses: docker/build-push-action@v7
         with:
