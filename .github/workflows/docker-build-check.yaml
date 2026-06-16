@@ -11,6 +11,8 @@ on:
 
 permissions:
   contents: read
+  # Required for azure/login OIDC on same-repo PRs and workflow_dispatch.
+  id-token: write
 
 concurrency:
   group: docker-build-check-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.git_ref || '' }}
@@ -20,6 +22,11 @@ jobs:
   build:
     name: Build app image
     runs-on: ubuntu-latest
+    env:
+      # Default tag is the full commit SHA. The deploy-to-image resolver
+      # resolves git_ref to the FULL SHA, so we must publish the full SHA
+      # (not the short-7 form used by the post-merge build-and-deploy).
+      IMAGE_TAG: ${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -45,18 +52,41 @@ jobs:
           fi
           git checkout --detach "$full_sha"
           echo "Resolved ${INPUT_REF} -> ${full_sha}"
+          # Publish under the resolved full SHA so deploy-to-image can find
+          # the image for the exact requested commit.
+          echo "IMAGE_TAG=${full_sha}" >> "$GITHUB_ENV"
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build image without pushing
+      # Azure + ACR login only run for trusted events (same-repo PRs and
+      # workflow_dispatch). Fork PRs skip these and stay build-only below.
+      # Wiring (azure/login@v3 OIDC client-id/tenant-id/subscription-id vars
+      # and `az acr login --name romainecr`) is reused verbatim from
+      # build-and-deploy.yaml.
+      - name: Azure Login (OIDC)
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.ARM_CLIENT_ID }}
+          tenant-id: ${{ vars.ARM_TENANT_ID }}
+          subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
+
+      - name: ACR login
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        run: az acr login --name romainecr
+
+      # Single build step: pushes the full-SHA-tagged image on trusted events,
+      # and stays build-only (push: false) on fork PRs.
+      - name: Build app image
         uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile
-          push: false
+          push: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
           load: false
+          tags: romainecr.azurecr.io/kill-me:${{ env.IMAGE_TAG }}
           build-args: |
-            BUILD_NUMBER=docker-build-check
+            BUILD_NUMBER=${{ env.IMAGE_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
