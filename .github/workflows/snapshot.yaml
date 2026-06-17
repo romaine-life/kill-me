@@ -21,6 +21,7 @@ jobs:
     name: Generate snapshot.db and commit
     needs: tofu-outputs
     runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
