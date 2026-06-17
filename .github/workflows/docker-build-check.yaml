@@ -22,13 +22,6 @@ jobs:
   build:
     name: Build app image
     runs-on: ubuntu-latest
-    env:
-      # Default tag is the PR head commit's full SHA. github.sha on a
-      # pull_request event is the synthetic merge commit, which the
-      # deploy-to-image resolver never sees (it resolves git_ref to the head
-      # commit). Full SHA, not the short-7 form the post-merge build-and-deploy
-      # tag uses. Matches tank-operator #1256 / glimmung / ambience.
-      IMAGE_TAG: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -54,9 +47,7 @@ jobs:
           fi
           git checkout --detach "$full_sha"
           echo "Resolved ${INPUT_REF} -> ${full_sha}"
-          # Publish under the resolved full SHA so deploy-to-image can find
-          # the image for the exact requested commit.
-          echo "IMAGE_TAG=${full_sha}" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=${full_sha}" >> "$GITHUB_ENV"
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
@@ -78,17 +69,63 @@ jobs:
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: az acr login --name romainecr
 
-      # Single build step: pushes the full head-sha-tagged image on trusted
-      # events, and stays build-only (push: false) on fork PRs.
-      - name: Build app image
+      - name: Compute image fingerprint
+        id: fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts/image-fingerprint.sh \
+            --image app \
+            --dockerfile Dockerfile \
+            --context . \
+            --paths 'Dockerfile .dockerignore backend frontend'
+
+      - name: Check ACR candidate image
+        id: candidate
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.fingerprint.outputs.proof_tag }}"
+          if az acr repository show-tags \
+              --name romainecr \
+              --repository kill-me \
+              --query "[?@=='${tag}'] | [0]" \
+              --output tsv | grep -qx "${tag}"; then
+            echo "hit=true" >>"${GITHUB_OUTPUT}"
+            echo "Found reusable image romainecr.azurecr.io/kill-me:${tag}"
+          else
+            echo "hit=false" >>"${GITHUB_OUTPUT}"
+            echo "No reusable image found for app fingerprint ${{ steps.fingerprint.outputs.fingerprint }}"
+          fi
+
+      - name: Build and push candidate image
+        if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && steps.candidate.outputs.hit != 'true'
         uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile
-          push: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+          push: true
           load: false
-          tags: romainecr.azurecr.io/kill-me:${{ env.IMAGE_TAG }}
+          tags: romainecr.azurecr.io/kill-me:${{ steps.fingerprint.outputs.proof_tag }}
           build-args: |
-            BUILD_NUMBER=${{ env.IMAGE_TAG }}
+            BUILD_NUMBER=${{ env.BUILD_NUMBER || github.event.pull_request.head.sha || github.sha }}
+          cache-from: |
+            type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app
+            type=gha,scope=app
+          cache-to: |
+            type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app,mode=max
+            type=gha,mode=max,scope=app
+
+      - name: Build image without pushing
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          load: false
+          build-args: |
+            BUILD_NUMBER=${{ github.event.pull_request.head.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

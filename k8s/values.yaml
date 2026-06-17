@@ -1,9 +1,10 @@
 # The image tag is bumped by .github/workflows/build-and-deploy.yaml on every
-# push to main (via `sed` on this file).
+# push to main. Tags use the app content fingerprint (`app-<sha256>`), not git
+# SHA identity.
 image:
   repository: romainecr.azurecr.io/kill-me
-  # Quoted on purpose: a bare SHA like 4255e97 is valid YAML scientific notation; keep the quotes.
-  tag: "61b3ba1"
+  # Quoted so YAML never reinterprets image tags.
+  tag: "app-db08f01873464c271e3c2389924015c5cb218a51bdcf77eef108556b962b3e81"
   pullPolicy: IfNotPresent
 
 name: kill-me

@@ -9,10 +9,11 @@ agonizing set of leg extensions under hypnotherapy coaching.
 
 Agent pods are not expected to have Docker. Do not report missing local Docker
 as a blocker. Run available repo checks first, then use PR CI as the normal
-container build gate: `.github/workflows/docker-build-check.yml` performs a
-throwaway Docker build with `push: false`. If image-packaging feedback is
-needed before a PR is ready, manually dispatch that workflow with `git_ref`.
-Release/deploy workflows are the only path that publishes images.
+container build gate: `.github/workflows/docker-build-check.yaml` builds the
+app image. Same-repo PRs and manual dispatches publish the canonical
+content-fingerprint tag (`romainecr.azurecr.io/kill-me:app-<sha256>`); fork PRs
+stay build-only with `push: false`. Release/deploy workflows publish or reuse
+that same fingerprint tag and bump `k8s/values.yaml` to it.
 
 ## The 12-Day Synergy System
 
