@@ -25,3 +25,14 @@ jobs:
           node-version: '20'
       - name: Guard against MSAL/legacy-auth reintroduction
         run: node scripts/check-removed-msal.mjs
+
+  check-image-fingerprint-config:
+    name: Image fingerprint config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Guard image tag identity
+        run: node scripts/check-image-fingerprint-config.mjs

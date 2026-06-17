@@ -8,9 +8,15 @@ on:
       - frontend/**
       - Dockerfile
       - .dockerignore
+      - scripts/image-fingerprint.sh
       - k8s/**
-      - .github/workflows/build-and-deploy.yml
+      - .github/workflows/build-and-deploy.yaml
   workflow_dispatch:
+    inputs:
+      git_ref:
+        description: "Git ref or commit SHA to build. Leave blank to build the dispatch revision."
+        required: false
+        type: string
 
 permissions:
   id-token: write
@@ -22,13 +28,36 @@ concurrency:
 
 jobs:
   build-and-deploy:
-    name: Build image, push, bump kustomization tag
+    name: Build image, push, bump Helm values tag
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Resolve requested ref
+        env:
+          INPUT_REF: ${{ inputs.git_ref }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin '+refs/heads/*:refs/remotes/origin/*'
+
+          target_ref="${INPUT_REF:-$GITHUB_SHA}"
+          if full_sha="$(git rev-parse --verify "${target_ref}^{commit}" 2>/dev/null)"; then
+            :
+          elif git show-ref --verify --quiet "refs/remotes/origin/${target_ref}"; then
+            full_sha="$(git rev-parse "refs/remotes/origin/${target_ref}^{commit}")"
+          elif git show-ref --verify --quiet "refs/tags/${target_ref}"; then
+            full_sha="$(git rev-parse "refs/tags/${target_ref}^{commit}")"
+          else
+            echo "::error::Unable to resolve git_ref '${target_ref}' to a commit."
+            exit 1
+          fi
+
+          git checkout --detach "$full_sha"
+          echo "Resolved ${target_ref} -> ${full_sha}"
+          echo "BUILD_NUMBER=${full_sha::7}" >> "$GITHUB_ENV"
 
       - name: Azure Login (OIDC)
         uses: azure/login@v3
@@ -40,24 +69,88 @@ jobs:
       - name: ACR login
         run: az acr login --name romainecr
 
-      - name: Build and push image
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Compute image fingerprint
+        id: fingerprint
+        shell: bash
         run: |
-          TAG="${GITHUB_SHA::7}"
-          IMAGE="romainecr.azurecr.io/kill-me:${TAG}"
-          docker build \
-            --build-arg BUILD_NUMBER="${TAG}" \
-            -t "$IMAGE" .
-          docker push "$IMAGE"
-          echo "TAG=${TAG}" >> $GITHUB_ENV
+          set -euo pipefail
+          fingerprint="$(scripts/image-fingerprint.sh \
+            --image app \
+            --dockerfile Dockerfile \
+            --context . \
+            --paths 'Dockerfile .dockerignore backend frontend' \
+            | tee /tmp/kill-me-image-fingerprint.txt \
+            | awk -F= '$1 == "fingerprint" { print $2 }')"
+          echo "ALIAS_TAG=app-${fingerprint}" >> "$GITHUB_ENV"
+
+      - name: Check existing image
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          if az acr repository show-tags \
+              --name romainecr \
+              --repository kill-me \
+              --query "[?@=='${ALIAS_TAG}'] | [0]" \
+              --output tsv | grep -qx "${ALIAS_TAG}"; then
+            echo "exists=true" >>"${GITHUB_OUTPUT}"
+            echo "Found reusable image romainecr.azurecr.io/kill-me:${ALIAS_TAG}"
+          else
+            echo "exists=false" >>"${GITHUB_OUTPUT}"
+            echo "No reusable image found for app fingerprint ${{ steps.fingerprint.outputs.fingerprint }}"
+          fi
+
+      - name: Build and push image
+        if: steps.image.outputs.exists != 'true'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: romainecr.azurecr.io/kill-me:${{ env.ALIAS_TAG }}
+          build-args: |
+            BUILD_NUMBER=${{ env.BUILD_NUMBER }}
+          cache-from: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app
+          cache-to: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app,mode=max
+
+      - name: Compute ACR lookup tag
+        id: lookup
+        shell: bash
+        env:
+          REF_NAME: ${{ inputs.git_ref || github.ref_name || github.ref }}
+        run: |
+          set -euo pipefail
+          ref_hash="$(printf '%s' "${REF_NAME:-unknown}" | sha256sum | cut -c1-16)"
+          lookup_tag="ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
+          echo "tag=${lookup_tag}" >>"${GITHUB_OUTPUT}"
+          echo "Computed lookup tag ${lookup_tag}"
+
+      - name: Create ACR lookup tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          canonical="${ALIAS_TAG}"
+          lookup='${{ steps.lookup.outputs.tag }}'
+          az acr import --name romainecr \
+            --source "romainecr.azurecr.io/kill-me:${canonical}" \
+            --image "kill-me:${lookup}" \
+            --force
+          echo "Tagged romainecr.azurecr.io/kill-me:${lookup} -> ${canonical}"
 
       - name: Bump image tag in k8s/values.yaml
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          # Quote the tag: short SHAs like 4255e97 are valid YAML scientific
-          # notation and parse as a float (4.255e+100) unless quoted.
-          sed -i "s|^  tag: .*|  tag: \"${{ env.TAG }}\"|" k8s/values.yaml
+          set -euo pipefail
+          # Quote the tag so YAML never reinterprets image tags.
+          sed -i "s|^  tag: .*|  tag: \"${ALIAS_TAG}\"|" k8s/values.yaml
 
       - name: Commit and push tag bump
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add k8s/values.yaml
@@ -65,5 +158,5 @@ jobs:
             echo "No values changes to commit"
             exit 0
           fi
-          git commit -m "chore: bump kill-me image to ${{ env.TAG }} [skip ci]"
-          git push
+          git commit -m "chore: bump kill-me image to fingerprint ${{ env.ALIAS_TAG }} [skip ci]"
+          git push origin HEAD:main
