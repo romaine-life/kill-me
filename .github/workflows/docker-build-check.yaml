@@ -158,6 +158,23 @@ jobs:
             --force
           echo "Tagged romainecr.azurecr.io/kill-me:${lookup} -> ${canonical}"
 
+      - name: Tag app image by commit
+        # Commit-addressed alias of the fingerprint manifest so Glimmung's
+        # deploy-image resolver looks the image up by the verified commit SHA.
+        # Additive alongside the ACR lookup tag during the sha-alias migration;
+        # the run-scoped lookup tag is removed once the resolver reads sha-<commit>.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          canonical='${{ steps.fingerprint.outputs.proof_tag }}'
+          commit_tag="sha-${{ steps.source.outputs.sha }}"
+          az acr import --name romainecr \
+            --source "romainecr.azurecr.io/kill-me:${canonical}" \
+            --image "kill-me:${commit_tag}" \
+            --force
+          echo "Tagged romainecr.azurecr.io/kill-me:${commit_tag} -> ${canonical}"
+
       - name: Build image without pushing
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
         uses: docker/build-push-action@v7
