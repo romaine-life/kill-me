@@ -117,30 +117,6 @@ jobs:
           cache-from: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app
           cache-to: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app,mode=max
 
-      - name: Compute ACR lookup tag
-        id: lookup
-        shell: bash
-        env:
-          REF_NAME: ${{ inputs.git_ref || github.ref_name || github.ref }}
-        run: |
-          set -euo pipefail
-          ref_hash="$(printf '%s' "${REF_NAME:-unknown}" | sha256sum | cut -c1-16)"
-          lookup_tag="ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
-          echo "tag=${lookup_tag}" >>"${GITHUB_OUTPUT}"
-          echo "Computed lookup tag ${lookup_tag}"
-
-      - name: Create ACR lookup tag
-        shell: bash
-        run: |
-          set -euo pipefail
-          canonical="${ALIAS_TAG}"
-          lookup='${{ steps.lookup.outputs.tag }}'
-          az acr import --name romainecr \
-            --source "romainecr.azurecr.io/kill-me:${canonical}" \
-            --image "kill-me:${lookup}" \
-            --force
-          echo "Tagged romainecr.azurecr.io/kill-me:${lookup} -> ${canonical}"
-
       - name: Bump image tag in k8s/values.yaml
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |

@@ -31,8 +31,7 @@ assertNotIncludes(dockerBuildCheck, "romainecr.azurecr.io/kill-me:${{ env.IMAGE_
 assertIncludes(buildAndDeploy, "scripts/image-fingerprint.sh", "build-and-deploy");
 assertIncludes(buildAndDeploy, "ALIAS_TAG=app-${fingerprint}", "build-and-deploy");
 assertIncludes(buildAndDeploy, "romainecr.azurecr.io/kill-me:${{ env.ALIAS_TAG }}", "build-and-deploy");
-assertIncludes(buildAndDeploy, "ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}", "build-and-deploy");
-assertIncludes(buildAndDeploy, "az acr import --name romainecr", "build-and-deploy");
+assertNotIncludes(buildAndDeploy, "ci-ref-", "build-and-deploy");
 assertNotIncludes(buildAndDeploy, 'TAG="${GITHUB_SHA::7}"', "build-and-deploy");
 assertNotIncludes(buildAndDeploy, '--build-arg BUILD_NUMBER="${TAG}"', "build-and-deploy");
 assertNotIncludes(buildAndDeploy, "tag: \\\"${{ env.TAG }}\\\"", "build-and-deploy");
