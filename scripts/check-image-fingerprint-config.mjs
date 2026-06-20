@@ -21,8 +21,9 @@ function assertNotIncludes(text, needle, label) {
 assertIncludes(dockerBuildCheck, "scripts/image-fingerprint.sh", "docker-build-check");
 assertIncludes(dockerBuildCheck, "steps.fingerprint.outputs.proof_tag", "docker-build-check");
 assertIncludes(dockerBuildCheck, "romainecr.azurecr.io/kill-me:${{ steps.fingerprint.outputs.proof_tag }}", "docker-build-check");
-assertIncludes(dockerBuildCheck, "ci-pr-${PR_NUMBER}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}", "docker-build-check");
-assertIncludes(dockerBuildCheck, "ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}", "docker-build-check");
+assertIncludes(dockerBuildCheck, "sha-${{ steps.source.outputs.sha }}", "docker-build-check");
+assertNotIncludes(dockerBuildCheck, "ci-pr-", "docker-build-check");
+assertNotIncludes(dockerBuildCheck, "ci-ref-", "docker-build-check");
 assertIncludes(dockerBuildCheck, "az acr import --name romainecr", "docker-build-check");
 assertNotIncludes(dockerBuildCheck, "IMAGE_TAG:", "docker-build-check");
 assertNotIncludes(dockerBuildCheck, "romainecr.azurecr.io/kill-me:${{ env.IMAGE_TAG }}", "docker-build-check");

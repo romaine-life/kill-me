@@ -127,37 +127,6 @@ jobs:
             type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app,mode=max
             type=gha,mode=max,scope=app
 
-      - name: Compute ACR lookup tag
-        id: lookup
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        shell: bash
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
-          SOURCE_SHA: ${{ steps.source.outputs.sha }}
-        run: |
-          set -euo pipefail
-          if [[ -n "${PR_NUMBER}" ]]; then
-            lookup_tag="ci-pr-${PR_NUMBER}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
-          else
-            ref_hash="$(printf '%s' "${SOURCE_SHA}" | sha256sum | cut -c1-12)"
-            lookup_tag="ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
-          fi
-          echo "tag=${lookup_tag}" >>"${GITHUB_OUTPUT}"
-          echo "Computed lookup tag ${lookup_tag}"
-
-      - name: Create ACR lookup tag
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        shell: bash
-        run: |
-          set -euo pipefail
-          canonical='${{ steps.fingerprint.outputs.proof_tag }}'
-          lookup='${{ steps.lookup.outputs.tag }}'
-          az acr import --name romainecr \
-            --source "romainecr.azurecr.io/kill-me:${canonical}" \
-            --image "kill-me:${lookup}" \
-            --force
-          echo "Tagged romainecr.azurecr.io/kill-me:${lookup} -> ${canonical}"
-
       - name: Tag app image by commit
         # Commit-addressed alias of the fingerprint manifest so Glimmung's
         # deploy-image resolver looks the image up by the verified commit SHA.
