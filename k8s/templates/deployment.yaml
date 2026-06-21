@@ -7,7 +7,13 @@ metadata:
   labels:
     app: {{ include "kill-me.resourceName" . }}
 spec:
-  replicas: 1
+  # Single serving pod. When livePreview is enabled the live-preview-edge.replicas
+  # helper returns 1 and FAILS the render on requested>1 (a per-pod emptyDir
+  # override behind replicas>1 flickers the co-watched frontend, v1 #1419). The
+  # include is GATED on enabled so the chart renders standalone WITHOUT the
+  # vendored library on a normal/CI/validation install (where it stays 1,
+  # byte-identical to today); Glimmung vendors the library only on a preview lease.
+  replicas: {{ if .Values.livePreview.enabled }}{{ include "live-preview-edge.replicas" (dict "spec" .Values.livePreview "requested" 1) }}{{ else }}1{{ end }}
   selector:
     matchLabels:
       app: {{ include "kill-me.resourceName" . }}
@@ -28,7 +34,13 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
-            - name: http
+            # When a live-preview edge fronts the backend, the edge owns the
+            # "http" served port and the backend's own port is renamed to an
+            # internal name (kill-me.appPortName) to avoid a duplicate port name
+            # in the pod. The container port NUMBER (3000) is unchanged, so the
+            # edge's loopback upstream still targets :3000. Without the edge the
+            # name stays "http", so normal/validation renders are byte-identical.
+            - name: {{ include "kill-me.appPortName" . }}
               containerPort: 3000
           env:
             - name: PORT
@@ -45,19 +57,32 @@ spec:
           startupProbe:
             httpGet:
               path: /health
-              port: http
+              port: {{ include "kill-me.appPortName" . }}
             periodSeconds: 5
             failureThreshold: 20
           readinessProbe:
             httpGet:
               path: /health
-              port: http
+              port: {{ include "kill-me.appPortName" . }}
             periodSeconds: 10
             failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /health
-              port: http
+              port: {{ include "kill-me.appPortName" . }}
             periodSeconds: 30
             failureThreshold: 3
+        {{- /*
+        The live-preview edge, in front of the backend. Gated on
+        livePreview.enabled (off by default → renders nothing), so this changes
+        nothing on a normal/validation install. When enabled it becomes the
+        pod's served port and reverse-proxies the backend on :3000.
+        */ -}}
+        {{- if .Values.livePreview.enabled }}
+        {{- include "live-preview-edge.container" .Values.livePreview | nindent 8 }}
+        {{- end }}
+      {{- if .Values.livePreview.enabled }}
+      volumes:
+        {{- include "live-preview-edge.volume" .Values.livePreview | nindent 8 }}
+      {{- end }}
 {{- end }}

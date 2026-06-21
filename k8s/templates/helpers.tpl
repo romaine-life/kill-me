@@ -36,3 +36,15 @@
 {{- .Values.namespace | default .Release.Namespace -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+kill-me.appPortName — the backend container's served port name. When a
+live-preview edge fronts the backend (livePreview.enabled), the edge owns the
+"http" served port, so the backend's own port is renamed to an internal name to
+avoid a duplicate port name in the pod; the Service then targets the edge via
+live-preview-edge.servedPortName. Without the edge it stays "http", so normal /
+validation renders are byte-identical.
+*/}}
+{{- define "kill-me.appPortName" -}}
+{{- if .Values.livePreview.enabled -}}app-internal{{- else -}}http{{- end -}}
+{{- end -}}

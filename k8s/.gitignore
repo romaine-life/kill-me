@@ -1,0 +1,8 @@
+# Glimmung vendors the generic live-preview-edge library partial into
+# charts/live-preview-edge/ at preview-provision time (a cluster ConfigMap, NOT
+# an oci:// Helm dependency — ACR is Basic SKU; NOT a committed copy). The slot
+# chart includes the partial's named templates gated on livePreview.enabled and
+# declares no Helm dependency, so a normal/CI/prod/validation render never needs
+# the library. This keeps any locally-vendored copy out of git.
+# See glimmung docs/live-preview-plan.md "Stage 4a landed contracts".
+charts/
