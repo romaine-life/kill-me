@@ -13,6 +13,11 @@ spec:
   ports:
     - name: http
       port: 80
-      targetPort: http
+      # Served port: the live-preview edge when livePreview is enabled (it fronts
+      # the backend), the backend's own port ("http") otherwise. The include is
+      # GATED on enabled so the chart renders standalone WITHOUT the vendored
+      # library on a normal/CI/validation install (targetPort stays "http",
+      # byte-identical to today); Glimmung vendors the library on a preview lease.
+      targetPort: {{ if .Values.livePreview.enabled }}{{ include "live-preview-edge.servedPortName" (dict "spec" .Values.livePreview "appPortName" (include "kill-me.appPortName" .)) }}{{ else }}http{{ end }}
       protocol: TCP
 {{- end }}

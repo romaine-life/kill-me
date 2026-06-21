@@ -19,6 +19,52 @@ testEnv:
 serviceAccount: infra-shared
 serviceAccountClientId: 2ba3e252-c553-4a57-8811-c29b51c06cd9
 
+# Live-preview lane (glimmung docs/live-preview-plan.md). OFF by default: a
+# normal/prod, CI, or validation (warm/hot) install renders no edge, so this
+# changes NOTHING until Glimmung sets livePreview.enabled=true on a preview
+# lease. When enabled, the generic live-preview-edge library partial runs the
+# edge in front of kill-me's own backend: the edge becomes the served port, the
+# app backend listens internally on its own port (3000), and the edge serves the
+# dev's freshly-pushed frontend override-first (fresh-preview passthrough to the
+# stable backend). The partial is vendored into charts/live-preview-edge/ by
+# Glimmung's preview install Job (a cluster ConfigMap), NOT a committed copy and
+# NOT a Helm dependency — every reference is gated on livePreview.enabled so the
+# chart renders standalone without the library. Glimmung --sets image.tag,
+# upstream.url, authorizedSubject, and backendPrefixes per preview lease. The
+# single-serving-pod invariant (replicas=1) is enforced by the
+# live-preview-edge.replicas helper.
+#
+# AUTH: the edge validates pushes against auth.romaine.life JWKS (public RS256
+# keys fetched over HTTPS); it needs only outbound HTTPS to auth.romaine.life,
+# which the slot pod already has. No projected SA token is added to the pod.
+livePreview:
+  enabled: false
+  image:
+    repository: romainecr.azurecr.io/glimmung-live-preview-edge
+    # Empty by default — Glimmung --sets the fingerprint-pinned tag from its
+    # control-plane Settings at provision time. The live-preview-edge.container
+    # helper fails the render if this is empty while enabled, so a missing edge
+    # image surfaces loudly rather than as a silent ImagePull.
+    tag: ""
+    pullPolicy: IfNotPresent
+  port: 8080
+  servedPortName: http
+  upstream:
+    # kill-me's backend listens internally on :3000 (== live_preview.backend_port);
+    # the edge reverse-proxies to it on loopback.
+    url: "http://127.0.0.1:3000"
+  # Request path prefixes the edge always proxies to the backend (kill-me's API
+  # and health routes). Everything else is served override-first by the edge.
+  # Glimmung --sets this from the project's live_preview.backend_prefixes.
+  backendPrefixes: []
+  # The auth.romaine.life JWT subject permitted to push/delete an override.
+  # Glimmung --sets it to the preview lease owner per provision.
+  authorizedSubject: ""
+  override:
+    volumeName: live-preview-override
+    mountPath: /var/run/glimmung-live-preview
+  resources: {}
+
 ingress:
   gatewayName: main
   gatewayNamespace: envoy-gateway-system
