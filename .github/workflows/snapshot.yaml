@@ -25,6 +25,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
+        with:
+          # Bump commits are pushed straight to main, which the branch ruleset
+          # forbids for GITHUB_TOKEN (GitHub Actions cannot be a bypass actor).
+          # The write deploy key is the ruleset's DeployKey bypass actor, so CI
+          # pushes keep working while PR merges still wait for required checks.
+          ssh-key: ${{ secrets.MAIN_PUSH_DEPLOY_KEY }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
