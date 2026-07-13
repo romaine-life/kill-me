@@ -4,7 +4,7 @@
 image:
   repository: romainecr.azurecr.io/kill-me
   # Quoted so YAML never reinterprets image tags.
-  tag: "app-e11448cb674de05de8a4339c0c4e7d7388bc4158ac49bf76e77d85c32a593790"
+  tag: "app-fafa4561d5846b9028939f7d810a7408b59e776cd3a547907a2dba5f1982b395"
   pullPolicy: IfNotPresent
 
 name: kill-me
