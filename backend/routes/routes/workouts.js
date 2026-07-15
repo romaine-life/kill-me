@@ -126,7 +126,13 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
 
       const { resources: settings } = await container.items.query(querySpec).fetchAll();
 
-      const currentDay = settings[0]?.currentDay || 1;
+      // Defensive: if more than one settings doc exists (e.g. leftover from a
+      // legacy/duplicate identity), prefer the most recently updated so the
+      // "current day" pointer is stable instead of an arbitrary cross-partition hit.
+      const latest = settings
+        .slice()
+        .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))[0];
+      const currentDay = Number(latest?.currentDay) || 1;
       res.json({ currentDay });
     } catch (error) {
       console.error('Error fetching current day:', error);
@@ -162,18 +168,24 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
 
       const { resource } = await container.items.create(workoutDoc);
 
-      // Auto-advance currentDay if the logged workout matches the current day
+      // Auto-advance currentDay if the logged workout matches the current day.
+      // Scope the lookup to THIS user (partition) so we never read another
+      // identity's pointer, and always key the upsert on settings_<userId> so a
+      // stray/legacy doc id can't spawn a duplicate settings document.
       let advancedTo = null;
       const { resources: settings } = await container.items.query({
-        query: 'SELECT * FROM c WHERE c.type = @type',
-        parameters: [{ name: '@type', value: 'settings' }]
-      }).fetchAll();
-      const currentDay = settings[0]?.currentDay || 1;
-      if (dayNumber === currentDay) {
+        query: 'SELECT * FROM c WHERE c.type = @type AND c.userId = @userId',
+        parameters: [
+          { name: '@type', value: 'settings' },
+          { name: '@userId', value: userId }
+        ]
+      }, { partitionKey: userId }).fetchAll();
+      const currentDay = Number(settings[0]?.currentDay) || 1;
+      if (Number(dayNumber) === currentDay) {
         const nextDay = currentDay >= 12 ? 1 : currentDay + 1;
         await container.items.upsert({
           ...settings[0],
-          id: settings[0]?.id || `settings_${userId}`,
+          id: `settings_${userId}`,
           userId,
           type: 'settings',
           currentDay: nextDay,
@@ -259,7 +271,7 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
   router.put('/api/current-day', requireAuth, requireAdmin, async (req, res) => {
     try {
       const userId = req.user.sub;
-      const { currentDay } = req.body;
+      const currentDay = Number(req.body.currentDay);
 
       if (!currentDay || currentDay < 1 || currentDay > 12) {
         return res.status(400).json({ error: 'Invalid day number. Must be between 1 and 12.' });
