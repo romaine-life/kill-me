@@ -45,7 +45,7 @@ async function getCosmosEndpoint(credential) {
   return setting.value;
 }
 
-// Schema DDL — mirrors the five public document types from Cosmos DB
+// Schema DDL — mirrors the public document types from Cosmos DB
 const SCHEMA = `
   CREATE TABLE workout_days (
     day_number    INTEGER PRIMARY KEY,
@@ -105,6 +105,15 @@ const SCHEMA = `
   );
   CREATE INDEX idx_cardio_date ON cardio_sessions(date DESC);
 
+  CREATE TABLE cardio_templates (
+    template_id   TEXT PRIMARY KEY,
+    activity      TEXT,
+    name          TEXT NOT NULL,
+    description   TEXT,
+    intervals     TEXT NOT NULL,
+    sort_order    INTEGER
+  );
+
   CREATE TABLE snapshot_meta (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -128,7 +137,7 @@ async function main() {
   const containerName = process.env.COSMOS_DB_CONTAINER_NAME || 'workouts';
   const container = cosmosClient.database(databaseName).container(containerName);
 
-  // Query all five public document types
+  // Query all public document types
   console.log('Querying Cosmos DB...');
 
   const queries = {
@@ -138,6 +147,7 @@ async function main() {
     settings: 'SELECT * FROM c WHERE c.type = "settings"',
     soreness: 'SELECT * FROM c WHERE c.type = "soreness-entry" ORDER BY c.date DESC',
     cardioSessions: 'SELECT * FROM c WHERE c.type = "cardio-session" ORDER BY c.date DESC',
+    cardioTemplates: 'SELECT * FROM c WHERE c.type = "cardio-template" ORDER BY c.sortOrder',
   };
 
   const results = {};
@@ -241,6 +251,21 @@ async function main() {
         doc.bike ? JSON.stringify(doc.bike) : null,
         doc.timestamp || null,
         doc.createdAt || null,
+      );
+    }
+
+    // Cardio templates (shared treadmill interval library)
+    const insertTemplate = db.prepare(
+      'INSERT INTO cardio_templates (template_id, activity, name, description, intervals, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
+    );
+    for (const doc of results.cardioTemplates) {
+      insertTemplate.run(
+        doc.templateId,
+        doc.activity || 'treadmill',
+        doc.name,
+        doc.description || null,
+        JSON.stringify(Array.isArray(doc.intervals) ? doc.intervals : []),
+        doc.sortOrder ?? 0,
       );
     }
 

@@ -3,6 +3,7 @@ import { CosmosClient } from '@azure/cosmos';
 import { DefaultAzureCredential } from '@azure/identity';
 import { workoutDays, loggedWorkouts, exercises } from '../data/seed-data.js';
 import { sorenessSeedData } from '../data/seed-soreness.js';
+import { cardioTemplates } from '../data/seed-cardio-templates.js';
 
 const LEGACY_USER_ID = 'cf57d57d-1411-4f59-b517-e9a8600b140a';
 
@@ -32,7 +33,7 @@ export function createAdminRoutes({ container, cosmosDbEndpoint, databaseName, c
         partitionKey: { paths: ['/userId'] }
       });
 
-      const seededData = { workoutDays: 0, loggedWorkouts: 0, exercises: 0 };
+      const seededData = { workoutDays: 0, loggedWorkouts: 0, exercises: 0, cardioTemplates: 0 };
 
       // Clean up old workout day definitions
       try {
@@ -107,6 +108,34 @@ export function createAdminRoutes({ container, cosmosDbEndpoint, databaseName, c
           seededData.exercises++;
         } catch (err) {
           console.error(`Failed to seed exercise ${exercise.name}:`, err.message);
+        }
+      }
+
+      // Delete old cardio-template documents then re-seed (idempotent)
+      try {
+        const { resources: oldTemplates } = await newContainer.items
+          .query('SELECT c.id, c.userId FROM c WHERE c.type = "cardio-template"')
+          .fetchAll();
+        for (const old of oldTemplates) {
+          try { await newContainer.item(old.id, old.userId ?? undefined).delete(); } catch { /* ignore */ }
+        }
+      } catch (cleanupErr) {
+        console.error('Cardio template cleanup failed (non-fatal):', cleanupErr.message);
+      }
+
+      for (const template of cardioTemplates) {
+        try {
+          const templateDoc = {
+            id: `cardio-template-${template.templateId}`,
+            type: 'cardio-template',
+            userId: 'shared',
+            ...template,
+            createdAt: new Date().toISOString()
+          };
+          await newContainer.items.upsert(templateDoc);
+          seededData.cardioTemplates++;
+        } catch (err) {
+          console.error(`Failed to seed cardio template ${template.templateId}:`, err.message);
         }
       }
 
