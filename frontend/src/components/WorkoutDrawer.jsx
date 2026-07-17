@@ -62,6 +62,10 @@ export function LogTab({
   const [cardioActivity, setCardioActivity] = useState('treadmill');
   const [cardioDate, setCardioDate] = useState(todayLocal());
   const [cardioTime, setCardioTime] = useState(nowLocalTime());
+  // Treadmill templates come from the data source (Cosmos via API, or the
+  // snapshot for anonymous visitors). TREADMILL_TEMPLATES is only an offline
+  // fallback for when neither is available (same role as dayConfig.js).
+  const [templates, setTemplates] = useState(TREADMILL_TEMPLATES);
   const [cardioTemplateId, setCardioTemplateId] = useState(TREADMILL_TEMPLATES[0]?.id || '');
   const [cardioNotes, setCardioNotes] = useState('');
   const [cardioSubmitting, setCardioSubmitting] = useState(false);
@@ -84,7 +88,7 @@ export function LogTab({
 
   const dateInputRef = useRef(null);
   const cardioDateRef = useRef(null);
-  const { fetchWorkouts: fetchWorkoutsFromSource, fetchCardioSessions, isReady } = useDataSource();
+  const { fetchWorkouts: fetchWorkoutsFromSource, fetchCardioSessions, fetchCardioTemplates, isReady } = useDataSource();
 
   const dayInfo = getDayInfo(selectedDay);
 
@@ -134,6 +138,28 @@ export function LogTab({
       fetchExercises();
     }
   }, [selectedDay, viewWorkout]);
+
+  // Load treadmill templates from the data source. Falls back to the static
+  // list if the source is empty or errors, so the dropdown is never blank.
+  useEffect(() => {
+    if (!isReady) return;
+    fetchCardioTemplates()
+      .then((data) => {
+        const list = data?.templates?.length ? data.templates : TREADMILL_TEMPLATES;
+        setTemplates(list);
+        // In create mode, keep the default pointed at the first (lowest sortOrder)
+        // template unless the current selection is still valid.
+        if (!viewCardio) {
+          setCardioTemplateId((prev) =>
+            list.some((t) => t.id === prev) ? prev : (list[0]?.id || '')
+          );
+        }
+      })
+      .catch((err) => {
+        console.warn('Cardio template load failed, using static fallback:', err);
+        setTemplates(TREADMILL_TEMPLATES);
+      });
+  }, [isReady, viewCardio]);
 
   // Switch logType when viewCardio/viewWorkout changes
   useEffect(() => {
@@ -362,7 +388,7 @@ export function LogTab({
   const handleCardioSubmit = async () => {
     setCardioSubmitting(true);
     try {
-      const selectedTemplate = TREADMILL_TEMPLATES.find(t => t.id === cardioTemplateId);
+      const selectedTemplate = templates.find(t => t.id === cardioTemplateId);
 
       const body = {
         date: cardioDate,
@@ -439,7 +465,7 @@ export function LogTab({
   // Render — one form, always
   // ─────────────────────────────────────────────
 
-  const selectedTemplate = TREADMILL_TEMPLATES.find(t => t.id === cardioTemplateId);
+  const selectedTemplate = templates.find(t => t.id === cardioTemplateId);
 
   return (
     <div className="max-w-2xl">
@@ -983,7 +1009,7 @@ export function LogTab({
                 onChange={(e) => setCardioTemplateId(e.target.value)}
                 className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
               >
-                {TREADMILL_TEMPLATES.map(t => (
+                {templates.map(t => (
                   <option key={t.id} value={t.id} className="bg-slate-800">
                     {t.name}
                   </option>

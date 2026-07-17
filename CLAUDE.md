@@ -63,7 +63,7 @@ frontend/          React 19 SPA (Vite + Tailwind CSS 4)
   └── Calls backend API with Bearer tokens
 
 snapshot/          SQLite snapshot generator (Node 20)
-  ├── Queries Cosmos DB for all public document types (6 tables)
+  ├── Queries Cosmos DB for all public document types (7 tables)
   ├── Writes a SQLite .db file consumed by the frontend
   └── Runs every 4 hours via GitHub Actions cron
 
@@ -132,6 +132,7 @@ distinguished by a `type` field:
 | `exercise` | Exercise library entries per day | `dayNumber`, `name`, `equipment`, `tags[]`, `variations[]` (`{name, default, targetWeight/Reps/Sets}`) |
 | `logged-workout` | A completed workout session | `userId`, `dayNumber`, `date`, `time` (HH:MM, nullable), `mode` (quick/detailed), `exercises[]` (`{name, variation, weight, reps, sets}`) |
 | `cardio-session` | A completed cardio session | `userId`, `date`, `time` (HH:MM, nullable), `activity` (treadmill/bike), `durationMinutes`, `treadmill{}`, `bike{}` |
+| `cardio-template` | Shared treadmill interval template (library) | `userId` (`shared`), `templateId`, `name`, `description`, `activity`, `intervals[]` (`{type, speedMph, durationMinutes}`), `sortOrder` |
 | `soreness-entry` | Daily soreness journal entry | `userId`, `date`, `muscles[]` (`{group, muscle, level}`) |
 | `settings` | Per-user settings (current day) | `userId`, `currentDay` |
 | `account` | Microsoft auth account record | `userId`, `provider`, `name`, `email`, `role` |

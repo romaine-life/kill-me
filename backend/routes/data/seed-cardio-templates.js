@@ -1,21 +1,24 @@
-// Treadmill interval templates — OFFLINE FALLBACK ONLY.
+// Seed data for treadmill interval templates (cardio-template document type).
 //
-// Templates now live in Cosmos DB as `cardio-template` documents and are loaded
-// at runtime via useDataSource().fetchCardioTemplates() (live API when signed
-// in, SQLite snapshot for anonymous visitors). This array is a static mirror of
-// backend/routes/data/seed-cardio-templates.js, used only when the data source
-// is empty or errors so the dropdown is never blank (same role dayConfig.js
-// plays for workout-day-definition). Keep it in sync with the seed file.
+// These are shared library documents (userId: 'shared'), seeded by
+// /api/admin/init-database alongside the exercise library and day definitions.
+// A logged cardio-session stores the full interval array at log time, so
+// editing or removing a template here never rewrites history.
 //
-// Each template defines a sequence of walk/jog intervals. The full interval
-// array is stored in each logged cardio-session document so history remains
-// self-contained even if templates change or are deleted later.
+// `templateId` is the stable slug the frontend and logged sessions reference.
+// `sortOrder` controls dropdown order; the lowest sortOrder is the default.
+//
+// The frontend keeps a static mirror of these in
+// frontend/src/utils/cardioTemplates.js as an offline fallback (same pattern as
+// dayConfig.js mirroring the workout-day-definition seed). Keep the two in sync.
 
-export const TREADMILL_TEMPLATES = [
+export const cardioTemplates = [
   {
-    id: 'walk-jog-5x-60',
+    templateId: 'walk-jog-5x-60',
+    activity: 'treadmill',
     name: 'Walk/Jog 5×6.0 + 1×7.0',
     description: '2 min walk / 4 min jog @ 6.0 mph × 5, then 4 min @ 7.0, cooldown',
+    sortOrder: 0,
     intervals: [
       { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
       { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
@@ -33,9 +36,11 @@ export const TREADMILL_TEMPLATES = [
     ],
   },
   {
-    id: 'walk-jog-5x-54',
+    templateId: 'walk-jog-5x-54',
+    activity: 'treadmill',
     name: 'Walk/Jog 5×5.4 + 1×6.0',
     description: '2 min walk / 4 min jog @ 5.4 mph × 5, then 4 min @ 6.0, cooldown',
+    sortOrder: 1,
     intervals: [
       { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
       { type: 'jog',  speedMph: 5.4, durationMinutes: 4 },
@@ -53,15 +58,3 @@ export const TREADMILL_TEMPLATES = [
     ],
   },
 ];
-
-// Total duration of all intervals in a template (minutes)
-export function getTotalDuration(intervals) {
-  return intervals.reduce((sum, i) => sum + i.durationMinutes, 0);
-}
-
-// Human-readable summary of a template's intervals
-export function formatIntervalSummary(intervals) {
-  const jogCount = intervals.filter(i => i.type === 'jog').length;
-  const totalMin = getTotalDuration(intervals);
-  return `${jogCount} jog intervals, ${totalMin} min`;
-}

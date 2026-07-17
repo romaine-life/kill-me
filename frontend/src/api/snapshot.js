@@ -154,6 +154,27 @@ export function getCardioSessions(db) {
   return { sessions };
 }
 
+// Get all treadmill templates, ordered for the dropdown
+export function getCardioTemplates(db) {
+  const result = db.exec(
+    'SELECT template_id, activity, name, description, intervals, sort_order FROM cardio_templates ORDER BY sort_order'
+  );
+
+  if (result.length === 0) {
+    return { templates: [] };
+  }
+
+  const templates = result[0].values.map(([id, activity, name, description, intervals]) => ({
+    id,
+    activity,
+    name,
+    description,
+    intervals: intervals ? JSON.parse(intervals) : [],
+  }));
+
+  return { templates };
+}
+
 // Get snapshot metadata (generated_at timestamp)
 export function getSnapshotMeta(db) {
   const result = db.exec('SELECT key, value FROM snapshot_meta');
