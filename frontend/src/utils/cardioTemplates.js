@@ -1,58 +1,11 @@
-// Treadmill interval templates — OFFLINE FALLBACK ONLY.
+// Treadmill interval helpers.
 //
-// Templates now live in Cosmos DB as `cardio-template` documents and are loaded
-// at runtime via useDataSource().fetchCardioTemplates() (live API when signed
-// in, SQLite snapshot for anonymous visitors). This array is a static mirror of
-// backend/routes/data/seed-cardio-templates.js, used only when the data source
-// is empty or errors so the dropdown is never blank (same role dayConfig.js
-// plays for workout-day-definition). Keep it in sync with the seed file.
-//
-// Each template defines a sequence of walk/jog intervals. The full interval
-// array is stored in each logged cardio-session document so history remains
-// self-contained even if templates change or are deleted later.
-
-export const TREADMILL_TEMPLATES = [
-  {
-    id: 'walk-jog-5x-60',
-    name: 'Walk/Jog 5×6.0 + 1×7.0',
-    description: '2 min walk / 4 min jog @ 6.0 mph × 5, then 4 min @ 7.0, cooldown',
-    intervals: [
-      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
-      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
-      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
-      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
-      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
-      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
-      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
-      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
-      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
-      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
-      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
-      { type: 'jog',  speedMph: 7.0, durationMinutes: 4 },
-      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
-    ],
-  },
-  {
-    id: 'walk-jog-5x-54',
-    name: 'Walk/Jog 5×5.4 + 1×6.0',
-    description: '2 min walk / 4 min jog @ 5.4 mph × 5, then 4 min @ 6.0, cooldown',
-    intervals: [
-      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
-      { type: 'jog',  speedMph: 5.4, durationMinutes: 4 },
-      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
-      { type: 'jog',  speedMph: 5.4, durationMinutes: 4 },
-      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
-      { type: 'jog',  speedMph: 5.4, durationMinutes: 4 },
-      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
-      { type: 'jog',  speedMph: 5.4, durationMinutes: 4 },
-      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
-      { type: 'jog',  speedMph: 5.4, durationMinutes: 4 },
-      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
-      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
-      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
-    ],
-  },
-];
+// Templates themselves are DATA — they live in Cosmos DB as `cardio-template`
+// documents and are loaded at runtime via useDataSource().fetchCardioTemplates()
+// (live API when signed in, SQLite snapshot for anonymous visitors). There is no
+// hardcoded template list in the frontend. These are the only things that stay
+// in code: pure functions that summarize an interval array (which each logged
+// cardio-session stores inline, so history is self-contained).
 
 // Total duration of all intervals in a template (minutes)
 export function getTotalDuration(intervals) {

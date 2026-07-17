@@ -14,7 +14,7 @@ import { getDayInfo, DAY_CONFIG } from '../utils/dayConfig';
 import { apiFetch } from '../api/client.js';
 import { todayLocal, nowLocalTime } from '../utils/dateUtils';
 import { useDataSource } from '../api/snapshotContext.jsx';
-import { TREADMILL_TEMPLATES, getTotalDuration } from '../utils/cardioTemplates.js';
+import { getTotalDuration } from '../utils/cardioTemplates.js';
 import { CARDIO_CONFIG } from '../utils/cardioConfig.js';
 
 export function LogTab({
@@ -62,11 +62,10 @@ export function LogTab({
   const [cardioActivity, setCardioActivity] = useState('treadmill');
   const [cardioDate, setCardioDate] = useState(todayLocal());
   const [cardioTime, setCardioTime] = useState(nowLocalTime());
-  // Treadmill templates come from the data source (Cosmos via API, or the
-  // snapshot for anonymous visitors). TREADMILL_TEMPLATES is only an offline
-  // fallback for when neither is available (same role as dayConfig.js).
-  const [templates, setTemplates] = useState(TREADMILL_TEMPLATES);
-  const [cardioTemplateId, setCardioTemplateId] = useState(TREADMILL_TEMPLATES[0]?.id || '');
+  // Treadmill templates come entirely from the data source (Cosmos via the live
+  // API, or the SQLite snapshot for anonymous visitors) — no hardcoded list.
+  const [templates, setTemplates] = useState([]);
+  const [cardioTemplateId, setCardioTemplateId] = useState('');
   const [cardioNotes, setCardioNotes] = useState('');
   const [cardioSubmitting, setCardioSubmitting] = useState(false);
   const [cardioDeleting, setCardioDeleting] = useState(false);
@@ -139,16 +138,15 @@ export function LogTab({
     }
   }, [selectedDay, viewWorkout]);
 
-  // Load treadmill templates from the data source. Falls back to the static
-  // list if the source is empty or errors, so the dropdown is never blank.
+  // Load treadmill templates from the data source (live API or snapshot).
   useEffect(() => {
     if (!isReady) return;
     fetchCardioTemplates()
       .then((data) => {
-        const list = data?.templates?.length ? data.templates : TREADMILL_TEMPLATES;
+        const list = data?.templates || [];
         setTemplates(list);
-        // In create mode, keep the default pointed at the first (lowest sortOrder)
-        // template unless the current selection is still valid.
+        // In create mode, default to the first (lowest sortOrder) template,
+        // keeping the current selection if it's still present.
         if (!viewCardio) {
           setCardioTemplateId((prev) =>
             list.some((t) => t.id === prev) ? prev : (list[0]?.id || '')
@@ -156,8 +154,8 @@ export function LogTab({
         }
       })
       .catch((err) => {
-        console.warn('Cardio template load failed, using static fallback:', err);
-        setTemplates(TREADMILL_TEMPLATES);
+        console.warn('Cardio template load failed:', err);
+        setTemplates([]);
       });
   }, [isReady, viewCardio]);
 
