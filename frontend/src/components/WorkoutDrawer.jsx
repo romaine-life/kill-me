@@ -848,24 +848,27 @@ export function LogTab({
                               <div className="grid grid-cols-3 gap-2">
                                 <input
                                   type="text"
+                                  inputMode="decimal"
                                   placeholder="Weight (lbs)"
                                   value={exercise.weight}
                                   onChange={(e) => updateExercise(idx, 'weight', e.target.value)}
-                                  className="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                                  className="bg-slate-800 border border-slate-600 rounded px-3 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                                 />
                                 <input
                                   type="text"
+                                  inputMode="numeric"
                                   placeholder="Reps"
                                   value={exercise.reps}
                                   onChange={(e) => updateExercise(idx, 'reps', e.target.value)}
-                                  className="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                                  className="bg-slate-800 border border-slate-600 rounded px-3 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                                 />
                                 <input
                                   type="text"
+                                  inputMode="numeric"
                                   placeholder="Sets"
                                   value={exercise.sets}
                                   onChange={(e) => updateExercise(idx, 'sets', e.target.value)}
-                                  className="bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                                  className="bg-slate-800 border border-slate-600 rounded px-3 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                                 />
                               </div>
                             </div>

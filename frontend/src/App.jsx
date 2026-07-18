@@ -190,7 +190,15 @@ function App() {
         )}
 
         {/* Tab content area */}
-        <div className="app-tab-content" style={styles.tabContent}>
+        <div
+          className="app-tab-content"
+          style={{
+            ...styles.tabContent,
+            // Clear the fixed bottom nav (+ home-indicator safe area) on mobile
+            // so the last row of content is never hidden behind it.
+            ...(isMobile ? { paddingBottom: 'calc(76px + env(safe-area-inset-bottom))' } : {}),
+          }}
+        >
           {activeTab === 'today' && (
             <TodayTab currentDay={currentDay} isAdmin={isAdmin} onNavigateExercises={handleNavigateExercises} />
           )}
@@ -332,7 +340,12 @@ function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, isAdmin, 
 }
 
 function BottomNav({ tabs, activeTab, onTabChange }) {
-  const visibleTabs = tabs.filter((tab) => ['list', 'today', 'cycle', 'soreness'].includes(tab.id));
+  // Log is the primary daily action for admins — surface it centered in the bar
+  // (it's only in `tabs` when signed in as admin, so public visitors still see 4).
+  const order = ['list', 'today', 'log', 'cycle', 'soreness'];
+  const visibleTabs = order
+    .map((id) => tabs.find((tab) => tab.id === id))
+    .filter(Boolean);
 
   return (
     <nav style={{ ...styles.bottomNav, gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)` }}>
@@ -577,7 +590,9 @@ const styles = {
     display: 'grid',
     background: 'var(--bg-sidebar)',
     borderTop: '1px solid var(--border-subtle)',
-    padding: '8px 8px 16px',
+    // Respect the home-indicator safe area on notched phones (needs
+    // viewport-fit=cover in index.html) so the buttons aren't tucked under it.
+    padding: '8px 8px calc(16px + env(safe-area-inset-bottom))',
     zIndex: 35,
   },
   bottomNavButton: {
