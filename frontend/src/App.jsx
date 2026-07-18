@@ -456,8 +456,8 @@ const styles = {
     fontFamily: 'var(--font-mono)',
   },
   mobileMenuButton: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
     borderRadius: 8,
     border: '1px solid var(--border-subtle)',
     background: 'var(--bg-raised)',

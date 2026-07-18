@@ -172,7 +172,7 @@ export function ListTab({ onWorkoutClick, onCardioClick, currentDay = 1 }) {
                 key={f.id}
                 onClick={() => setFilter(f.id)}
                 style={{
-                  padding: '6px 12px',
+                  padding: '9px 12px',
                   borderRadius: 7,
                   fontSize: 12,
                   fontFamily: 'var(--font-primary)',
