@@ -8,6 +8,12 @@ import { AppConfigurationClient } from '@azure/app-configuration';
 import { DefaultAzureCredential } from '@azure/identity';
 
 export async function fetchConfig() {
+  // Local dev: a directly-provided Cosmos endpoint skips the App Config lookup
+  // (which needs App Config Data Reader). Combine with `az login` for Cosmos.
+  if (process.env.COSMOS_DB_ENDPOINT) {
+    return { cosmosDbEndpoint: process.env.COSMOS_DB_ENDPOINT };
+  }
+
   const appConfigEndpoint = process.env.AZURE_APP_CONFIG_ENDPOINT;
   if (!appConfigEndpoint) throw new Error('AZURE_APP_CONFIG_ENDPOINT unset');
 
