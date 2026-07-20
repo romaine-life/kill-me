@@ -15,6 +15,20 @@ const AUTH_URL = 'https://auth.romaine.life';
 const SESSION_CACHE_TTL_MS = 60_000;
 const ALLOWED_ROLES = new Set(['admin', 'user']);
 
+// LOCAL DEV ONLY. When DEV_AUTH is set (e.g. DEV_AUTH=admin), skip the
+// auth.romaine.life cookie forward and treat every request as this mock user.
+// Production never sets DEV_AUTH, so this is inert there. Lets you run the
+// backend locally and act as admin without a real .romaine.life session.
+function devUser() {
+  if (!process.env.DEV_AUTH) return null;
+  return {
+    sub: process.env.DEV_AUTH_SUB || 'dev-admin-local',
+    email: process.env.DEV_AUTH_EMAIL || 'dev@localhost',
+    name: process.env.DEV_AUTH_NAME || 'Dev Admin',
+    role: process.env.DEV_AUTH === 'admin' ? 'admin' : 'user',
+  };
+}
+
 // Map<cookieHeader, {expiry, user|null}>. null user = negative cache (we
 // know this cookie didn't resolve, so we don't keep retrying for 60s).
 const sessionCache = new Map();
@@ -54,6 +68,8 @@ async function resolveCaller(cookie) {
 
 export function createRequireAuth() {
   return async (req, res, next) => {
+    const dev = devUser();
+    if (dev) { req.user = dev; return next(); }
     const cookie = req.headers.cookie || '';
     const user = await resolveCaller(cookie);
     if (!user) {
@@ -83,6 +99,8 @@ export function requireAdmin(req, res, next) {
 // Used by the GET /api/auth/me handler to return the current user (or
 // null) without a 401 — useful for the boot-time "am I signed in?" probe.
 export async function currentCaller(req) {
+  const dev = devUser();
+  if (dev) return dev;
   const cookie = req.headers.cookie || '';
   const user = await resolveCaller(cookie);
   if (!user) return null;
