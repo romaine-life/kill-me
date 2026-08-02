@@ -295,17 +295,10 @@
     font-size: 56px !important;
   }
 
+  /* Was absolutely positioned over the single-column hero text at opacity 0.85,
+     covering the day name + description. Hidden on mobile for readability. */
   .list-hero-anatomy {
-    position: absolute !important;
-    right: -10px;
-    top: 0;
-    width: 160px !important;
-    height: 180px !important;
-    opacity: 0.85;
-  }
-
-  .list-hero-anatomy img {
-    height: 170px !important;
+    display: none !important;
   }
 
   .stats-strip {

@@ -19,7 +19,7 @@ import { dateToLocal } from '../utils/dateUtils';
 
 const SORENESS_COLOR = '#f97316'; // orange-500
 
-export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick }) {
+export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewToggle }) {
   const [calendarPeriod, setCalendarPeriod] = useState('month'); // 'week', 'month', or 'year'
   const [workouts, setWorkouts] = useState([]);
   const [cardioSessions, setCardioSessions] = useState([]);
@@ -246,10 +246,7 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick }) {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <h2 className="text-3xl sm:text-5xl font-black text-cyan-400 uppercase tracking-wide">
-        History
-      </h2>
+      {viewToggle}
 
       {/* Stats Card */}
       <div className="bg-gradient-to-r from-cyan-500/20 to-blue-600/20 backdrop-blur-md rounded-2xl border border-cyan-500/50 p-4 sm:p-6">
