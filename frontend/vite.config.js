@@ -155,7 +155,7 @@ function devBackend(port) {
             DEV_AUTH: process.env.DEV_AUTH || 'admin',
             DEV_AUTH_SUB: process.env.DEV_AUTH_SUB || 'e23pPWiNAUSAEMsxU6yEWrIiD2TnxZDf',
             DEV_AUTH_NAME: process.env.DEV_AUTH_NAME || 'Nelson Romaine',
-            DEV_AUTH_EMAIL: process.env.DEV_AUTH_EMAIL || 'nelson-devops-project@outlook.com',
+            DEV_AUTH_EMAIL: process.env.DEV_AUTH_EMAIL || 'nelson@romaine.life',
             PORT: String(port),
           },
           stdio: ['ignore', 'pipe', 'pipe'],

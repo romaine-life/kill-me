@@ -31,38 +31,13 @@ const fmtDate = (iso) => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-const fmtDateLong = (iso) => {
-  const d = new Date(iso + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-};
-
 const daysSince = (iso) => {
   const a = new Date(iso + 'T00:00:00').getTime();
   const b = new Date(todayLocal() + 'T00:00:00').getTime();
   return Math.round((b - a) / (1000 * 60 * 60 * 24));
 };
 
-// Longest consecutive run of unique active dates ending today (or yesterday).
-const computeStreak = (allDates) => {
-  if (!allDates.length) return 0;
-  const set = new Set(allDates);
-  let cursor = todayLocal();
-  if (!set.has(cursor)) {
-    const d = new Date(cursor + 'T00:00:00');
-    d.setDate(d.getDate() - 1);
-    cursor = d.toISOString().slice(0, 10);
-  }
-  let streak = 0;
-  while (set.has(cursor)) {
-    streak += 1;
-    const d = new Date(cursor + 'T00:00:00');
-    d.setDate(d.getDate() - 1);
-    cursor = d.toISOString().slice(0, 10);
-  }
-  return streak;
-};
-
-export function ListTab({ onWorkoutClick, onCardioClick, currentDay = 1 }) {
+export function ListTab({ onWorkoutClick, onCardioClick, viewToggle }) {
   const [workouts, setWorkouts] = useState([]);
   const [cardioSessions, setCardioSessions] = useState([]);
   const [sorenessEntries, setSorenessEntries] = useState([]);
@@ -137,11 +112,7 @@ export function ListTab({ onWorkoutClick, onCardioClick, currentDay = 1 }) {
     [workouts, cardioSessions, sorenessEntries],
   );
 
-  const streak = useMemo(() => computeStreak(allDates), [allDates]);
   const cyclesCompleted = Math.floor(workouts.length / 12);
-
-  const todayInfo = DAY_CONFIG[currentDay];
-  const todayDesign = DAY_DESIGN[currentDay];
 
   if (loading) {
     return (
@@ -160,7 +131,7 @@ export function ListTab({ onWorkoutClick, onCardioClick, currentDay = 1 }) {
 
   return (
     <div className="list-tab-page" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 80px', display: 'flex', flexDirection: 'column', gap: 28, fontFamily: 'var(--font-primary)' }}>
-      <Hero today={todayInfo} design={todayDesign} dayN={currentDay} streak={streak} />
+      {viewToggle}
       <StatsStrip workouts={workouts} cardio={cardioSessions} cycles={cyclesCompleted} activeDays={new Set(allDates).size} />
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -213,106 +184,6 @@ export function ListTab({ onWorkoutClick, onCardioClick, currentDay = 1 }) {
 }
 
 // ── Hero ───────────────────────────────────────────────────────────────
-function Hero({ today, design, dayN, streak }) {
-  if (!today || !design) return null;
-  return (
-    <div
-      className="list-hero"
-      style={{
-        position: 'relative',
-        borderRadius: 14,
-        background: 'linear-gradient(180deg, #161616 0%, #0e0e0e 100%)',
-        border: '1px solid var(--border-subtle)',
-        padding: '32px 36px',
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) auto',
-        gap: 24,
-        alignItems: 'center',
-        overflow: 'hidden',
-        minHeight: 240,
-      }}
-    >
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          pointerEvents: 'none',
-          background: 'radial-gradient(circle at 80% 50%, rgba(200,56,56,0.08), transparent 55%)',
-        }}
-      />
-      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span className="eyebrow">Today · {fmtDateLong(todayLocal())}</span>
-          <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--fg-disabled)' }} />
-          <span className="eyebrow tnum" style={{ color: 'var(--status-active)' }}>● {streak}-day streak</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, flexWrap: 'wrap' }}>
-          <span className="display tnum" style={{ fontSize: 84, color: 'var(--fg-primary)' }}>D{pad2(dayN)}</span>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <span className="display" style={{ fontSize: 28, color: design.color }}>{today.name}</span>
-            <span style={{ fontSize: 13, color: 'var(--fg-muted)' }}>{today.focus}</span>
-          </div>
-        </div>
-        <p style={{ margin: 0, fontSize: 14, color: 'var(--fg-secondary)', maxWidth: 460, lineHeight: 1.5, fontFamily: "system-ui, 'Segoe UI', sans-serif" }}>
-          {today.description}
-        </p>
-        <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-          <button style={btnPrimary}>
-            <Plus size={14} strokeWidth={2.5} />
-            <span>Log session</span>
-          </button>
-          <button style={btnSecondary}>
-            <Check size={14} strokeWidth={2.5} />
-            <span>View exercises</span>
-          </button>
-        </div>
-      </div>
-      <div className="list-hero-anatomy" style={{ position: 'relative', width: 200, height: 220, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'radial-gradient(ellipse at center, rgba(200,56,56,0.18), transparent 60%)',
-            filter: 'blur(8px)',
-          }}
-        />
-        <img className="anatomy" src={anatomyUrl(design.muscle)} alt="" style={{ height: 220, width: 'auto', display: 'block' }} />
-      </div>
-    </div>
-  );
-}
-
-const btnPrimary = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 6,
-  padding: '9px 14px',
-  borderRadius: 9999,
-  background: 'var(--fg-primary)',
-  color: '#0a0a0a',
-  fontFamily: 'var(--font-primary)',
-  fontWeight: 700,
-  fontSize: 13,
-  letterSpacing: '-0.005em',
-  border: 'none',
-  cursor: 'pointer',
-};
-
-const btnSecondary = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 6,
-  padding: '9px 14px',
-  borderRadius: 9999,
-  background: 'var(--bg-elevated)',
-  color: 'var(--fg-body)',
-  fontFamily: 'var(--font-primary)',
-  fontWeight: 600,
-  fontSize: 13,
-  border: '1px solid var(--border-subtle)',
-  cursor: 'pointer',
-};
-
 // ── Stats strip ────────────────────────────────────────────────────────
 function StatsStrip({ workouts, cardio, cycles, activeDays }) {
   const stats = [

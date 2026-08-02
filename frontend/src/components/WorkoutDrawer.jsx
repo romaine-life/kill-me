@@ -11,6 +11,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { getDayInfo, DAY_CONFIG } from '../utils/dayConfig';
+import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { apiFetch } from '../api/client.js';
 import { todayLocal, nowLocalTime } from '../utils/dateUtils';
 import { useDataSource } from '../api/snapshotContext.jsx';
@@ -31,6 +32,7 @@ export function LogTab({
 }) {
   // Top-level toggle: 'weight' or 'cardio'
   const [logType, setLogType] = useState(viewCardio ? 'cardio' : 'weight');
+  const [logStep, setLogStep] = useState(viewWorkout || viewCardio ? 'form' : 'picker'); // 'picker' | 'form'
 
   const isEditMode = !!viewWorkout;
 
@@ -55,8 +57,6 @@ export function LogTab({
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // --- Recent workouts ---
-  const [recentWorkouts, setRecentWorkouts] = useState([]);
 
   // --- Cardio form state ---
   const [cardioActivity, setCardioActivity] = useState('treadmill');
@@ -80,14 +80,12 @@ export function LogTab({
   const [bikeAvgSpeed, setBikeAvgSpeed] = useState('');
   const [bikeAvgHR, setBikeAvgHR] = useState('');
   const [bikeCalories, setBikeCalories] = useState('');
-  // Recent cardio
-  const [recentCardio, setRecentCardio] = useState([]);
 
   const isCardioEditMode = !!viewCardio;
 
   const dateInputRef = useRef(null);
   const cardioDateRef = useRef(null);
-  const { fetchWorkouts: fetchWorkoutsFromSource, fetchCardioSessions, fetchCardioTemplates, isReady } = useDataSource();
+  const { fetchCardioTemplates, isReady } = useDataSource();
 
   const dayInfo = getDayInfo(selectedDay);
 
@@ -159,10 +157,12 @@ export function LogTab({
       });
   }, [isReady, viewCardio]);
 
-  // Switch logType when viewCardio/viewWorkout changes
+  // Switch logType/step when viewCardio/viewWorkout changes. Edit mode jumps
+  // straight to the form; create mode starts on the type picker.
   useEffect(() => {
-    if (viewCardio) setLogType('cardio');
-    else if (viewWorkout) setLogType('weight');
+    if (viewCardio) { setLogType('cardio'); setLogStep('form'); }
+    else if (viewWorkout) { setLogType('weight'); setLogStep('form'); }
+    else { setLogStep('picker'); }
   }, [viewCardio, viewWorkout]);
 
   // Populate cardio form from viewCardio (edit) or defaults (create)
@@ -204,16 +204,6 @@ export function LogTab({
     };
   }, []);
 
-  // Load recent workouts and cardio
-  useEffect(() => {
-    if (!isReady) return;
-    fetchWorkoutsFromSource().then(data => {
-      setRecentWorkouts((data.workouts || []).slice(0, 5));
-    }).catch(() => {});
-    fetchCardioSessions().then(data => {
-      setRecentCardio((data.sessions || []).slice(0, 5));
-    }).catch(() => {});
-  }, [isReady]);
 
   // ─────────────────────────────────────────────
   // Data fetching
@@ -467,31 +457,37 @@ export function LogTab({
 
   return (
     <div className="max-w-2xl">
-      {/* Log Type Toggle */}
-      <div className="flex gap-3 bg-slate-800/30 backdrop-blur-md rounded-xl p-2 mb-6">
-        <button
-          onClick={() => { setLogType('weight'); onViewCardio?.(null); }}
-          className={`flex-1 py-3 rounded-lg font-bold uppercase tracking-wide transition-all ${
-            logType === 'weight'
-              ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/30'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          Weight Workout
-        </button>
-        <button
-          onClick={() => { setLogType('cardio'); onViewWorkout?.(null); }}
-          className={`flex-1 py-3 rounded-lg font-bold uppercase tracking-wide transition-all ${
-            logType === 'cardio'
-              ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          Cardio Session
-        </button>
-      </div>
+      {/* Type picker (create mode) */}
+      {logStep === 'picker' && !viewWorkout && !viewCardio && (
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={() => { setLogType('weight'); onViewCardio?.(null); setLogStep('form'); }}
+            className="flex items-center justify-between px-6 py-6 rounded-xl bg-slate-800/40 border border-slate-700/50 hover:border-cyan-500/60 hover:bg-slate-800/70 transition-all"
+          >
+            <span className="text-2xl font-black text-slate-100 uppercase tracking-wide">Strength</span>
+            <ChevronRight className="text-slate-400" size={24} />
+          </button>
+          <button
+            onClick={() => { setLogType('cardio'); onViewWorkout?.(null); setLogStep('form'); }}
+            className="flex items-center justify-between px-6 py-6 rounded-xl bg-slate-800/40 border border-slate-700/50 hover:border-emerald-500/60 hover:bg-slate-800/70 transition-all"
+          >
+            <span className="text-2xl font-black text-slate-100 uppercase tracking-wide">Cardio</span>
+            <ChevronRight className="text-slate-400" size={24} />
+          </button>
+        </div>
+      )}
 
-      {logType === 'weight' && (<>
+      {/* Back to picker (create mode only) */}
+      {logStep === 'form' && !viewWorkout && !viewCardio && (
+        <button
+          onClick={() => setLogStep('picker')}
+          className="flex items-center gap-1.5 mb-4 text-slate-400 hover:text-slate-200 transition-colors font-bold uppercase tracking-wide text-sm"
+        >
+          <ChevronLeft size={18} /> Back
+        </button>
+      )}
+
+      {logStep === 'form' && logType === 'weight' && (<>
       {/* Header */}
       <div className="mb-6">
         <h2 className="text-4xl font-black text-cyan-400 uppercase tracking-wide mb-2">
@@ -671,6 +667,9 @@ export function LogTab({
               {dayInfo?.name}
             </h3>
             <p className="text-slate-400">{dayInfo?.focus}</p>
+            {dayInfo?.description && (
+              <p className="text-slate-500 text-sm mt-1">{dayInfo.description}</p>
+            )}
           </div>
           <span className={`${dayInfo?.color} text-white text-sm font-bold px-3 py-1 rounded-full`}>
             Day {selectedDay}
@@ -926,7 +925,7 @@ export function LogTab({
 
       </>)} {/* end logType === 'weight' */}
 
-      {logType === 'cardio' && (<>
+      {logStep === 'form' && logType === 'cardio' && (<>
         {/* Cardio Header */}
         <div className="mb-6">
           <h2 className="text-4xl font-black uppercase tracking-wide mb-2" style={{ color: CARDIO_CONFIG[cardioActivity]?.color || '#10b981' }}>
@@ -1220,89 +1219,6 @@ export function LogTab({
         )}
       </>)} {/* end logType === 'cardio' */}
 
-      {/* Recent Workouts */}
-      {recentWorkouts.length > 0 && (
-        <div className="mt-8">
-          <h3 className="text-lg font-bold text-slate-300 uppercase tracking-wide mb-4">
-            Recent Workouts
-          </h3>
-          <div className="space-y-2">
-            {recentWorkouts.map(workout => {
-              const wDayInfo = getDayInfo(workout.dayNumber);
-              const isActive = isEditMode && viewWorkout.id === workout.id;
-              return (
-                <div
-                  key={workout.id}
-                  onClick={() => onViewWorkout?.(workout)}
-                  className={`bg-slate-800/30 rounded-xl border p-4 transition-all cursor-pointer hover:scale-[1.01] ${
-                    isActive
-                      ? 'border-cyan-500/50 bg-cyan-500/5'
-                      : 'border-slate-700/50 hover:border-slate-600'
-                  }`}
-                  title="View workout details"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className={`${wDayInfo?.color || 'bg-slate-600'} text-white text-xs font-bold px-2 py-1 rounded-full`}>
-                      Day {workout.dayNumber}
-                    </span>
-                    <span className="text-slate-300 font-bold text-sm">
-                      {workout.dayName}
-                    </span>
-                    <span className="text-slate-500 text-xs ml-auto">
-                      {new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
-                    <span className="text-slate-600 text-xs">
-                      {workout.mode === 'quick' ? '⚡' : '📋'}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Recent Cardio */}
-      {recentCardio.length > 0 && (
-        <div className="mt-8">
-          <h3 className="text-lg font-bold text-slate-300 uppercase tracking-wide mb-4">
-            Recent Cardio
-          </h3>
-          <div className="space-y-2">
-            {recentCardio.map(session => {
-              const config = CARDIO_CONFIG[session.activity] || CARDIO_CONFIG.treadmill;
-              const isActive = isCardioEditMode && viewCardio?.id === session.id;
-              return (
-                <div
-                  key={session.id}
-                  onClick={() => onViewCardio?.(session)}
-                  className={`bg-slate-800/30 rounded-xl border p-4 transition-all cursor-pointer hover:scale-[1.01] ${
-                    isActive
-                      ? 'border-emerald-500/50 bg-emerald-500/5'
-                      : 'border-slate-700/50 hover:border-slate-600'
-                  }`}
-                  title="View cardio session"
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="text-white text-xs font-bold px-2 py-1 rounded-full"
-                      style={{ backgroundColor: config.color }}
-                    >
-                      {config.label}
-                    </span>
-                    <span className="text-slate-300 font-bold text-sm">
-                      {session.durationMinutes ? `${session.durationMinutes} min` : ''}
-                    </span>
-                    <span className="text-slate-500 text-xs ml-auto">
-                      {new Date(session.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
       {/* Cardio success toast */}
       {cardioToast && (
         <motion.div

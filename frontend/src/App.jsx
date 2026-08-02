@@ -14,7 +14,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWorkouts } from './hooks/useWorkouts';
 import { useAuth } from './auth/AuthContext.jsx';
-import { TodayTab } from './components/TodayTab';
 import { HistoryTab } from './components/HistoryTab';
 import { DatabaseInit } from './components/DatabaseInit';
 import { LogTab } from './components/WorkoutDrawer';
@@ -26,12 +25,12 @@ import { ExercisesTab } from './components/ExercisesTab';
 import { ListTab } from './components/ListTab';
 import { CycleDial } from './components/CycleDial';
 import { isAdminMode } from './utils/adminMode';
-import { CalendarDays, Dumbbell, RefreshCw, Activity, PenLine, Wrench, ListChecks, List, Menu, UserCircle } from 'lucide-react';
+import { CalendarDays, RefreshCw, Activity, PenLine, Wrench, ListChecks, List, Menu } from 'lucide-react';
 
 // Map URL path to tab id. Unknown paths fall back to 'list' (the landing page).
 const tabFromPath = (path) => {
   const slug = path.replace(/^\//, '').toLowerCase();
-  const valid = ['history', 'list', 'today', 'exercises', 'cycle', 'soreness', 'log', 'admin'];
+  const valid = ['list', 'exercises', 'cycle', 'soreness', 'log', 'admin'];
   return valid.includes(slug) ? slug : 'list';
 };
 
@@ -48,8 +47,7 @@ function App() {
   const [logViewCardio, setLogViewCardio] = useState(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 760);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [exercisesInitialDay, setExercisesInitialDay] = useState(null);
-  const [exercisesInitialName, setExercisesInitialName] = useState(null);
+  const [activityView, setActivityView] = useState('list'); // History tab: 'list' | 'calendar'
 
   // Push URL when tab changes (but not on initial mount)
   const navigateTab = useCallback((tab) => {
@@ -123,21 +121,13 @@ function App() {
     navigateTab('list');
   };
 
-  const handleNavigateExercises = (dayNumber = null, exerciseName = null) => {
-    setExercisesInitialDay(dayNumber);
-    setExercisesInitialName(exerciseName);
-    navigateTab('exercises');
-  };
-
   const handleNav = (tab) => {
     navigateTab(tab);
     setMobileNavOpen(false);
   };
 
   const tabs = [
-    { id: 'list', label: 'List', icon: List },
-    { id: 'history', label: 'History', icon: CalendarDays },
-    { id: 'today', label: 'Workout', icon: Dumbbell },
+    { id: 'list', label: 'History', icon: CalendarDays },
     { id: 'exercises', label: 'Exercises', icon: ListChecks },
     { id: 'cycle', label: 'Cycle', icon: RefreshCw },
     { id: 'soreness', label: 'Soreness', icon: Activity },
@@ -199,35 +189,30 @@ function App() {
             ...(isMobile ? { paddingBottom: 'calc(76px + env(safe-area-inset-bottom))' } : {}),
           }}
         >
-          {activeTab === 'today' && (
-            <TodayTab currentDay={currentDay} isAdmin={isAdmin} onNavigateExercises={handleNavigateExercises} />
-          )}
-
           {activeTab === 'exercises' && (
             <ExercisesTab
               currentDay={currentDay}
               isAdmin={isAdmin}
-              initialDay={exercisesInitialDay}
-              initialExercise={exercisesInitialName}
-            />
-          )}
-
-          {activeTab === 'history' && (
-            <HistoryTab
-              key={refreshKey}
-              onDayClick={isAdmin ? handleOpenLog : undefined}
-              onWorkoutClick={isAdmin ? handleViewWorkout : undefined}
-              onCardioClick={isAdmin ? handleViewCardio : undefined}
             />
           )}
 
           {activeTab === 'list' && (
-            <ListTab
-              key={refreshKey}
-              currentDay={currentDay}
-              onWorkoutClick={isAdmin ? handleViewWorkout : undefined}
-              onCardioClick={isAdmin ? handleViewCardio : undefined}
-            />
+            activityView === 'calendar' ? (
+              <HistoryTab
+                key={refreshKey}
+                viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
+                onDayClick={isAdmin ? handleOpenLog : undefined}
+                onWorkoutClick={isAdmin ? handleViewWorkout : undefined}
+                onCardioClick={isAdmin ? handleViewCardio : undefined}
+              />
+            ) : (
+              <ListTab
+                key={refreshKey}
+                viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
+                onWorkoutClick={isAdmin ? handleViewWorkout : undefined}
+                onCardioClick={isAdmin ? handleViewCardio : undefined}
+              />
+            )
           )}
 
           {activeTab === 'cycle' && (
@@ -275,8 +260,33 @@ function App() {
 
 export default App;
 
+function ActivityToggle({ view, onChange }) {
+  const opts = [{ id: 'list', label: 'List' }, { id: 'calendar', label: 'Calendar' }];
+  return (
+    <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, width: 'fit-content' }}>
+      {opts.map((o) => {
+        const active = o.id === view;
+        return (
+          <button
+            key={o.id}
+            onClick={() => onChange(o.id)}
+            style={{
+              padding: '9px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600,
+              fontFamily: 'var(--font-primary)', border: 'none', cursor: 'pointer',
+              color: active ? 'var(--fg-primary)' : 'var(--fg-muted)',
+              background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function TopBar({ activeTab, isMobile, showAdminTab, mobileNavOpen, onToggleMobileNav }) {
-  const title = activeTab === 'list' ? 'List' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
+  const title = activeTab === 'list' ? 'History' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
 
   return (
     <header style={{ ...styles.topBar, ...(isMobile ? styles.topBarMobile : {}) }}>
@@ -297,13 +307,8 @@ function TopBar({ activeTab, isMobile, showAdminTab, mobileNavOpen, onToggleMobi
         </div>
       </div>
       <div style={styles.topBarRight}>
-        <span style={styles.livePill}>
-          <span style={styles.liveDot} />
-          live
-        </span>
         {showAdminTab && <span style={styles.adminPill}>admin</span>}
-        {!isMobile && <span style={styles.buildNumber}>{__BUILD_NUMBER__}</span>}
-        {!isMobile && <UserProfile />}
+        <UserProfile />
       </div>
     </header>
   );
@@ -325,16 +330,6 @@ function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, isAdmin, 
       <TabBar tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
 
       <div style={{ flex: 1 }} />
-
-      <div style={styles.profileFooter}>
-        <div style={styles.profileAvatar}>
-          {isAdmin ? 'N' : <UserCircle size={15} />}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2, minWidth: 0 }}>
-          <span style={styles.profileName}>{isAdmin ? 'nelsong6' : 'Guest'}</span>
-          <span style={styles.profileMeta}>{isAdmin ? 'signed in · admin' : 'public view'}</span>
-        </div>
-      </div>
     </aside>
   );
 }
@@ -342,7 +337,7 @@ function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, isAdmin, 
 function BottomNav({ tabs, activeTab, onTabChange }) {
   // Log is the primary daily action for admins — surface it centered in the bar
   // (it's only in `tabs` when signed in as admin, so public visitors still see 4).
-  const order = ['list', 'today', 'log', 'cycle', 'soreness'];
+  const order = ['list', 'log', 'cycle', 'soreness'];
   const visibleTabs = order
     .map((id) => tabs.find((tab) => tab.id === id))
     .filter(Boolean);
@@ -425,34 +420,12 @@ const styles = {
     color: 'var(--fg-faint)',
     fontFamily: 'var(--font-mono)',
   },
-  livePill: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '5px 10px',
-    borderRadius: 9999,
-    background: 'var(--status-active-bg)',
-    color: 'var(--status-active)',
-    fontSize: 11,
-    fontFamily: 'var(--font-mono)',
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: '50%',
-    background: 'var(--status-active)',
-  },
   adminPill: {
     padding: '5px 9px',
     borderRadius: 9999,
     background: 'rgba(240,197,96,0.10)',
     color: 'var(--status-warn)',
     fontSize: 11,
-    fontFamily: 'var(--font-mono)',
-  },
-  buildNumber: {
-    fontSize: 10,
-    color: 'var(--fg-faint)',
     fontFamily: 'var(--font-mono)',
   },
   mobileMenuButton: {
@@ -518,44 +491,6 @@ const styles = {
     letterSpacing: 0,
   },
   brandHost: {
-    fontSize: 10,
-    color: 'var(--fg-faint)',
-    fontFamily: 'var(--font-mono)',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  profileFooter: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    padding: '8px 8px',
-    borderRadius: 12,
-    background: 'rgba(255,255,255,0.02)',
-    border: '1px solid var(--border-subtle)',
-  },
-  profileAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: '50%',
-    background: 'linear-gradient(135deg, #3a3a3f, #1f1f22)',
-    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.04)',
-    display: 'grid',
-    placeItems: 'center',
-    fontFamily: 'var(--font-primary)',
-    fontWeight: 700,
-    fontSize: 12,
-    color: 'var(--fg-secondary)',
-  },
-  profileName: {
-    fontSize: 12,
-    color: 'var(--fg-body)',
-    fontWeight: 500,
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  profileMeta: {
     fontSize: 10,
     color: 'var(--fg-faint)',
     fontFamily: 'var(--font-mono)',

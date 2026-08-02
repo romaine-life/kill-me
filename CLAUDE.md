@@ -177,6 +177,36 @@ The frontend reads `VITE_API_URL`. The auth service URL is fetched at runtime fr
 Admin mode (database init, data migration) is available only on localhost in dev
 mode when signed in as admin.
 
+### Visual verification (screenshots)
+
+"Take a screenshot" here means **render the running app to a PNG with headless
+Chromium and read the file** — not the in-app/agent preview browser, whose
+capture action hangs (30s timeout) in this environment regardless of page or
+viewport. Its DOM/measurement tools (`read_page`, JS `getBoundingClientRect`)
+still work, but geometry alone misses real bugs: e.g. content that clips off the
+right edge is invisible to a `scrollWidth` check because page overflow is hidden
+(the page doesn't scroll, it just cuts). Only an actual rendered image catches
+those. So screenshots are required for any layout/mobile verification, not
+optional.
+
+Working method (dev server started via `devctl`, see the dev-servers skill):
+
+```bash
+chrome --headless=new --disable-gpu --hide-scrollbars \
+  --user-data-dir="<temp>/chrome-prof" \
+  --window-size=390,844 \          # 390w = mobile; app's isMobile triggers <760px
+  --virtual-time-budget=9000 \     # let async load (sql.js WASM + snapshot.db) settle
+  --screenshot="<temp>/shot.png" \
+  "http://localhost:<vite-port>/<route>"
+```
+
+Then read the PNG. Notes: use an isolated `--user-data-dir` so it can't disturb
+a real Chrome profile; bump `--virtual-time-budget` for data-heavy routes (the
+History calendar needs ~20000); routes are `/`, `/today`, `/history`,
+`/exercises`, `/cycle`, `/soreness`, `/log` (admin-gated). On Windows the binary
+is typically `C:\Program Files\Google\Chrome\Application\chrome.exe` or Edge's
+`msedge.exe`.
+
 ### Build number
 
 The frontend displays a git short hash as the build number, injected at build time
