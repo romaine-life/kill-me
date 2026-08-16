@@ -46,12 +46,9 @@ export function LogTab({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [useNextWorkout, setUseNextWorkout] = useState(true);
-  const [dropdownDay, setDropdownDay] = useState(() => {
-    const alternativeDays = Object.keys(DAY_CONFIG)
-      .map(d => parseInt(d))
-      .filter(d => d !== currentDay);
-    return alternativeDays[0] || 1;
-  });
+  // The picker lists all 12 days (see the cycle dial — the list has to line up
+  // with it), so it starts on the current day rather than an arbitrary other one.
+  const [dropdownDay, setDropdownDay] = useState(currentDay);
 
   // --- Delete state (edit mode only) ---
   const [deleting, setDeleting] = useState(false);
@@ -102,24 +99,17 @@ export function LogTab({
       setMode(viewWorkout.mode || 'quick');
       setConfirmDelete(false);
 
-      if (viewWorkout.dayNumber === currentDay) {
-        setUseNextWorkout(true);
-      } else {
-        setUseNextWorkout(false);
-        setDropdownDay(viewWorkout.dayNumber);
-      }
+      setDropdownDay(viewWorkout.dayNumber);
+      setUseNextWorkout(viewWorkout.dayNumber === currentDay);
     } else {
       // Create mode: populate from initialDay/initialDate or defaults
       if (initialDay) {
         setSelectedDay(initialDay);
-        if (initialDay !== currentDay) {
-          setDropdownDay(initialDay);
-          setUseNextWorkout(false);
-        } else {
-          setUseNextWorkout(true);
-        }
+        setDropdownDay(initialDay);
+        setUseNextWorkout(initialDay === currentDay);
       } else {
         setSelectedDay(currentDay);
+        setDropdownDay(currentDay);
         setUseNextWorkout(true);
       }
       setSelectedDate(initialDate || todayLocal());
@@ -646,13 +636,12 @@ export function LogTab({
                   !useNextWorkout ? 'hover:border-cyan-400/70 focus:ring-cyan-500/50' : ''
                 }`}
               >
-                {Object.entries(DAY_CONFIG)
-                  .filter(([dayNum]) => parseInt(dayNum) !== currentDay)
-                  .map(([dayNum, config]) => (
-                    <option key={dayNum} value={dayNum} className="bg-slate-800 text-white font-bold">
-                      {config.name}
-                    </option>
-                  ))}
+                {Object.entries(DAY_CONFIG).map(([dayNum, config]) => (
+                  <option key={dayNum} value={dayNum} className="bg-slate-800 text-white font-bold">
+                    Day {dayNum} · {config.name}
+                    {parseInt(dayNum) === currentDay ? ' (today)' : ''}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
