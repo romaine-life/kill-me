@@ -2,7 +2,8 @@
 // in its accent color; completed segments are dim white; future segments
 // are nearly invisible. Click a segment to navigate (admin) or inspect.
 
-import { DAY_DESIGN, dayGroup, pad2 } from '../utils/dayDesign';
+import { DAY_DESIGN, pad2 } from '../utils/dayDesign';
+import { DAY_CONFIG } from '../utils/dayConfig';
 
 const SIZE = 200;
 const CX = SIZE / 2;
@@ -28,6 +29,7 @@ const segPath = (i) => {
 
 export function CycleDial({ currentDay, onDay }) {
   const cur = DAY_DESIGN[currentDay];
+  const dayName = (DAY_CONFIG[currentDay]?.name || '').toUpperCase();
   return (
     <div style={{ display: 'grid', placeItems: 'center', padding: '4px 0 6px' }}>
       <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
@@ -84,16 +86,18 @@ export function CycleDial({ currentDay, onDay }) {
         >
           D{pad2(currentDay)}
         </text>
+        {/* The dial hole is ~90 units wide at this baseline, which fits ~13 chars
+            at 9px — the longest names ("COMPOUND: PULLS") are 15, so they drop a notch. */}
         <text
           x={CX}
           y={CY + 30}
           textAnchor="middle"
-          fontSize="9"
+          fontSize={dayName.length > 13 ? 8 : 9}
           fontFamily="var(--font-primary)"
           fontWeight="500"
           fill={cur?.color || '#8a8a8a'}
         >
-          {dayGroup(currentDay)}
+          {dayName}
         </text>
       </svg>
     </div>
