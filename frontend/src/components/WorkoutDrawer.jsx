@@ -775,11 +775,16 @@ export function LogTab({
                             return (
                               <>
                                 {hasMultipleVars && (
-                                  <div className="flex flex-wrap gap-1.5 mb-2">
+                                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                                    {/* Labelled so the chips read as a control, not as tags. */}
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-0.5">
+                                      Variation
+                                    </span>
                                     {vars.map((v, vi) => (
                                       <button
                                         key={vi}
                                         type="button"
+                                        aria-pressed={exercise.variation === v.name}
                                         onClick={() => {
                                           updateExercise(idx, 'variation', v.name);
                                           updateExercise(idx, 'weight', v.targetWeight || '');
@@ -787,10 +792,10 @@ export function LogTab({
                                           updateExercise(idx, 'sets', v.targetSets || '');
                                           updateExercise(idx, 'cableSetting', v.cableSetting || '');
                                         }}
-                                        className={`text-xs px-2 py-0.5 rounded-full border cursor-pointer transition-all ${
+                                        className={`text-xs px-2.5 py-1 rounded-full border cursor-pointer transition-all ${
                                           exercise.variation === v.name
-                                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                                            : 'bg-slate-700/50 text-slate-400 border-slate-600/40 hover:border-slate-500'
+                                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold'
+                                            : 'bg-slate-700 text-slate-200 border-slate-500 hover:border-slate-400'
                                         }`}
                                       >
                                         {v.name}
