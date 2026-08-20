@@ -233,6 +233,7 @@ export const exercises = [
       { name: 'Standard', targetWeight: 20, targetReps: 'Failure', targetSets: 3, cableSetting: '', default: true },
       { name: 'Rope Hammer', targetWeight: 20, targetReps: 'Failure', targetSets: 3, cableSetting: '' },
       { name: 'Single Arm', targetWeight: 10, targetReps: 'Failure', targetSets: 3, cableSetting: '' },
+      { name: 'Bayesian', targetWeight: 13, targetReps: 12, targetSets: 3, cableSetting: '' },
     ],
   },
 
