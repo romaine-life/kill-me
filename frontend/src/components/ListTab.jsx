@@ -17,6 +17,7 @@ import {
   pad2,
   sorenessTierColor,
 } from '../utils/dayDesign';
+import { daysBetween } from '../utils/sorenessLink';
 import {
   Plus,
   Check,
@@ -37,7 +38,7 @@ const daysSince = (iso) => {
   return Math.round((b - a) / (1000 * 60 * 60 * 24));
 };
 
-export function ListTab({ onWorkoutClick, onCardioClick, viewToggle }) {
+export function ListTab({ onWorkoutClick, onCardioClick, onLogSoreness, viewToggle }) {
   const [workouts, setWorkouts] = useState([]);
   const [cardioSessions, setCardioSessions] = useState([]);
   const [sorenessEntries, setSorenessEntries] = useState([]);
@@ -175,7 +176,7 @@ export function ListTab({ onWorkoutClick, onCardioClick, viewToggle }) {
           </div>
         ) : (
           groups.map(([date, dayItems]) => (
-            <DateGroup key={date} date={date} items={dayItems} onWorkoutClick={onWorkoutClick} onCardioClick={onCardioClick} />
+            <DateGroup key={date} date={date} items={dayItems} onWorkoutClick={onWorkoutClick} onCardioClick={onCardioClick} onLogSoreness={onLogSoreness} />
           ))
         )}
       </div>
@@ -217,7 +218,7 @@ function StatsStrip({ workouts, cardio, cycles, activeDays }) {
 }
 
 // ── Date group ─────────────────────────────────────────────────────────
-function DateGroup({ date, items, onWorkoutClick, onCardioClick }) {
+function DateGroup({ date, items, onWorkoutClick, onCardioClick, onLogSoreness }) {
   const ds = daysSince(date);
   const rel = ds === 0 ? 'today' : ds === 1 ? 'yesterday' : `${ds} days ago`;
   return (
@@ -228,9 +229,9 @@ function DateGroup({ date, items, onWorkoutClick, onCardioClick }) {
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
         {items.map((it) => {
-          if (it._kind === 'workout') return <WorkoutCard key={it.id} w={it} onClick={onWorkoutClick} />;
+          if (it._kind === 'workout') return <WorkoutCard key={it.id} w={it} onClick={onWorkoutClick} onLogSoreness={onLogSoreness} />;
           if (it._kind === 'cardio') return <CardioCard key={it.id} c={it} onClick={onCardioClick} />;
-          if (it._kind === 'soreness') return <SorenessCard key={`s-${it.date}`} s={it} />;
+          if (it._kind === 'soreness') return <SorenessCard key={it.id || `s-${it.date}`} s={it} />;
           return null;
         })}
       </div>
@@ -268,7 +269,7 @@ function DayChip({ n, size = 'md' }) {
 }
 
 // ── Workout card ───────────────────────────────────────────────────────
-function WorkoutCard({ w, onClick }) {
+function WorkoutCard({ w, onClick, onLogSoreness }) {
   const [open, setOpen] = useState(false);
   const design = DAY_DESIGN[w.dayNumber] || {};
   const dayInfo = DAY_CONFIG[w.dayNumber];
@@ -401,30 +402,43 @@ function WorkoutCard({ w, onClick }) {
               </div>
             </div>
           ))}
-          {onClick && (
-            <button
-              onClick={() => onClick(w)}
-              style={{
-                alignSelf: 'flex-start',
-                marginTop: 6,
-                padding: '6px 10px',
-                fontSize: 11,
-                fontFamily: 'var(--font-primary)',
-                fontWeight: 600,
-                color: 'var(--fg-muted)',
-                background: 'transparent',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 9999,
-                cursor: 'pointer',
-              }}
-            >
-              Open in editor →
-            </button>
+          {(onClick || onLogSoreness) && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+              {onClick && (
+                <button onClick={() => onClick(w)} style={cardActionStyle()}>
+                  Open in editor →
+                </button>
+              )}
+              {onLogSoreness && (
+                <button
+                  onClick={() => onLogSoreness(w)}
+                  style={cardActionStyle('#f59e6f')}
+                  title="Record the soreness this workout caused"
+                >
+                  Log soreness →
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
     </div>
   );
+}
+
+// Pill button used for the actions revealed inside an expanded workout card.
+function cardActionStyle(color) {
+  return {
+    padding: '6px 10px',
+    fontSize: 11,
+    fontFamily: 'var(--font-primary)',
+    fontWeight: 600,
+    color: color || 'var(--fg-muted)',
+    background: 'transparent',
+    border: `1px solid ${color ? 'rgba(245,158,111,0.35)' : 'var(--border-subtle)'}`,
+    borderRadius: 9999,
+    cursor: 'pointer',
+  };
 }
 
 // ── Cardio card ────────────────────────────────────────────────────────
@@ -535,6 +549,51 @@ function SorenessCard({ s }) {
           {s.muscles.length} muscle{s.muscles.length !== 1 ? 's' : ''} logged
         </span>
       </div>
+
+      {/* Which workout caused this.
+          The feed groups by the date soreness was *felt*, so this card often sits
+          directly beneath a workout from the same date that did NOT cause it —
+          e.g. Aug 14 leg day above soreness carried over from Aug 13 abs day.
+          The attribution therefore has to name the day and its date outright;
+          a bare "from D04" reads as a footnote on the card above it. */}
+      {s.sourceWorkoutDay != null && (
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            alignSelf: 'flex-start',
+            flexWrap: 'wrap',
+            padding: '5px 10px',
+            borderRadius: 8,
+            background: 'rgba(255,255,255,0.03)',
+            borderLeft: `3px solid ${dayColor(s.sourceWorkoutDay)}`,
+          }}
+        >
+          <span style={{ fontSize: 10, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--fg-faint)', fontFamily: 'var(--font-primary)', fontWeight: 700 }}>
+            Caused by
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: dayColor(s.sourceWorkoutDay) }} />
+            <span className="tnum" style={{ fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--fg-body)' }}>
+              D{pad2(s.sourceWorkoutDay)}
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)' }}>
+              {DAY_CONFIG[s.sourceWorkoutDay]?.name}
+            </span>
+          </span>
+          {s.sourceWorkoutDate && (
+            <span style={{ fontSize: 11, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+              {fmtDate(s.sourceWorkoutDate)}
+              {' · '}
+              {(() => {
+                const d = daysBetween(s.sourceWorkoutDate, s.date);
+                return d === 0 ? 'same day' : `${d} day${d === 1 ? '' : 's'} later`;
+              })()}
+            </span>
+          )}
+        </div>
+      )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {s.muscles.map((m, i) => (
           <span

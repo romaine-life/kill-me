@@ -193,7 +193,10 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
     }
     if (item._kind === 'soreness') {
       const muscleNames = item.muscles.map(m => m.muscle || m.group).join(', ');
-      return `Soreness: ${muscleNames}`;
+      const source = item.sourceWorkoutDay != null
+        ? ` (from Day ${item.sourceWorkoutDay})`
+        : '';
+      return `Soreness${source}: ${muscleNames}`;
     }
     return `Day ${item.dayNumber}: ${item.dayName}`;
   };
