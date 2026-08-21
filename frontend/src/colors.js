@@ -1,5 +1,5 @@
 // Centralized compatibility palette. Older tabs still import this object; keep
-// the shape stable while mapping values onto the synergy-12 visual system.
+// the shape stable while mapping values onto the synergy visual system.
 
 export const colors = {
   // ── Backgrounds (layered from deepest to most elevated) ──

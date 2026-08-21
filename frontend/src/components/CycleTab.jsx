@@ -1,17 +1,23 @@
-// Displays the full Synergy 12 cycle overview — philosophy, day-by-day breakdown,
+// Displays the full Synergy cycle overview — philosophy, day-by-day breakdown,
 // recovery sequencing rationale, and CNS-aware compound day highlighting.
+//
+// The day list and cycle length come from DAY_CONFIG; only the compound-day set
+// and the recovery notes are curated here.
 
-import { DAY_CONFIG } from '../utils/dayConfig';
+import { DAY_CONFIG, getTotalDays } from '../utils/dayConfig';
 
-const COMPOUND_DAYS = new Set([1, 5, 9]);
+const TOTAL_DAYS = getTotalDays();
+
+const COMPOUND_DAYS = new Set([1, 6, 12]);
 
 const RECOVERY_NOTES = {
   1: 'Starts the cycle — systemic leg strength sets the recovery baseline',
-  3: 'Hamstring isolation is safe here because Day 1 squat volume has cleared',
-  7: 'Placed to save the lower back for Day 1 when the cycle wraps around',
-  8: 'Primes the shoulder capsule for Day 9 heavy pressing — light work only',
-  9: 'Dips and heavy pressing belong here, never on Day 8',
-  12: 'Ends the cycle at near-zero CNS load before restarting',
+  5: 'Tendon work is safe here because Day 1 squat volume has cleared. Defined by intent — slow eccentrics and holds, not a second leg day',
+  9: 'The only loaded spinal extension, placed 8 days clear of Day 1 to spare the lower back for squats',
+  11: 'Primes the shoulder capsule for Day 12 heavy pressing — light work only',
+  12: 'Dips and heavy pressing belong here, never on Day 11',
+  15: 'Sits 8 days clear of Pulls and Bicep so forearm loading never stacks',
+  16: 'Primes the hips the day before Day 1 squats, mirroring how Day 11 primes Day 12',
 };
 
 export function CycleTab({ currentDay }) {
@@ -23,7 +29,7 @@ export function CycleTab({ currentDay }) {
           The Cycle
         </h2>
         <p className="text-slate-400 mt-2 text-lg">
-          Synergy 12 — a custom 12-day training cycle
+          Synergy {TOTAL_DAYS} — a custom {TOTAL_DAYS}-day training cycle
         </p>
       </div>
 
@@ -46,15 +52,20 @@ export function CycleTab({ currentDay }) {
           <Principle
             number={3}
             title="CNS-aware sequencing"
-            text="Only three days (1, 5, 9) are systemically taxing compound lifts. They are evenly spaced with isolation and recovery work between them to avoid stacking central nervous system fatigue."
+            text="Only three days (1, 6, 12) are systemically taxing compound lifts. They are evenly spaced with isolation and recovery work between them to avoid stacking central nervous system fatigue."
+          />
+          <Principle
+            number={4}
+            title="Coverage over optimization"
+            text="The cycle exists to prevent atrophy, not to optimize any one adaptation. Its job is making sure nothing gets left out — every day is a short, fixed list requiring zero decisions."
           />
         </div>
       </div>
 
-      {/* 12-Day Breakdown */}
+      {/* Day-by-day breakdown */}
       <div className="space-y-3">
         <h3 className="text-lg font-bold text-slate-100 uppercase tracking-wide">
-          12-Day Breakdown
+          {TOTAL_DAYS}-Day Breakdown
         </h3>
         <div className="space-y-2">
           {Object.entries(DAY_CONFIG).map(([dayNum, day]) => {

@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Plus, Copy, X, Search } from 'lucide-react';
 import { apiFetch } from '../api/client.js';
 import { useDataSource } from '../api/snapshotContext.jsx';
-import { DAY_CONFIG } from '../utils/dayConfig.js';
+import { DAY_CONFIG, getDayNumbers } from '../utils/dayConfig.js';
 import { AnatomyDiagram } from './AnatomyDiagrams.jsx';
 import { ExercisePose } from './ExercisePoses.jsx';
 import { colors } from '../colors.js';
@@ -93,11 +93,11 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
     // If navigated with a specific day, start filtered to that day
     if (initialDay) {
       const days = {};
-      for (let i = 1; i <= 12; i++) days[i] = i === initialDay;
+      for (const i of getDayNumbers()) days[i] = i === initialDay;
       return days;
     }
     const days = {};
-    for (let i = 1; i <= 12; i++) days[i] = true;
+    for (const i of getDayNumbers()) days[i] = true;
     return days;
   });
   const [activeTags, setActiveTags] = useState(new Set());
@@ -240,13 +240,13 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
 
   const enableAllDays = () => {
     const days = {};
-    for (let i = 1; i <= 12; i++) days[i] = true;
+    for (const i of getDayNumbers()) days[i] = true;
     setEnabledDays(days);
   };
 
   const clearAllDays = () => {
     const days = {};
-    for (let i = 1; i <= 12; i++) days[i] = false;
+    for (const i of getDayNumbers()) days[i] = false;
     setEnabledDays(days);
   };
 

@@ -1,4 +1,4 @@
-// Visual metadata for the 12-day Synergy cycle — accent colors and anatomy
+// Visual metadata for the 16-day Synergy cycle — accent colors and anatomy
 // slugs used by the redesigned List landing page (hero, day chip, sidebar
 // cycle dial, feed thumbnails). Logic-relevant config (focus / safety) lives
 // in dayConfig.js; this file is purely presentational.
@@ -11,16 +11,20 @@
 export const DAY_DESIGN = {
   1:  { color: '#4f8cf7', muscle: 'rectus-femoris' },
   2:  { color: '#7fb98a', muscle: 'gastrocnemius' },
-  3:  { color: '#b48bf0', muscle: 'rectus-femoris' },
-  4:  { color: '#f0c560', muscle: 'rectus-abdominis' },
-  5:  { color: '#6c8df5', muscle: 'latissimus-dorsi' },
-  6:  { color: '#f08bb8', muscle: 'biceps-brachii-anterior' },
-  7:  { color: '#5fc7c7', muscle: 'trapezius' },
-  8:  { color: '#ef6f6f', muscle: 'pectoralis-major-anterior', warn: true },
-  9:  { color: '#f59e6f', muscle: 'pectoralis-major-anterior' },
-  10: { color: '#67e8f9', muscle: 'biceps-brachii-anterior' },
-  11: { color: '#a06ff5', muscle: 'deltoid-lateral' },
-  12: { color: '#c8e85e', muscle: 'biceps-brachii-anterior' },
+  3:  { color: '#f0c560', muscle: 'rectus-abdominis' },
+  4:  { color: '#b48bf0', muscle: 'rectus-femoris' },
+  5:  { color: '#5fd6a0', muscle: 'rectus-femoris' },
+  6:  { color: '#6c8df5', muscle: 'latissimus-dorsi' },
+  7:  { color: '#f08bb8', muscle: 'biceps-brachii-anterior' },
+  8:  { color: '#5fc7c7', muscle: 'rectus-abdominis' },
+  9:  { color: '#d4a05f', muscle: 'trapezius' },
+  10: { color: '#9fb0c0', muscle: 'trapezius-lateral' },
+  11: { color: '#ef6f6f', muscle: 'pectoralis-major-anterior', warn: true },
+  12: { color: '#f59e6f', muscle: 'pectoralis-major-anterior' },
+  13: { color: '#67e8f9', muscle: 'biceps-brachii-anterior' },
+  14: { color: '#a06ff5', muscle: 'deltoid-lateral' },
+  15: { color: '#c8e85e', muscle: 'biceps-brachii-anterior' },
+  16: { color: '#e08fd0', muscle: 'gluteus-maximus' },
 };
 
 export const MUSCLE_RED = '#c83838';

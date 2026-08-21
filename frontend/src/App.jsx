@@ -2,7 +2,7 @@
 // eight-queens pattern). Tabs:
 //   - History (default): calendar/list view of past workouts with color-coded days
 //   - Workout: detailed view of any day in the cycle (defaults to current day)
-//   - Cycle: Synergy 12 overview — philosophy, day breakdown, recovery notes
+//   - Cycle: Synergy cycle overview — philosophy, day breakdown, recovery notes
 //   - Soreness: daily muscle soreness journal with structured muscle picker
 //   - Log (admin only): log a workout with quick or detailed mode
 //   - Admin (localhost only + admin role): day override, database init and data migration
@@ -25,7 +25,11 @@ import { ExercisesTab } from './components/ExercisesTab';
 import { ListTab } from './components/ListTab';
 import { CycleDial } from './components/CycleDial';
 import { isAdminMode } from './utils/adminMode';
+import { getTotalDays } from './utils/dayConfig';
 import { CalendarDays, RefreshCw, Activity, PenLine, Wrench, ListChecks, List, Menu } from 'lucide-react';
+
+// Brand string tracks the cycle length so it can't drift from DAY_CONFIG.
+const BRAND = `synergy-${getTotalDays()}`;
 
 // Map URL path to tab id. Unknown paths fall back to 'list' (the landing page).
 const tabFromPath = (path) => {
@@ -302,7 +306,7 @@ function TopBar({ activeTab, isMobile, showAdminTab, mobileNavOpen, onToggleMobi
         )}
         {isMobile && <BrandMark />}
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0 }}>
-          <span className="display" style={styles.topTitle}>{isMobile ? 'synergy-12' : title}</span>
+          <span className="display" style={styles.topTitle}>{isMobile ? BRAND : title}</span>
           {!isMobile && <span style={styles.topSubtitle}>activity feed · public view</span>}
         </div>
       </div>
@@ -320,7 +324,7 @@ function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, isAdmin, 
       <div style={styles.brand}>
         <BrandMark />
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1, minWidth: 0 }}>
-          <span style={styles.brandName}>synergy-12</span>
+          <span style={styles.brandName}>{BRAND}</span>
           <span style={styles.brandHost}>workout.romaine.life</span>
         </div>
       </div>
@@ -366,7 +370,7 @@ function BottomNav({ tabs, activeTab, onTabChange }) {
 }
 
 function BrandMark() {
-  return <div style={styles.brandMark}>S12</div>;
+  return <div style={styles.brandMark}>{`S${getTotalDays()}`}</div>;
 }
 
 // ---------------------------------------------------------------------------

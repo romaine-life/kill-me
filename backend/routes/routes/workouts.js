@@ -1,4 +1,9 @@
 import { Router } from 'express';
+import { workoutDays } from '../data/seed-data.js';
+
+// Cycle length comes from the seeded day definitions, so the route bounds follow
+// the cycle instead of a literal that has to be remembered separately.
+const MAX_DAY = workoutDays.length;
 
 /**
  * Workout day definitions, exercises, logged workouts, and current-day tracking.
@@ -25,8 +30,8 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
     try {
       const dayNumber = parseInt(req.params.dayNumber);
 
-      if (isNaN(dayNumber) || dayNumber < 1 || dayNumber > 12) {
-        return res.status(400).json({ error: 'Invalid day number. Must be between 1 and 12.' });
+      if (isNaN(dayNumber) || dayNumber < 1 || dayNumber > MAX_DAY) {
+        return res.status(400).json({ error: `Invalid day number. Must be between 1 and ${MAX_DAY}.` });
       }
 
       const querySpec = {
@@ -74,8 +79,8 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
     try {
       const dayNumber = parseInt(req.params.dayNumber);
 
-      if (isNaN(dayNumber) || dayNumber < 1 || dayNumber > 12) {
-        return res.status(400).json({ error: 'Invalid day number. Must be between 1 and 12.' });
+      if (isNaN(dayNumber) || dayNumber < 1 || dayNumber > MAX_DAY) {
+        return res.status(400).json({ error: `Invalid day number. Must be between 1 and ${MAX_DAY}.` });
       }
 
       const querySpec = {
@@ -273,8 +278,8 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
       const userId = req.user.sub;
       const currentDay = Number(req.body.currentDay);
 
-      if (!currentDay || currentDay < 1 || currentDay > 12) {
-        return res.status(400).json({ error: 'Invalid day number. Must be between 1 and 12.' });
+      if (!currentDay || currentDay < 1 || currentDay > MAX_DAY) {
+        return res.status(400).json({ error: `Invalid day number. Must be between 1 and ${MAX_DAY}.` });
       }
 
       const settingsDoc = {
@@ -301,8 +306,8 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
       if (!dayNumber || !name) {
         return res.status(400).json({ error: 'Missing required fields: dayNumber and name' });
       }
-      if (dayNumber < 1 || dayNumber > 12) {
-        return res.status(400).json({ error: 'Invalid day number. Must be between 1 and 12.' });
+      if (dayNumber < 1 || dayNumber > MAX_DAY) {
+        return res.status(400).json({ error: `Invalid day number. Must be between 1 and ${MAX_DAY}.` });
       }
 
       const id = `exercise-${dayNumber}-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;

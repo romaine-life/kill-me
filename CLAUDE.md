@@ -1,6 +1,6 @@
 # kill-me — Workout Tracker
 
-Personal workout tracker built around a custom 12-day training cycle called **Synergy 12**.
+Personal workout tracker built around a custom 16-day training cycle called **Synergy 16**.
 
 The repo name comes from a Tom Platz video where he screams "KILL ME" during an
 agonizing set of leg extensions under hypnotherapy coaching.
@@ -15,39 +15,70 @@ content-fingerprint tag (`romainecr.azurecr.io/kill-me:app-<sha256>`); fork PRs
 stay build-only with `push: false`. Release/deploy workflows publish or reuse
 that same fingerprint tag and bump `k8s/values.yaml` to it.
 
-## The 12-Day Synergy System
+## The 16-Day Synergy System
 
 The cycle is Nelson's own design, optimized for **consistent daily activity** rather
-than traditional rest-heavy programming. Three guiding principles:
+than traditional rest-heavy programming. Four guiding principles:
 
 1. **Daily activity over rest** — the cycle alternates intensity so every day has
-   something to do. Grip, calves, and mobility days are deliberately low-impact,
+   something to do. Grip, calves, neck, and mobility days are deliberately low-impact,
    keeping the habit of daily training without taxing recovery.
 2. **Wellness over hypertrophy** — the goal is muscle-mind connection and joint health,
    not progressive overload. Nelson's muscles grow readily; the priority is controlled
    movement and avoiding excessive bulk.
-3. **CNS-aware sequencing** — only three days (1, 5, 9) are systemically taxing compound
-   lifts. They are evenly spaced with isolation and recovery work between them to avoid
-   stacking central nervous system fatigue.
+3. **CNS-aware sequencing** — only three days (1, 6, 12) are systemically taxing compound
+   lifts. They are evenly spaced (5, 6, 5 apart including the wrap) with isolation and
+   recovery work between them to avoid stacking central nervous system fatigue.
+4. **Coverage over optimization** — the cycle exists to prevent atrophy, not to optimize
+   any one adaptation. Its job is making sure nothing gets left out. Traditional splits
+   drop the peripheral work (ankles, neck, hip rotation, grip) because a four-day week
+   has no room for it; giving each its own slot is the whole point of a long cycle.
+
+### Short days are the design, not an oversight
+
+Nelson works ~12-hour days. Logged sessions run 1-3 exercises regardless of how many the
+day lists, so **every day is a fixed, fully specified list of 2-4 exercises requiring zero
+decisions** — open the app, do what today says. Two consequences worth preserving:
+
+- **More days means shorter days, not more work.** The same coverage distributed into
+  smaller pieces is what makes it survivable. Adding a day is cheap; lengthening one is not.
+- **Nothing rides along as an optional add-on.** Work bolted onto other days gets cut when
+  he's tired, so ankles, neck, and stretching are scheduled days rather than warmup riders.
+  This is also why stretching stays its own day: it is long, home-based, and the first
+  thing dropped when combined with anything else.
 
 ### Recovery sequencing in the cycle order
 
 The day ordering is not arbitrary — each placement accounts for what came before:
 
-- **Day 1 (Legs/Squat)** → **Day 3 (Hamstrings)**: hamstring isolation is safe because
-  Day 1's squat volume has cleared by Day 3
-- **Day 7 (Torso)** is placed to save the lower back for Day 1 when the cycle wraps
-- **Day 8 (Pecs Mobility)** primes the shoulder capsule for Day 9's heavy pressing —
+- **Day 1 (Legs/Squat)** → **Day 5 (Knee)**: tendon-focused knee work is safe here because
+  Day 1's squat volume has cleared. Day 5 is defined by *intent* (slow eccentrics,
+  isometric holds, controlled range), not by its exercise list — otherwise it is just a
+  second leg day
+- **Day 9 (Back)** carries the only loaded spinal extension, placed 8 days clear of Day 1
+  to spare the lower back for squats when the cycle wraps
+- **Day 11 (Pecs Mobility)** primes the shoulder capsule for Day 12's heavy pressing —
   light flys, holds, and stretches only
-- **Day 9 (Compound Push)** is where dips and heavy pressing belong — never on Day 8
-- **Day 12 (Grip)** ends the cycle as a near-zero CNS load before restarting
+- **Day 12 (Compound Push)** is where dips and heavy pressing belong — never on Day 11
+- **Day 15 (Grip)** sits 8 days clear of Day 6 (Pulls) and Day 7 (Bicep) so forearm
+  loading never stacks on consecutive days
+- **Day 16 (Hips)** primes the hips the day before Day 1 squats, mirroring how Day 11
+  primes Day 12
 
-### Day 8 shoulder safety
+### Day 11 shoulder safety
 
 Nelson has historical shoulder injuries (both shoulders, 15-20 years ago). They healed
-well but have underlying limitations. Day 8's strict "no heavy pressing" rule protects
+well but have underlying limitations. Day 11's strict "no heavy pressing" rule protects
 the shoulder joint by keeping pec work light and mobility-focused before compound push
-day. Dips are fine on Day 9 (assisted machine at -90 lbs), but never on Day 8.
+day. Dips are fine on Day 12 (assisted machine at -90 lbs), but never on Day 11.
+
+### Known gap: no hip hinge
+
+The cycle contains no deadlift, RDL, or good morning. Squats are knee-dominant, leg curl
+is isolated knee flexion, and the Day 9 back extension is spinal extension with the hips
+fixed — none of them train the hinge pattern. This is a deliberate deferral, not an
+oversight: a hinge day is the most demanding thing that could be added and would be the
+first session skipped on a 12-hour workday. Revisit only if capacity changes.
 
 ## Architecture
 
@@ -128,7 +159,7 @@ distinguished by a `type` field:
 
 | Type | Purpose | Key fields |
 | ---- | ------- | ---------- |
-| `workout-day-definition` | Static cycle definition (days 1-12) | `dayNumber`, `name`, `focus`, `primaryMuscleGroups` |
+| `workout-day-definition` | Static cycle definition (days 1-16) | `dayNumber`, `name`, `focus`, `primaryMuscleGroups` |
 | `exercise` | Exercise library entries per day | `dayNumber`, `name`, `equipment`, `tags[]`, `variations[]` (`{name, default, targetWeight/Reps/Sets}`) |
 | `logged-workout` | A completed workout session | `userId`, `dayNumber`, `date`, `time` (HH:MM, nullable), `mode` (quick/detailed), `exercises[]` (`{name, variation, weight, reps, sets}`) |
 | `cardio-session` | A completed cardio session | `userId`, `date`, `time` (HH:MM, nullable), `activity` (treadmill/bike), `durationMinutes`, `treadmill{}`, `bike{}` |

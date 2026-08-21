@@ -2,7 +2,7 @@
 // cardio sessions, and soreness journal entries with an anatomical hero,
 // stats strip, filter tabs, and date-grouped timeline cards.
 //
-// Pixel-matched to the synergy-12 design (workout-tracker.html).
+// Pixel-matched to the synergy design system (workout-tracker.html).
 
 import { useState, useEffect, useMemo } from 'react';
 import { DAY_CONFIG } from '../utils/dayConfig';

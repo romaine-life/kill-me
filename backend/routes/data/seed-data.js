@@ -18,44 +18,48 @@
 // 12-Day Workout Cycle Definition
 export const workoutDays = [
   { dayNumber: 1, name: 'Compound: Legs', focus: 'Main Lift: Squat. Systemic leg strength.', primaryMuscleGroups: ['legs', 'glutes', 'quads'] },
-  { dayNumber: 2, name: 'Calves', focus: 'Active recovery.', primaryMuscleGroups: ['calves'] },
-  { dayNumber: 3, name: 'Hamstring', focus: 'Isolation. (Safe here since Day 1 was Squats).', primaryMuscleGroups: ['hamstrings'] },
-  { dayNumber: 4, name: 'Abs', focus: 'Flexion focus.', primaryMuscleGroups: ['abs', 'core'] },
-  { dayNumber: 5, name: 'Compound: Pulls', focus: 'Main Lift: Back/Rows. Systemic pulling strength.', primaryMuscleGroups: ['back', 'lats'] },
-  { dayNumber: 6, name: 'Bicep', focus: 'Accessory work.', primaryMuscleGroups: ['biceps'] },
-  { dayNumber: 7, name: 'Torso', focus: 'Extension/Rotation. Placed here to save lower back for Day 1.', primaryMuscleGroups: ['core', 'back'] },
-  { dayNumber: 8, name: 'Pecs (Mobility)', focus: 'The Primer. Light flys/holds to prep shoulder capsule. ⚠️ NO DIPS or heavy pressing.', primaryMuscleGroups: ['chest'], warning: 'Shoulder health priority - light work only' },
-  { dayNumber: 9, name: 'Compound: Push', focus: 'Main Lift: DB Bench. Heavy chest/front delt focus.', primaryMuscleGroups: ['chest', 'shoulders', 'triceps'] },
-  { dayNumber: 10, name: 'Triceps', focus: 'Isolation. Focus on "feel" to save elbows.', primaryMuscleGroups: ['triceps'] },
-  { dayNumber: 11, name: 'Deltoid', focus: 'Shoulder isolation.', primaryMuscleGroups: ['shoulders', 'delts'] },
-  { dayNumber: 12, name: 'Grip', focus: 'Forearm/Hand focus. Final burnout.', primaryMuscleGroups: ['forearms', 'grip'] }
+  { dayNumber: 2, name: 'Calves + Ankles', focus: 'Active recovery. Ankle mobility included.', primaryMuscleGroups: ['calves', 'ankles'] },
+  { dayNumber: 3, name: 'Abs', focus: 'Flexion focus. Isolation with mental focus on the group.', primaryMuscleGroups: ['abs', 'core'] },
+  { dayNumber: 4, name: 'Stretching', focus: 'Its own day by design — long, home-based, easy to cut if combined.', primaryMuscleGroups: ['hamstrings', 'adductors', 'hip-flexors'] },
+  { dayNumber: 5, name: 'Knee', focus: 'Tendon health: slow eccentrics, isometrics, controlled range. Not a second leg day.', primaryMuscleGroups: ['quads', 'knees'] },
+  { dayNumber: 6, name: 'Compound: Pulls', focus: 'Main Lift: Back/Rows. Systemic pulling strength.', primaryMuscleGroups: ['back', 'lats'] },
+  { dayNumber: 7, name: 'Bicep', focus: 'Accessory work.', primaryMuscleGroups: ['biceps'] },
+  { dayNumber: 8, name: 'Transverse', focus: 'Rotation and anti-rotation. The only transverse-plane work in the cycle.', primaryMuscleGroups: ['core', 'obliques'] },
+  { dayNumber: 9, name: 'Back', focus: 'Spinal extension. Placed 8 days clear of Day 1 to spare the lower back for squats.', primaryMuscleGroups: ['back', 'erector-spinae'] },
+  { dayNumber: 10, name: 'Neck', focus: 'Retraction and four-way isometrics. Short day.', primaryMuscleGroups: ['neck'] },
+  { dayNumber: 11, name: 'Pecs (Mobility)', focus: 'The Primer. Light flys/holds to prep shoulder capsule. ⚠️ NO DIPS or heavy pressing.', primaryMuscleGroups: ['chest'], warning: 'Shoulder health priority - light work only' },
+  { dayNumber: 12, name: 'Compound: Push', focus: 'Main Lift: DB Bench. Heavy chest/front delt focus.', primaryMuscleGroups: ['chest', 'shoulders', 'triceps'] },
+  { dayNumber: 13, name: 'Triceps', focus: 'Isolation. Focus on "feel" to save elbows.', primaryMuscleGroups: ['triceps'] },
+  { dayNumber: 14, name: 'Deltoid', focus: 'Shoulder isolation.', primaryMuscleGroups: ['shoulders', 'delts'] },
+  { dayNumber: 15, name: 'Grip', focus: 'Forearm/Hand focus. Placed 8 days clear of pulls and bicep so forearms never stack.', primaryMuscleGroups: ['forearms', 'grip'] },
+  { dayNumber: 16, name: 'Hips', focus: 'Adduction, abduction, extension, flexion. Primes the hips for Day 1 squats.', primaryMuscleGroups: ['hips', 'glutes', 'adductors', 'abductors'] }
 ];
 
 // Historical Logged Workouts (from spreadsheet)
 export const loggedWorkouts = [
   // 2026 Workouts
-  { date: '2026-02-14', dayNumber: 8, dayName: 'Pecs (Mobility)', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
-  { date: '2026-01-29', dayNumber: 11, dayName: 'Deltoid', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
-  { date: '2026-01-26', dayNumber: 6, dayName: 'Bicep', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
-  { date: '2026-01-23', dayNumber: 5, dayName: 'Compound: Pulls', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
-  { date: '2026-01-22', dayNumber: 4, dayName: 'Abs', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
-  { date: '2026-01-08', dayNumber: 3, dayName: 'Hamstring', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2026-02-14', dayNumber: 11, dayName: 'Pecs (Mobility)', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2026-01-29', dayNumber: 14, dayName: 'Deltoid', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2026-01-26', dayNumber: 7, dayName: 'Bicep', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2026-01-23', dayNumber: 6, dayName: 'Compound: Pulls', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2026-01-22', dayNumber: 3, dayName: 'Abs', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2026-01-08', dayNumber: 4, dayName: 'Hamstring', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
   { date: '2026-01-05', dayNumber: 2, dayName: 'Calves', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
   { date: '2026-01-04', dayNumber: 1, dayName: 'Compound: Legs', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
 
   // 2025 November/December Workouts
-  { date: '2025-12-11', dayNumber: 6, dayName: 'Bicep', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
-  { date: '2025-12-10', dayNumber: 5, dayName: 'Compound: Pulls', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
-  { date: '2025-12-09', dayNumber: 7, dayName: 'Torso', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2025-12-11', dayNumber: 7, dayName: 'Bicep', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2025-12-10', dayNumber: 6, dayName: 'Compound: Pulls', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2025-12-09', dayNumber: 8, dayName: 'Torso', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
   { date: '2025-12-08', dayNumber: 1, dayName: 'Compound: Legs', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
-  { date: '2025-12-07', dayNumber: 10, dayName: 'Triceps', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
-  { date: '2025-12-05', dayNumber: 12, dayName: 'Grip', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
-  { date: '2025-11-26', dayNumber: 9, dayName: 'Compound: Push', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
-  { date: '2025-11-25', dayNumber: 6, dayName: 'Bicep', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
-  { date: '2025-11-24', dayNumber: 5, dayName: 'Compound: Pulls', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
-  { date: '2025-11-16', dayNumber: 7, dayName: 'Torso', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2025-12-07', dayNumber: 13, dayName: 'Triceps', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2025-12-05', dayNumber: 15, dayName: 'Grip', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2025-11-26', dayNumber: 12, dayName: 'Compound: Push', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2025-11-25', dayNumber: 7, dayName: 'Bicep', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2025-11-24', dayNumber: 6, dayName: 'Compound: Pulls', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
+  { date: '2025-11-16', dayNumber: 8, dayName: 'Torso', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
   { date: '2025-11-15', dayNumber: 1, dayName: 'Compound: Legs', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' },
-  { date: '2025-11-14', dayNumber: 12, dayName: 'Grip', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' }
+  { date: '2025-11-14', dayNumber: 15, dayName: 'Grip', userId: 'cf57d57d-1411-4f59-b517-e9a8600b140a' }
 ];
 
 // Exercise Library
@@ -63,8 +67,7 @@ export const loggedWorkouts = [
 // Each exercise has a `variations` array with per-variation targets. The `default`
 // flag marks which variation pre-fills in the log form. Exercises that don't have
 // meaningful variations use a single "Standard" entry.
-export const exercises = [
-  // ── Day 1: Compound Legs ──
+export const exercises = [  // ── Day 1: Compound: Legs ──
   {
     name: 'Barbell Squat', dayNumber: 1, equipment: 'Smith Machine', location: 'Gym',
     tags: ['compound', 'squat', 'press', 'machine', 'quads', 'glutes', 'hamstrings', 'core'],
@@ -86,33 +89,16 @@ export const exercises = [
     ],
   },
   {
-    name: 'Leg Extension', dayNumber: 1, equipment: 'Leg Extension Machine', location: 'Gym',
-    tags: ['isolation', 'extension', 'machine', 'quads'],
-    notes: 'Lowest seat, legs notch 1, back notch 1. Superset with leg curls',
-    variations: [
-      { name: 'Standard', targetWeight: 60, targetReps: '12-15', targetSets: 3, default: true },
-      { name: 'Single Leg', targetWeight: 30, targetReps: '12-15', targetSets: 3 },
-      { name: 'Pause at Top', targetWeight: 50, targetReps: '10-12', targetSets: 3 },
-    ],
-  },
-  {
     name: 'Leg Curl', dayNumber: 1, equipment: 'Leg Curl Machine', location: 'Gym',
     tags: ['isolation', 'curl', 'machine', 'hamstrings'],
-    notes: 'Highest seat, legs at lowest notch. Superset with leg extension',
+    notes: 'Highest seat, legs at lowest notch. Only loaded hamstring work in the cycle',
     variations: [
       { name: 'Standard', targetWeight: 60, targetReps: '12-15', targetSets: 3, default: true },
       { name: 'Single Leg', targetWeight: 30, targetReps: '12-15', targetSets: 3 },
-    ],
-  },
-  {
-    name: 'Seated Calf Raises', dayNumber: 1, equipment: 'Bench + Dumbbells', location: 'Gym',
-    tags: ['isolation', 'calves', 'dumbbell'],
-    variations: [
-      { name: 'Standard', targetWeight: 80, targetReps: 12, targetSets: 3, default: true },
     ],
   },
 
-  // ── Day 2: Calves ──
+  // ── Day 2: Calves + Ankles ──
   {
     name: 'Calf Stands', dayNumber: 2, equipment: 'Bodyweight', location: 'Anywhere',
     tags: ['isolation', 'calves', 'bodyweight', 'hold'],
@@ -135,40 +121,19 @@ export const exercises = [
       { name: 'Standard', targetWeight: 90, targetReps: 12, targetSets: 3, default: true },
     ],
   },
-
-  // ── Day 3: Hamstring ──
   {
-    name: 'Single Leg Cable Stretch (Front)', dayNumber: 3, equipment: 'Cable', location: 'Gym',
-    tags: ['mobility', 'stretch', 'cable', 'hamstrings', 'hip-flexors'],
+    name: 'Ankle Circles', dayNumber: 2, equipment: 'Bodyweight', location: 'Anywhere',
+    tags: ['mobility', 'ankles', 'bodyweight', 'rotation'],
+    notes: 'Both directions. Ankle dorsiflexion limits squat depth, so this feeds Day 1.',
     variations: [
-      { name: 'Standard', targetReps: '3-5 minutes, 2-5 times', cableSetting: '', default: true },
-    ],
-  },
-  {
-    name: 'Single Leg Cable Stretch (Side)', dayNumber: 3, equipment: 'Cable', location: 'Gym',
-    tags: ['mobility', 'stretch', 'cable', 'adductors', 'abductors'],
-    variations: [
-      { name: 'Standard', targetReps: '3-5 minutes, 2-5 times', cableSetting: '', default: true },
-    ],
-  },
-  {
-    name: 'Single Leg Forward Lean', dayNumber: 3, equipment: 'Bodyweight', location: 'Anywhere',
-    tags: ['mobility', 'stretch', 'bodyweight', 'hamstrings', 'glutes'],
-    variations: [
-      { name: 'Standard', default: true },
-    ],
-  },
-  {
-    name: 'Seated Splits', dayNumber: 3, equipment: 'None', location: 'Anywhere',
-    tags: ['mobility', 'stretch', 'bodyweight', 'hamstrings', 'adductors'],
-    variations: [
-      { name: 'Standard', default: true },
+      { name: 'Standard', targetReps: '10 each direction', targetSets: 2, default: true },
+      { name: 'Dorsiflexion Rocks', targetReps: 15, targetSets: 2 },
     ],
   },
 
-  // ── Day 4: Abs ──
+  // ── Day 3: Abs ──
   {
-    name: 'Crunches', dayNumber: 4, equipment: 'Bodyweight', location: 'Anywhere',
+    name: 'Crunches', dayNumber: 3, equipment: 'Bodyweight', location: 'Anywhere',
     tags: ['isolation', 'abs', 'core', 'flexion', 'bodyweight'],
     variations: [
       { name: 'Standard', default: true },
@@ -177,16 +142,85 @@ export const exercises = [
     ],
   },
   {
-    name: 'Under Leg Crunches', dayNumber: 4, equipment: 'Bodyweight', location: 'Anywhere',
+    name: 'Under Leg Crunches', dayNumber: 3, equipment: 'Bodyweight', location: 'Anywhere',
     tags: ['isolation', 'abs', 'core', 'flexion', 'bodyweight'],
     variations: [
       { name: 'Standard', default: true },
     ],
   },
-
-  // ── Day 5: Compound Pulls ──
   {
-    name: 'Lat Pulldowns', dayNumber: 5, equipment: 'Cable Machine', location: 'Home',
+    name: 'Situps', dayNumber: 3, equipment: 'Situp Device', location: 'Gym',
+    tags: ['isolation', 'flexion', 'machine', 'abs', 'core', 'hip-flexors'],
+    variations: [
+      { name: 'Standard', targetReps: 12, targetSets: 3, default: true },
+    ],
+  },
+
+  // ── Day 4: Stretching ──
+  {
+    name: 'Single Leg Cable Stretch (Front)', dayNumber: 4, equipment: 'Cable', location: 'Gym',
+    tags: ['mobility', 'stretch', 'cable', 'hamstrings', 'hip-flexors'],
+    variations: [
+      { name: 'Standard', targetReps: '3-5 minutes, 2-5 times', cableSetting: '', default: true },
+    ],
+  },
+  {
+    name: 'Single Leg Cable Stretch (Side)', dayNumber: 4, equipment: 'Cable', location: 'Gym',
+    tags: ['mobility', 'stretch', 'cable', 'adductors', 'abductors'],
+    variations: [
+      { name: 'Standard', targetReps: '3-5 minutes, 2-5 times', cableSetting: '', default: true },
+    ],
+  },
+  {
+    name: 'Single Leg Forward Lean', dayNumber: 4, equipment: 'Bodyweight', location: 'Anywhere',
+    tags: ['mobility', 'stretch', 'bodyweight', 'hamstrings', 'glutes'],
+    variations: [
+      { name: 'Standard', default: true },
+    ],
+  },
+  {
+    name: 'Seated Splits', dayNumber: 4, equipment: 'None', location: 'Anywhere',
+    tags: ['mobility', 'stretch', 'bodyweight', 'hamstrings', 'adductors'],
+    variations: [
+      { name: 'Standard', default: true },
+    ],
+  },
+
+  // ── Day 5: Knee ──
+  {
+    name: 'Leg Extension', dayNumber: 5, equipment: 'Leg Extension Machine', location: 'Gym',
+    tags: ['isolation', 'extension', 'machine', 'quads', 'knees', 'tendon', 'eccentric'],
+    notes: 'Lowest seat, legs notch 1, back notch 1. Slow 3-4s lowering — this day is tendon loading, not volume.',
+    variations: [
+      { name: 'Slow Eccentric', targetWeight: 50, targetReps: 12, targetSets: 3, default: true },
+      { name: 'Standard', targetWeight: 60, targetReps: '12-15', targetSets: 3 },
+      { name: 'Single Leg', targetWeight: 30, targetReps: '12-15', targetSets: 3 },
+      { name: 'Pause at Top', targetWeight: 50, targetReps: '10-12', targetSets: 3 },
+    ],
+  },
+  {
+    name: 'Wall Sit', dayNumber: 5, equipment: 'Bodyweight', location: 'Anywhere',
+    tags: ['isometric', 'hold', 'bodyweight', 'quads', 'knees', 'tendon'],
+    notes: 'Isometric hold for patellar tendon loading. Thighs parallel, back flat to wall.',
+    variations: [
+      { name: 'Standard', targetReps: '30-45 seconds', targetSets: 3, default: true },
+      { name: 'Spanish Squat (Banded)', targetReps: '30-45 seconds', targetSets: 3 },
+      { name: 'Single Leg', targetReps: '20-30 seconds', targetSets: 3 },
+    ],
+  },
+  {
+    name: 'Single-Leg Decline Squat', dayNumber: 5, equipment: 'Decline Board', location: 'Gym',
+    tags: ['isolation', 'squat', 'bodyweight', 'quads', 'knees', 'tendon', 'eccentric'],
+    notes: 'Classic patellar tendon exercise. 25 degree decline, slow 3-4s lowering.',
+    variations: [
+      { name: 'Slow Eccentric', targetReps: 12, targetSets: 3, default: true },
+      { name: 'Bodyweight', targetReps: 15, targetSets: 3 },
+    ],
+  },
+
+  // ── Day 6: Compound: Pulls ──
+  {
+    name: 'Lat Pulldowns', dayNumber: 6, equipment: 'Cable Machine', location: 'Home',
     tags: ['compound', 'pull', 'cable', 'lats', 'back', 'biceps', 'rear-delt'],
     variations: [
       { name: 'Wide Grip', targetWeight: 40, targetReps: 12, targetSets: 3, cableSetting: '', default: true },
@@ -196,7 +230,7 @@ export const exercises = [
     ],
   },
   {
-    name: 'Bent-Over Rows', dayNumber: 5, equipment: 'Barbell', location: 'Home',
+    name: 'Bent-Over Rows', dayNumber: 6, equipment: 'Barbell', location: 'Home',
     tags: ['compound', 'row', 'pull', 'barbell', 'back', 'lats', 'biceps', 'rear-delt', 'traps'],
     variations: [
       { name: 'Standard', targetWeight: 35, targetReps: 12, targetSets: 3, default: true },
@@ -204,7 +238,7 @@ export const exercises = [
     ],
   },
   {
-    name: 'Seated Cable Rows', dayNumber: 5, equipment: 'Cable Machine', location: 'Home',
+    name: 'Seated Cable Rows', dayNumber: 6, equipment: 'Cable Machine', location: 'Home',
     tags: ['compound', 'row', 'pull', 'cable', 'back', 'lats', 'biceps', 'traps', 'rear-delt'],
     variations: [
       { name: 'Standard', targetWeight: 80, targetReps: 12, targetSets: 3, cableSetting: '', default: true },
@@ -213,9 +247,9 @@ export const exercises = [
     ],
   },
 
-  // ── Day 6: Biceps ──
+  // ── Day 7: Bicep ──
   {
-    name: 'Dumbbell Bicep Curl', dayNumber: 6, equipment: 'Dumbbells', location: 'Home',
+    name: 'Dumbbell Bicep Curl', dayNumber: 7, equipment: 'Dumbbells', location: 'Home',
     tags: ['isolation', 'curl', 'dumbbell', 'biceps', 'forearms'],
     notes: 'Reps to failure, decrease weight by 5-10 each time',
     variations: [
@@ -226,7 +260,7 @@ export const exercises = [
     ],
   },
   {
-    name: 'Cable Bicep Curl', dayNumber: 6, equipment: 'Cable Machine', location: 'Home',
+    name: 'Cable Bicep Curl', dayNumber: 7, equipment: 'Cable Machine', location: 'Home',
     tags: ['isolation', 'curl', 'cable', 'biceps', 'forearms'],
     notes: 'Reps to failure, decrease weight by 5-10 each time',
     variations: [
@@ -237,9 +271,9 @@ export const exercises = [
     ],
   },
 
-  // ── Day 7: Torso ──
+  // ── Day 8: Transverse ──
   {
-    name: 'Torso Twist', dayNumber: 7, equipment: 'Torso Twist Machine', location: 'Gym',
+    name: 'Torso Twist', dayNumber: 8, equipment: 'Torso Twist Machine', location: 'Gym',
     tags: ['isolation', 'rotation', 'machine', 'core', 'obliques'],
     notes: 'Max twist. One set is rotating from each side',
     variations: [
@@ -247,7 +281,28 @@ export const exercises = [
     ],
   },
   {
-    name: 'Back Extension (Seated)', dayNumber: 7, equipment: 'Seated Back Extension Machine', location: 'Gym',
+    name: 'Cable Chop', dayNumber: 8, equipment: 'Cable Machine', location: 'Gym',
+    tags: ['rotation', 'cable', 'core', 'obliques', 'transverse'],
+    notes: 'Arm is the lever, trunk is the target. Light weight — this is movement, not load.',
+    variations: [
+      { name: 'High to Low', cableSetting: '', targetReps: 12, targetSets: 3, default: true },
+      { name: 'Low to High', cableSetting: '', targetReps: 12, targetSets: 3 },
+    ],
+  },
+  {
+    name: 'Pallof Press', dayNumber: 8, equipment: 'Cable Machine', location: 'Gym',
+    tags: ['anti-rotation', 'cable', 'core', 'obliques', 'transverse', 'isometric'],
+    notes: 'Resist rotation with the whole trunk braced. Pairs with the twist machine.',
+    variations: [
+      { name: 'Standard', cableSetting: '', targetReps: 12, targetSets: 3, default: true },
+      { name: 'Split Stance', cableSetting: '', targetReps: 12, targetSets: 3 },
+      { name: 'Hold', cableSetting: '', targetReps: '20-30 seconds', targetSets: 3 },
+    ],
+  },
+
+  // ── Day 9: Back ──
+  {
+    name: 'Back Extension (Seated)', dayNumber: 9, equipment: 'Seated Back Extension Machine', location: 'Gym',
     tags: ['isolation', 'extension', 'machine', 'back', 'erector-spinae'],
     notes: 'Max range of motion',
     variations: [
@@ -255,31 +310,37 @@ export const exercises = [
     ],
   },
   {
-    name: 'Hip Adductor', dayNumber: 7, equipment: 'Hip Adductor Machine', location: 'Gym',
-    tags: ['isolation', 'machine', 'adductors', 'hip'],
-    notes: 'Max stretch. Involves static stretching and contractions',
+    name: 'Bird Dog', dayNumber: 9, equipment: 'Bodyweight', location: 'Anywhere',
+    tags: ['isolation', 'extension', 'bodyweight', 'back', 'erector-spinae', 'core'],
+    notes: 'Opposite arm and leg. Spinal extension with an anti-rotation demand, no load on the discs.',
     variations: [
-      { name: 'Standard', targetWeight: 100, targetReps: 'Failure', targetSets: 3, default: true },
-    ],
-  },
-  {
-    name: 'Hip Abductor', dayNumber: 7, equipment: 'Hip Abductor Machine', location: 'Gym',
-    tags: ['isolation', 'machine', 'abductors', 'hip', 'glutes'],
-    variations: [
-      { name: 'Standard', targetWeight: 80, targetReps: 'Failure', targetSets: 3, default: true },
-    ],
-  },
-  {
-    name: 'Situps', dayNumber: 7, equipment: 'Situp Device', location: 'Gym',
-    tags: ['isolation', 'flexion', 'machine', 'abs', 'core', 'hip-flexors'],
-    variations: [
-      { name: 'Standard', targetReps: 12, targetSets: 3, default: true },
+      { name: 'Standard', targetReps: 10, targetSets: 3, default: true },
+      { name: 'Hold', targetReps: '10 seconds each', targetSets: 3 },
     ],
   },
 
-  // ── Day 8: Pecs (Mobility) ──
+  // ── Day 10: Neck ──
   {
-    name: 'Dumbbell Bench Press', dayNumber: 8, equipment: 'Dumbbells', location: 'Home',
+    name: 'Neck Retraction', dayNumber: 10, equipment: 'Neck Retraction Device', location: 'Home',
+    tags: ['isolation', 'neck', 'posture', 'deep-neck-flexors'],
+    notes: 'Chin tuck against resistance. Trains the deep neck flexors that posture depends on.',
+    variations: [
+      { name: 'Standard', targetReps: 12, targetSets: 3, default: true },
+      { name: 'Hold', targetReps: '10 seconds', targetSets: 3 },
+    ],
+  },
+  {
+    name: 'Neck Isometrics (4-Way)', dayNumber: 10, equipment: 'Hand Resistance', location: 'Anywhere',
+    tags: ['isometric', 'neck', 'hold', 'posture'],
+    notes: 'Palm against forehead, back of head, and each side. Press without moving.',
+    variations: [
+      { name: 'Standard', targetReps: '10 seconds each of 4', targetSets: 2, default: true },
+    ],
+  },
+
+  // ── Day 11: Pecs (Mobility) ──
+  {
+    name: 'Dumbbell Bench Press', dayNumber: 11, equipment: 'Dumbbells', location: 'Home',
     tags: ['mobility', 'press', 'dumbbell', 'chest', 'front-delt', 'triceps'],
     notes: '⚠️ Light weight only for mobility',
     variations: [
@@ -288,7 +349,7 @@ export const exercises = [
     ],
   },
   {
-    name: 'Cable Fly', dayNumber: 8, equipment: 'Cable Machine', location: 'Home',
+    name: 'Cable Fly', dayNumber: 11, equipment: 'Cable Machine', location: 'Home',
     tags: ['mobility', 'fly', 'cable', 'chest', 'front-delt'],
     notes: '⚠️ Light weight, focus on stretch',
     variations: [
@@ -298,7 +359,7 @@ export const exercises = [
     ],
   },
   {
-    name: 'Static Hold (Lowered Position)', dayNumber: 8, equipment: 'Dumbbells', location: 'Home',
+    name: 'Static Hold (Lowered Position)', dayNumber: 11, equipment: 'Dumbbells', location: 'Home',
     tags: ['mobility', 'hold', 'dumbbell', 'chest', 'stretch'],
     notes: '⚠️ Horizontal dumbbell hold in lowered position',
     variations: [
@@ -306,9 +367,9 @@ export const exercises = [
     ],
   },
 
-  // ── Day 9: Compound Push ──
+  // ── Day 12: Compound: Push ──
   {
-    name: 'Barbell Bench Press', dayNumber: 9, equipment: 'Smith Machine', location: 'Gym',
+    name: 'Barbell Bench Press', dayNumber: 12, equipment: 'Smith Machine', location: 'Gym',
     tags: ['compound', 'press', 'machine', 'chest', 'triceps', 'front-delt'],
     variations: [
       { name: 'Flat', targetWeight: 115, targetReps: 12, targetSets: 3, default: true },
@@ -318,7 +379,7 @@ export const exercises = [
     ],
   },
   {
-    name: 'Dumbbell Bench Press', dayNumber: 9, equipment: 'Dumbbells', location: 'Home',
+    name: 'Dumbbell Bench Press', dayNumber: 12, equipment: 'Dumbbells', location: 'Home',
     tags: ['compound', 'press', 'dumbbell', 'chest', 'triceps', 'front-delt'],
     notes: 'Reps to failure, decreasing weight',
     variations: [
@@ -328,7 +389,7 @@ export const exercises = [
     ],
   },
   {
-    name: 'Dips', dayNumber: 9, equipment: 'Dip Machine', location: 'Gym',
+    name: 'Dips', dayNumber: 12, equipment: 'Dip Machine', location: 'Gym',
     tags: ['compound', 'press', 'machine', 'chest', 'triceps', 'front-delt', 'bodyweight'],
     variations: [
       { name: 'Assisted', targetWeight: -90, targetReps: '15-20', targetSets: 3, default: true },
@@ -336,7 +397,7 @@ export const exercises = [
     ],
   },
   {
-    name: 'Shoulder Press', dayNumber: 9, equipment: 'Dumbbells', location: 'Home',
+    name: 'Shoulder Press', dayNumber: 12, equipment: 'Dumbbells', location: 'Home',
     tags: ['compound', 'press', 'dumbbell', 'front-delt', 'side-delt', 'triceps'],
     variations: [
       { name: 'Seated', targetWeight: 15, targetReps: 12, targetSets: 3, default: true },
@@ -345,16 +406,16 @@ export const exercises = [
     ],
   },
 
-  // ── Day 10: Triceps ──
+  // ── Day 13: Triceps ──
   {
-    name: 'Cable Standing High Cross', dayNumber: 10, equipment: 'Cable Machine', location: 'Home',
+    name: 'Cable Standing High Cross', dayNumber: 13, equipment: 'Cable Machine', location: 'Home',
     tags: ['isolation', 'cable', 'triceps', 'extension'],
     variations: [
       { name: 'Standard', cableSetting: '', default: true },
     ],
   },
   {
-    name: 'Tricep Pushdown', dayNumber: 10, equipment: 'Cable Machine', location: 'Home',
+    name: 'Tricep Pushdown', dayNumber: 13, equipment: 'Cable Machine', location: 'Home',
     tags: ['isolation', 'cable', 'triceps', 'pushdown', 'extension'],
     variations: [
       { name: 'Rope', cableSetting: '', default: true },
@@ -364,7 +425,7 @@ export const exercises = [
     ],
   },
   {
-    name: 'Tricep Extension (Katana)', dayNumber: 10, equipment: 'Dumbbell', location: 'Home',
+    name: 'Tricep Extension (Katana)', dayNumber: 13, equipment: 'Dumbbell', location: 'Home',
     tags: ['isolation', 'extension', 'dumbbell', 'triceps'],
     variations: [
       { name: 'Standard', targetWeight: 10, default: true },
@@ -372,9 +433,9 @@ export const exercises = [
     ],
   },
 
-  // ── Day 11: Deltoids ──
+  // ── Day 14: Deltoid ──
   {
-    name: 'Reverse Delt Cable Fly', dayNumber: 11, equipment: 'Cable Machine', location: 'Home',
+    name: 'Reverse Delt Cable Fly', dayNumber: 14, equipment: 'Cable Machine', location: 'Home',
     tags: ['isolation', 'fly', 'cable', 'rear-delt', 'traps'],
     variations: [
       { name: 'Standard', cableSetting: '', default: true },
@@ -383,7 +444,7 @@ export const exercises = [
     ],
   },
   {
-    name: 'Side Delt Cable Raises', dayNumber: 11, equipment: 'Cable Machine', location: 'Home',
+    name: 'Side Delt Cable Raises', dayNumber: 14, equipment: 'Cable Machine', location: 'Home',
     tags: ['isolation', 'raise', 'cable', 'side-delt'],
     variations: [
       { name: 'Standard', cableSetting: '', default: true },
@@ -391,21 +452,21 @@ export const exercises = [
     ],
   },
   {
-    name: 'Front Deltoid Raises (Bottom to Top)', dayNumber: 11, equipment: 'Cable Machine', location: 'Home',
+    name: 'Front Deltoid Raises (Bottom to Top)', dayNumber: 14, equipment: 'Cable Machine', location: 'Home',
     tags: ['isolation', 'raise', 'cable', 'front-delt'],
     variations: [
       { name: 'Standard', cableSetting: '', default: true },
     ],
   },
   {
-    name: 'Front Deltoid Raises (Top to Bottom)', dayNumber: 11, equipment: 'Cable Machine', location: 'Home',
+    name: 'Front Deltoid Raises (Top to Bottom)', dayNumber: 14, equipment: 'Cable Machine', location: 'Home',
     tags: ['isolation', 'raise', 'cable', 'front-delt'],
     variations: [
       { name: 'Standard', cableSetting: '', default: true },
     ],
   },
   {
-    name: 'Rotator Cuff Work', dayNumber: 11, equipment: 'Light Weight', location: 'Home',
+    name: 'Rotator Cuff Work', dayNumber: 14, equipment: 'Light Weight', location: 'Home',
     tags: ['isolation', 'rotation', 'mobility', 'rotator-cuff', 'shoulder-health'],
     variations: [
       { name: 'Internal Rotation', default: true },
@@ -413,9 +474,9 @@ export const exercises = [
     ],
   },
 
-  // ── Day 12: Grip ──
+  // ── Day 15: Grip ──
   {
-    name: 'Gripper - Trainer', dayNumber: 12, equipment: 'Hand Gripper', location: 'Home',
+    name: 'Gripper - Trainer', dayNumber: 15, equipment: 'Hand Gripper', location: 'Home',
     tags: ['isolation', 'grip', 'forearms'],
     notes: 'Start with left/weak side',
     variations: [
@@ -423,7 +484,7 @@ export const exercises = [
     ],
   },
   {
-    name: 'Gripper - Sport', dayNumber: 12, equipment: 'Hand Gripper', location: 'Home',
+    name: 'Gripper - Sport', dayNumber: 15, equipment: 'Hand Gripper', location: 'Home',
     tags: ['isolation', 'grip', 'forearms'],
     notes: 'Start with left/weak side',
     variations: [
@@ -431,7 +492,7 @@ export const exercises = [
     ],
   },
   {
-    name: 'Gripper - Guide', dayNumber: 12, equipment: 'Hand Gripper', location: 'Home',
+    name: 'Gripper - Guide', dayNumber: 15, equipment: 'Hand Gripper', location: 'Home',
     tags: ['isolation', 'grip', 'forearms'],
     notes: 'Start with left/weak side',
     variations: [
@@ -439,11 +500,45 @@ export const exercises = [
     ],
   },
   {
-    name: 'Wrist Curls', dayNumber: 12, equipment: 'Dumbbells', location: 'Home',
+    name: 'Wrist Curls', dayNumber: 15, equipment: 'Dumbbells', location: 'Home',
     tags: ['isolation', 'curl', 'dumbbell', 'forearms', 'grip'],
     variations: [
       { name: 'Pronated', targetWeight: 20, targetReps: 'Failure', targetSets: 3, default: true },
       { name: 'Supinated', targetWeight: 20, targetReps: 'Failure', targetSets: 3 },
+    ],
+  },
+
+  // ── Day 16: Hips ──
+  {
+    name: 'Hip Adductor', dayNumber: 16, equipment: 'Hip Adductor Machine', location: 'Gym',
+    tags: ['isolation', 'machine', 'adductors', 'hip'],
+    notes: 'Max stretch. Involves static stretching and contractions',
+    variations: [
+      { name: 'Standard', targetWeight: 100, targetReps: 'Failure', targetSets: 3, default: true },
+    ],
+  },
+  {
+    name: 'Hip Abductor', dayNumber: 16, equipment: 'Hip Abductor Machine', location: 'Gym',
+    tags: ['isolation', 'machine', 'abductors', 'hip', 'glutes'],
+    variations: [
+      { name: 'Standard', targetWeight: 80, targetReps: 'Failure', targetSets: 3, default: true },
+    ],
+  },
+  {
+    name: 'Cable Glute Kickback', dayNumber: 16, equipment: 'Cable Machine', location: 'Gym',
+    tags: ['isolation', 'extension', 'cable', 'glutes', 'hip'],
+    notes: 'Ankle cuff on the low pulley. Same setup as the standing leg raise — just face the machine.',
+    variations: [
+      { name: 'Standard', targetWeight: 20, targetReps: 12, targetSets: 3, cableSetting: '', default: true },
+    ],
+  },
+  {
+    name: 'Cable Standing Leg Raise', dayNumber: 16, equipment: 'Cable Machine', location: 'Gym',
+    tags: ['isolation', 'flexion', 'cable', 'hip-flexors', 'psoas', 'hip'],
+    notes: 'Same cuff and pulley as the kickback, facing away. Drive the knee HIGH — psoas only engages above 90 degrees.',
+    variations: [
+      { name: 'Bent Knee', targetWeight: 15, targetReps: 12, targetSets: 3, cableSetting: '', default: true },
+      { name: 'Straight Leg', targetWeight: 10, targetReps: 12, targetSets: 3, cableSetting: '' },
     ],
   },
 ];

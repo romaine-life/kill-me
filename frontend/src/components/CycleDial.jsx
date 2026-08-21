@@ -1,16 +1,24 @@
-// 12-segment radial dial showing the Synergy 12 cycle. Today's segment fills
-// in its accent color; completed segments are dim white; future segments
+// Radial dial showing the Synergy cycle, one segment per day. Today's segment
+// fills in its accent color; completed segments are dim white; future segments
 // are nearly invisible. Click a segment to navigate (admin) or inspect.
+//
+// Segment count comes from DAY_CONFIG rather than a literal, so the dial follows
+// the cycle when days are added or removed.
 
 import { DAY_DESIGN, pad2 } from '../utils/dayDesign';
-import { DAY_CONFIG } from '../utils/dayConfig';
+import { DAY_CONFIG, getDayNumbers } from '../utils/dayConfig';
 
 const SIZE = 200;
 const CX = SIZE / 2;
 const CY = SIZE / 2;
 const R_OUTER = 88;
 const R_INNER = 54;
-const SLICE = 360 / 12;
+
+const DAYS = getDayNumbers();
+const SLICE = 360 / DAYS.length;
+// Arc length per segment at the label radius. Two-digit numbers need ~12px, so
+// the label steps down once the cycle grows past a dozen days.
+const LABEL_SIZE = DAYS.length > 12 ? 10 : 11;
 
 const polar = (r, deg) => {
   const rad = ((deg - 90) * Math.PI) / 180;
@@ -33,8 +41,7 @@ export function CycleDial({ currentDay, onDay }) {
   return (
     <div style={{ display: 'grid', placeItems: 'center', padding: '4px 0 6px' }}>
       <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
-        {Array.from({ length: 12 }, (_, i) => {
-          const n = i + 1;
+        {DAYS.map((n, i) => {
           const meta = DAY_DESIGN[n];
           const isCurrent = n === currentDay;
           const completed = n < currentDay;
@@ -54,7 +61,7 @@ export function CycleDial({ currentDay, onDay }) {
                 textAnchor="middle"
                 fontFamily="var(--font-primary)"
                 fontWeight={isCurrent ? 800 : 600}
-                fontSize="11"
+                fontSize={LABEL_SIZE}
                 fill={isCurrent ? '#0a0a0a' : completed ? 'var(--fg-body)' : 'var(--fg-faint)'}
               >
                 {n}
