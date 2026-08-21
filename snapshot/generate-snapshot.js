@@ -85,11 +85,18 @@ const SCHEMA = `
     value TEXT NOT NULL
   );
 
+  -- One row per (date, source workout). Several rows can share a date when the
+  -- soreness from two different workouts overlaps, so date alone is not the key.
   CREATE TABLE soreness_entries (
-    date    TEXT PRIMARY KEY,
-    muscles TEXT NOT NULL
+    id                  TEXT PRIMARY KEY,
+    date                TEXT NOT NULL,
+    muscles             TEXT NOT NULL,
+    source_workout_id   TEXT,
+    source_workout_day  INTEGER,
+    source_workout_date TEXT
   );
   CREATE INDEX idx_soreness_date ON soreness_entries(date DESC);
+  CREATE INDEX idx_soreness_source ON soreness_entries(source_workout_id);
 
   CREATE TABLE cardio_sessions (
     id                TEXT PRIMARY KEY,
@@ -230,9 +237,18 @@ async function main() {
     insertSetting.run('currentDay', String(currentDay));
 
     // Soreness entries
-    const insertSoreness = db.prepare('INSERT INTO soreness_entries (date, muscles) VALUES (?, ?)');
+    const insertSoreness = db.prepare(
+      'INSERT INTO soreness_entries (id, date, muscles, source_workout_id, source_workout_day, source_workout_date) VALUES (?, ?, ?, ?, ?, ?)'
+    );
     for (const doc of results.soreness) {
-      insertSoreness.run(doc.date, JSON.stringify(doc.muscles));
+      insertSoreness.run(
+        doc.id,
+        doc.date,
+        JSON.stringify(doc.muscles),
+        doc.sourceWorkoutId || null,
+        doc.sourceWorkoutDay || null,
+        doc.sourceWorkoutDate || null
+      );
     }
 
     // Cardio sessions

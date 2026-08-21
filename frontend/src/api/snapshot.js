@@ -110,19 +110,26 @@ export function getLoggedWorkouts(db) {
   return { workouts };
 }
 
-// Get all soreness entries, sorted by date descending
+// Get all soreness entries, sorted by date descending.
+// Several entries can share a date — one per originating workout — so `id` is
+// the identity, not `date`. Entries predating workout attribution have a null
+// source_workout_id and read as unattributed.
 export function getSorenessEntries(db) {
   const result = db.exec(
-    'SELECT date, muscles FROM soreness_entries ORDER BY date DESC'
+    'SELECT id, date, muscles, source_workout_id, source_workout_day, source_workout_date FROM soreness_entries ORDER BY date DESC'
   );
 
   if (result.length === 0) {
     return { entries: [] };
   }
 
-  const entries = result[0].values.map(([date, muscles]) => ({
+  const entries = result[0].values.map(([id, date, muscles, sourceWorkoutId, sourceWorkoutDay, sourceWorkoutDate]) => ({
+    id,
     date,
     muscles: JSON.parse(muscles),
+    sourceWorkoutId,
+    sourceWorkoutDay,
+    sourceWorkoutDate,
   }));
 
   return { entries };

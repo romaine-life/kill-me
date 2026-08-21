@@ -45,6 +45,9 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [logViewWorkout, setLogViewWorkout] = useState(null);
   const [logViewCardio, setLogViewCardio] = useState(null);
+  // Workout handed to the Soreness tab by a "Log soreness" action elsewhere,
+  // so the editor opens already attributed to it. Cleared once consumed.
+  const [sorenessSource, setSorenessSource] = useState(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 760);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activityView, setActivityView] = useState('list'); // History tab: 'list' | 'calendar'
@@ -94,6 +97,12 @@ function App() {
     setLogInitialDay(null);
     setLogInitialDate(null);
     navigateTab('log');
+  };
+
+  // Navigate to the Soreness tab with the editor pre-attributed to a workout
+  const handleLogSoreness = (workout) => {
+    setSorenessSource(workout);
+    navigateTab('soreness');
   };
 
   // Navigate to Log tab showing an existing cardio session
@@ -211,6 +220,7 @@ function App() {
                 viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
                 onWorkoutClick={isAdmin ? handleViewWorkout : undefined}
                 onCardioClick={isAdmin ? handleViewCardio : undefined}
+                onLogSoreness={isAdmin ? handleLogSoreness : undefined}
               />
             )
           )}
@@ -220,7 +230,11 @@ function App() {
           )}
 
           {activeTab === 'soreness' && (
-            <SorenessTab isAdmin={isAdmin} />
+            <SorenessTab
+              isAdmin={isAdmin}
+              initialSource={sorenessSource}
+              onSourceConsumed={() => setSorenessSource(null)}
+            />
           )}
 
           {activeTab === 'log' && isAdmin && (
@@ -231,6 +245,7 @@ function App() {
               onSuccess={handleWorkoutSuccess}
               viewWorkout={logViewWorkout}
               onViewWorkout={handleViewWorkout}
+              onLogSoreness={handleLogSoreness}
               onWorkoutChanged={() => {
                 setLogViewWorkout(null);
                 setRefreshKey(prev => prev + 1);

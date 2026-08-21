@@ -208,6 +208,10 @@ export function createAdminRoutes({ container, cosmosDbEndpoint, databaseName, c
             userId,
             date: entry.date,
             muscles: entry.muscles,
+            // Historical spreadsheet data predates workout attribution.
+            sourceWorkoutId: null,
+            sourceWorkoutDay: null,
+            sourceWorkoutDate: null,
             updatedAt: new Date().toISOString(),
           };
           await container.items.upsert(doc);
