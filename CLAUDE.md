@@ -98,9 +98,13 @@ snapshot/          SQLite snapshot generator (Node 20)
   ├── Writes a SQLite .db file consumed by the frontend
   └── Runs every 4 hours via GitHub Actions cron
 
-backend/routes/    Express router factories (workouts, soreness, cardio, admin)
-  ├── Imported locally by backend/server.js — no longer published to GitHub Packages
-  └── Seed data included (data/seed-data.js, data/seed-soreness.js)
+backend/routes/    Express router factories (workouts, soreness, cardio)
+  └── Imported locally by backend/server.js — no longer published to GitHub Packages
+
+backend/migrations/  Forward-only database migrations
+  ├── runner.js — finds NNN-*.js, skips applied, runs the rest at pod startup
+  ├── dry-run.js — `npm run migrate:dry-run`, previews against real data, writes nothing
+  └── apply.js — `npm run migrate`, applies deliberately from a workstation
 
 tofu/              OpenTofu infrastructure-as-code
   └── App-specific resources on top of shared infra (no backend — decommissioned)
@@ -159,17 +163,69 @@ distinguished by a `type` field:
 
 | Type | Purpose | Key fields |
 | ---- | ------- | ---------- |
-| `workout-day-definition` | Static cycle definition (days 1-16) | `dayNumber`, `name`, `focus`, `primaryMuscleGroups` |
-| `exercise` | Exercise library entries per day | `dayNumber`, `name`, `equipment`, `tags[]`, `variations[]` (`{name, default, targetWeight/Reps/Sets}`) |
-| `logged-workout` | A completed workout session | `userId`, `dayNumber`, `date`, `time` (HH:MM, nullable), `mode` (quick/detailed), `exercises[]` (`{name, variation, weight, reps, sets}`) |
+| `workout-model` | One generation of the cycle. Exactly one is `active`; retired ones stay so old logs still resolve | `version`, `name`, `active`, `days[]` (`{slug, number, name, focus, description, muscleGroups, safetyNotes}`) |
+| `exercise` | Exercise library entries per day | `daySlug`, `dayNumber`, `name`, `equipment`, `tags[]`, `variations[]` (`{name, default, targetWeight/Reps/Sets}`) |
+| `logged-workout` | A completed workout session | `userId`, `daySlug`, `dayNumber`, `dayName`, `modelVersion`, `date`, `time` (HH:MM, nullable), `mode` (quick/detailed), `exercises[]` (`{name, variation, weight, reps, sets}`) |
+| `schema-migration` | Record that a migration ran. Its existence is what stops it running again | `version`, `name`, `appliedAt`, `durationMs` |
 | `cardio-session` | A completed cardio session | `userId`, `date`, `time` (HH:MM, nullable), `activity` (treadmill/bike), `durationMinutes`, `treadmill{}`, `bike{}` |
 | `cardio-template` | Shared treadmill interval template (library) | `userId` (`shared`), `templateId`, `name`, `description`, `activity`, `intervals[]` (`{type, speedMph, durationMinutes}`), `sortOrder` |
 | `soreness-entry` | Daily soreness journal entry | `userId`, `date`, `muscles[]` (`{group, muscle, level}`) |
-| `settings` | Per-user settings (current day) | `userId`, `currentDay` |
+| `settings` | Per-user settings (current day) | `userId`, `currentDaySlug` |
 | `account` | Microsoft auth account record | `userId`, `provider`, `name`, `email`, `role` |
 
 All document types share the same container and partition key. The `type` field is
 used in queries to distinguish them.
+
+### Days are identified by slug, never by number
+
+A day's `slug` (`compound-legs`, `transverse`, `pecs-mobility`) is permanent. Its
+`number` is only its position in one version of the model, so reordering the cycle
+changes numbers and nothing else — no exercise or log is rebound.
+
+This is what makes a cycle change safe, and it is worth not undoing. Before it, the
+cycle was addressed positionally in three places at once (a bundled `DAY_CONFIG`, a
+bundled `DAY_DESIGN`, and the database), and moving a day silently repointed every
+historical record at whichever day moved into its slot.
+
+Two rules follow:
+
+- **A logged workout is a faithful record.** It stores `daySlug`, `dayNumber`,
+  `dayName` and `modelVersion` as they were on the day it happened. Nothing later may
+  edit it — not a rename, not a reorder, not a new model.
+- **Retired days are retired, not deleted.** `torso` no longer appears in the active
+  model but its record survives, and `dayDesign.js` keeps its color forever, so a 2025
+  Torso workout still renders as Torso.
+
+The program is *not* versioned per-day with valid-from/valid-to dates. That was
+considered and cut: history lives in the logs, and a day's exercise list is a default
+for pre-filling the log form rather than a specification of what was done.
+
+### Schema and data changes are migrations
+
+There is no seed step and no admin "initialize database" button; both were removed
+along with `seed-data.js`. A change to the cycle is a numbered file in
+`backend/migrations/`, it ships inside the same image as the code that expects it, and
+it runs at pod startup before any route is mounted. A failure exits the process and
+fails the rollout, because a half-migrated database serving traffic is worse than a
+deploy that stops.
+
+Cosmos has no cross-document transaction, so a migration can die partway and be retried
+from the top. **Every migration must be safe to re-run**, and `npm run migrate:dry-run`
+checks exactly that by replaying against the already-migrated result.
+
+Migrations auto-apply only in the cluster, gated on `RUN_MIGRATIONS_ON_BOOT=true` in
+`k8s/templates/deployment.yaml`. Local development points at the *live* database, so
+`npm run dev` deliberately reports what is pending instead of applying it — otherwise
+starting a dev server on a branch would push a half-written migration to production.
+
+`frontend/public/snapshot.db` is committed and baked into the image, so it has to be
+regenerated in the same commit as any migration that changes its schema. Otherwise
+anonymous visitors read a snapshot the new frontend cannot parse until the 4-hourly
+cron catches up:
+
+```bash
+cd snapshot && node generate-snapshot.js --preview-migrations --output ../frontend/public/snapshot.db
+```
 
 ## CI/CD
 
@@ -205,8 +261,10 @@ cd frontend && npm run dev  # Frontend only (Vite :5173)
 
 The frontend reads `VITE_API_URL`. The auth service URL is fetched at runtime from the backend's `/api/config` endpoint.
 
-Admin mode (database init, data migration) is available only on localhost in dev
-mode when signed in as admin.
+Admin mode is available only on localhost in dev mode when signed in as admin. It
+holds the day-override control; database initialization and the hand-run data
+migrations that used to live there are gone (see **Schema and data changes are
+migrations**).
 
 ### Visual verification (screenshots)
 

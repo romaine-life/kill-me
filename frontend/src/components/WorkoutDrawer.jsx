@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { getDayInfo, DAY_CONFIG } from '../utils/dayConfig';
+import { getDayInfo, getDays } from '../utils/dayConfig';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { apiFetch } from '../api/client.js';
 import { todayLocal, nowLocalTime } from '../utils/dateUtils';
@@ -28,7 +28,7 @@ export function LogTab({
   onCardioChanged,
   viewWorkout = null,
   viewCardio = null,
-  currentDay = 1,
+  currentDay = null,
 }) {
   // Top-level toggle: 'weight' or 'cardio'
   const [logType, setLogType] = useState(viewCardio ? 'cardio' : 'weight');
@@ -46,8 +46,8 @@ export function LogTab({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [useNextWorkout, setUseNextWorkout] = useState(true);
-  // The picker lists all 12 days (see the cycle dial — the list has to line up
-  // with it), so it starts on the current day rather than an arbitrary other one.
+  // The picker lists every day in the cycle (see the cycle dial — the list has to
+  // line up with it), so it starts on the current day rather than an arbitrary one.
   const [dropdownDay, setDropdownDay] = useState(currentDay);
 
   // --- Delete state (edit mode only) ---
@@ -93,14 +93,14 @@ export function LogTab({
   useEffect(() => {
     if (viewWorkout) {
       // Edit mode: populate from existing workout
-      setSelectedDay(viewWorkout.dayNumber);
+      setSelectedDay(viewWorkout.daySlug);
       setSelectedDate(viewWorkout.date);
       setSelectedTime(viewWorkout.time || '');
       setMode(viewWorkout.mode || 'quick');
       setConfirmDelete(false);
 
-      setDropdownDay(viewWorkout.dayNumber);
-      setUseNextWorkout(viewWorkout.dayNumber === currentDay);
+      setDropdownDay(viewWorkout.daySlug);
+      setUseNextWorkout(viewWorkout.daySlug === currentDay);
     } else {
       // Create mode: populate from initialDay/initialDate or defaults
       if (initialDay) {
@@ -298,8 +298,7 @@ export function LogTab({
           body: JSON.stringify({
             date: selectedDate,
             time: selectedTime || null,
-            dayNumber: selectedDay,
-            dayName: dayInfo?.name || `Day ${selectedDay}`,
+            daySlug: selectedDay,
             mode,
             exercises: mode === 'detailed' ? completed : [],
           })
@@ -310,8 +309,7 @@ export function LogTab({
         const result = await apiFetch('/api/log-workout', {
           method: 'POST',
           body: JSON.stringify({
-            dayNumber: selectedDay,
-            dayName: dayInfo?.name || `Day ${selectedDay}`,
+            daySlug: selectedDay,
             mode,
             date: selectedDate,
             time: selectedTime || null,
@@ -606,7 +604,7 @@ export function LogTab({
                 <span className="text-sm font-bold uppercase tracking-wide">Use Next</span>
               </div>
               <div className="mt-2 text-lg font-black">
-                {getDayInfo(currentDay)?.name || `Day ${currentDay}`}
+                {getDayInfo(currentDay)?.name || 'Today'}
               </div>
             </div>
 
@@ -620,7 +618,7 @@ export function LogTab({
               <select
                 value={dropdownDay}
                 onChange={(e) => {
-                  const newDay = parseInt(e.target.value);
+                  const newDay = e.target.value;
                   setDropdownDay(newDay);
                   if (!useNextWorkout) {
                     setSelectedDay(newDay);
@@ -636,10 +634,10 @@ export function LogTab({
                   !useNextWorkout ? 'hover:border-cyan-400/70 focus:ring-cyan-500/50' : ''
                 }`}
               >
-                {Object.entries(DAY_CONFIG).map(([dayNum, config]) => (
-                  <option key={dayNum} value={dayNum} className="bg-slate-800 text-white font-bold">
-                    Day {dayNum} · {config.name}
-                    {parseInt(dayNum) === currentDay ? ' (today)' : ''}
+                {getDays().map((day) => (
+                  <option key={day.slug} value={day.slug} className="bg-slate-800 text-white font-bold">
+                    Day {day.number} · {day.name}
+                    {day.slug === currentDay ? ' (today)' : ''}
                   </option>
                 ))}
               </select>
@@ -661,7 +659,7 @@ export function LogTab({
             )}
           </div>
           <span className={`${dayInfo?.color} text-white text-sm font-bold px-3 py-1 rounded-full`}>
-            Day {selectedDay}
+            Day {dayInfo?.number ?? '—'}
           </span>
         </div>
 
@@ -704,7 +702,7 @@ export function LogTab({
         <div className="bg-slate-800/30 backdrop-blur-md rounded-xl border border-slate-700/50 p-8 text-center">
           <div className="text-6xl mb-4">🚀</div>
           <h3 className="text-2xl font-bold text-slate-100 mb-3">
-            {isEditMode ? `Day ${selectedDay}` : `Complete Day ${selectedDay}`}
+            {isEditMode ? `Day ${dayInfo?.number ?? '—'}` : `Complete Day ${dayInfo?.number ?? '—'}`}
           </h3>
           <p className="text-slate-400 mb-6">
             {isEditMode

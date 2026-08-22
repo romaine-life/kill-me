@@ -15,7 +15,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useWorkouts } from './hooks/useWorkouts';
 import { useAuth } from './auth/AuthContext.jsx';
 import { HistoryTab } from './components/HistoryTab';
-import { DatabaseInit } from './components/DatabaseInit';
+import { DayOverride } from './components/DayOverride';
 import { LogTab } from './components/WorkoutDrawer';
 import { UserProfile } from './components/UserProfile';
 import { TabBar } from './components/TabBar';
@@ -28,8 +28,10 @@ import { isAdminMode } from './utils/adminMode';
 import { getTotalDays } from './utils/dayConfig';
 import { CalendarDays, RefreshCw, Activity, PenLine, Wrench, ListChecks, List, Menu } from 'lucide-react';
 
-// Brand string tracks the cycle length so it can't drift from DAY_CONFIG.
-const BRAND = `synergy-${getTotalDays()}`;
+// Brand string tracks the cycle length, which now comes from the active workout
+// model. It has to be read at render rather than at import: the model loads
+// asynchronously, and at module-evaluation time there is no cycle yet.
+const brand = () => `synergy-${getTotalDays()}`;
 
 // Map URL path to tab id. Unknown paths fall back to 'list' (the landing page).
 const tabFromPath = (path) => {
@@ -249,7 +251,7 @@ function App() {
           )}
 
           {activeTab === 'admin' && showAdminTab && (
-            <DatabaseInit currentDay={currentDay} onDayChange={setDay} />
+            <DayOverride currentDay={currentDay} onDayChange={setDay} />
           )}
         </div>
       </div>
@@ -306,7 +308,7 @@ function TopBar({ activeTab, isMobile, showAdminTab, mobileNavOpen, onToggleMobi
         )}
         {isMobile && <BrandMark />}
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15, minWidth: 0 }}>
-          <span className="display" style={styles.topTitle}>{isMobile ? BRAND : title}</span>
+          <span className="display" style={styles.topTitle}>{isMobile ? brand() : title}</span>
           {!isMobile && <span style={styles.topSubtitle}>activity feed · public view</span>}
         </div>
       </div>
@@ -324,7 +326,7 @@ function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, isAdmin, 
       <div style={styles.brand}>
         <BrandMark />
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1, minWidth: 0 }}>
-          <span style={styles.brandName}>{BRAND}</span>
+          <span style={styles.brandName}>{brand()}</span>
           <span style={styles.brandHost}>workout.romaine.life</span>
         </div>
       </div>

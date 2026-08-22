@@ -4,51 +4,47 @@
 // format as the corresponding API endpoint, so components can use either
 // source transparently via useDataSource().
 
-// Get current day in the 12-day cycle
-export function getCurrentDay(db) {
-  const row = db.exec('SELECT value FROM settings WHERE key = ?', ['currentDay']);
-  const currentDay = row.length > 0 && row[0].values.length > 0
-    ? parseInt(row[0].values[0][0])
-    : 1;
-  return { currentDay };
-}
-
-// Get workout day definition by day number
-export function getWorkoutDay(db, dayNumber) {
-  const result = db.exec(
-    'SELECT day_number, name, focus, warning, primary_muscle_groups FROM workout_days WHERE day_number = ?',
-    [dayNumber]
-  );
+// Get the active workout model — the whole cycle in one read
+export function getWorkoutModel(db) {
+  const result = db.exec('SELECT version, name, days FROM workout_model LIMIT 1');
 
   if (result.length === 0 || result[0].values.length === 0) {
-    return { workoutDay: null };
+    return { model: null };
   }
 
-  const [dn, name, focus, warning, muscleGroups] = result[0].values[0];
-  return {
-    workoutDay: {
-      dayNumber: dn,
-      name,
-      focus,
-      warning,
-      primaryMuscleGroups: muscleGroups ? JSON.parse(muscleGroups) : [],
-    },
-  };
+  const [version, name, days] = result[0].values[0];
+  return { model: { version, name, days: days ? JSON.parse(days) : [] } };
+}
+
+// Get the day the cycle is currently on
+export function getCurrentDay(db) {
+  const row = db.exec('SELECT value FROM settings WHERE key = ?', ['currentDaySlug']);
+  const currentDaySlug = row.length > 0 && row[0].values.length > 0
+    ? row[0].values[0][0]
+    : getWorkoutModel(db).model?.days?.[0]?.slug ?? null;
+  return { currentDaySlug };
+}
+
+// Get one day's definition out of the active model
+export function getWorkoutDay(db, daySlug) {
+  const { model } = getWorkoutModel(db);
+  return { workoutDay: model?.days.find((day) => day.slug === daySlug) ?? null };
 }
 
 // Get exercises for a specific day
-export function getExercisesForDay(db, dayNumber) {
+export function getExercisesForDay(db, daySlug) {
   const result = db.exec(
-    'SELECT id, day_number, name, equipment, location, notes, variations, tags FROM exercises WHERE day_number = ?',
-    [dayNumber]
+    'SELECT id, day_slug, day_number, name, equipment, location, notes, variations, tags FROM exercises WHERE day_slug = ?',
+    [daySlug]
   );
 
   if (result.length === 0) {
     return { exercises: [] };
   }
 
-  const exercises = result[0].values.map(([id, dn, name, equipment, location, notes, variations, tags]) => ({
+  const exercises = result[0].values.map(([id, daySlug, dn, name, equipment, location, notes, variations, tags]) => ({
     id,
+    daySlug,
     dayNumber: dn,
     name,
     equipment,
@@ -64,15 +60,16 @@ export function getExercisesForDay(db, dayNumber) {
 // Get all exercises across all days
 export function getAllExercises(db) {
   const result = db.exec(
-    'SELECT id, day_number, name, equipment, location, notes, variations, tags FROM exercises ORDER BY day_number'
+    'SELECT id, day_slug, day_number, name, equipment, location, notes, variations, tags FROM exercises ORDER BY day_number'
   );
 
   if (result.length === 0) {
     return { exercises: [] };
   }
 
-  const exercises = result[0].values.map(([id, dn, name, equipment, location, notes, variations, tags]) => ({
+  const exercises = result[0].values.map(([id, daySlug, dn, name, equipment, location, notes, variations, tags]) => ({
     id,
+    daySlug,
     dayNumber: dn,
     name,
     equipment,
@@ -88,17 +85,19 @@ export function getAllExercises(db) {
 // Get all logged workouts, sorted by date descending
 export function getLoggedWorkouts(db) {
   const result = db.exec(
-    'SELECT id, day_number, day_name, date, time, mode, exercises, timestamp, created_at FROM logged_workouts ORDER BY date DESC'
+    'SELECT id, day_slug, day_number, day_name, model_version, date, time, mode, exercises, timestamp, created_at FROM logged_workouts ORDER BY date DESC'
   );
 
   if (result.length === 0) {
     return { workouts: [] };
   }
 
-  const workouts = result[0].values.map(([id, dn, dayName, date, time, mode, exercises, timestamp, createdAt]) => ({
+  const workouts = result[0].values.map(([id, daySlug, dn, dayName, modelVersion, date, time, mode, exercises, timestamp, createdAt]) => ({
     id,
+    daySlug,
     dayNumber: dn,
     dayName,
+    modelVersion,
     date,
     time,
     mode,

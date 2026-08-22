@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Plus, Copy, X, Search } from 'lucide-react';
 import { apiFetch } from '../api/client.js';
 import { useDataSource } from '../api/snapshotContext.jsx';
-import { DAY_CONFIG, getDayNumbers } from '../utils/dayConfig.js';
+import { getDays, getDaySlugs, getDayInfo } from '../utils/dayConfig.js';
 import { AnatomyDiagram } from './AnatomyDiagrams.jsx';
 import { ExercisePose } from './ExercisePoses.jsx';
 import { colors } from '../colors.js';
@@ -93,11 +93,11 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
     // If navigated with a specific day, start filtered to that day
     if (initialDay) {
       const days = {};
-      for (const i of getDayNumbers()) days[i] = i === initialDay;
+      for (const slug of getDaySlugs()) days[slug] = slug === initialDay;
       return days;
     }
     const days = {};
-    for (const i of getDayNumbers()) days[i] = true;
+    for (const slug of getDaySlugs()) days[slug] = true;
     return days;
   });
   const [activeTags, setActiveTags] = useState(new Set());
@@ -147,7 +147,7 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
     let result = allExercises;
 
     // Day filter
-    result = result.filter(e => enabledDays[e.dayNumber]);
+    result = result.filter(e => enabledDays[e.daySlug]);
 
     // Tag filter (AND logic — exercise must have all active tags)
     if (activeTags.size > 0) {
@@ -183,7 +183,7 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
   // Exercises available for "add existing" (not already on target day)
   const addableExercises = useMemo(() => {
     const namesOnTargetDay = new Set(
-      allExercises.filter(e => e.dayNumber === addTargetDay).map(e => e.name)
+      allExercises.filter(e => e.daySlug === addTargetDay).map(e => e.name)
     );
     let result = allExercises.filter(e => !namesOnTargetDay.has(e.name));
     if (addSearchText.trim()) {
@@ -240,13 +240,13 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
 
   const enableAllDays = () => {
     const days = {};
-    for (const i of getDayNumbers()) days[i] = true;
+    for (const slug of getDaySlugs()) days[slug] = true;
     setEnabledDays(days);
   };
 
   const clearAllDays = () => {
     const days = {};
-    for (const i of getDayNumbers()) days[i] = false;
+    for (const slug of getDaySlugs()) days[slug] = false;
     setEnabledDays(days);
   };
 
@@ -257,7 +257,7 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
       await apiFetch('/api/exercises', {
         method: 'POST',
         body: JSON.stringify({
-          dayNumber: addTargetDay,
+          daySlug: addTargetDay,
           name: sourceExercise.name,
           equipment: sourceExercise.equipment,
           notes: sourceExercise.notes,
@@ -293,7 +293,7 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
       await apiFetch('/api/exercises', {
         method: 'POST',
         body: JSON.stringify({
-          dayNumber: newTargetDay,
+          daySlug: newTargetDay,
           name: newExercise.name.trim(),
           equipment: newExercise.equipment.trim(),
           notes: newExercise.notes.trim(),
@@ -327,7 +327,7 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
   }
 
   const anatomyGroups = exercise ? getAnatomyGroups(exercise) : [];
-  const dayConfig = exercise ? DAY_CONFIG[exercise.dayNumber] : null;
+  const dayConfig = exercise ? getDayInfo(exercise.daySlug) : null;
 
   return (
     <div style={{ maxWidth: 900 }}>
@@ -362,22 +362,21 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
       <div style={styles.filterSection}>
         <div style={styles.filterRow}>
           <div style={styles.dayStrip}>
-            {Object.entries(DAY_CONFIG).map(([dayNum, day]) => {
-              const num = parseInt(dayNum);
-              const enabled = enabledDays[num];
-              const isCurrent = num === currentDay;
+            {getDays().map((day) => {
+              const enabled = enabledDays[day.slug];
+              const isCurrent = day.slug === currentDay;
               return (
                 <button
-                  key={num}
-                  onClick={() => toggleDay(num)}
+                  key={day.slug}
+                  onClick={() => toggleDay(day.slug)}
                   style={{
                     ...styles.dayPill,
                     ...(enabled ? styles.dayPillEnabled : styles.dayPillDisabled),
                     ...(isCurrent ? { boxShadow: `0 0 0 2px ${colors.accent.green}` } : {}),
                   }}
-                  title={`Day ${num}: ${day.name}`}
+                  title={`Day ${day.number}: ${day.name}`}
                 >
-                  {num}
+                  {day.number}
                 </button>
               );
             })}
@@ -437,7 +436,7 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
           <div style={styles.cardContainer}>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
-                key={exercise.id || `${exercise.dayNumber}-${exercise.name}`}
+                key={exercise.id || `${exercise.daySlug}-${exercise.name}`}
                 initial={{ x: direction * 80, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: direction * -80, opacity: 0 }}
@@ -447,7 +446,7 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
                 {/* Day badge + exercise name */}
                 <div style={styles.cardHeader}>
                   <div style={styles.dayBadge}>
-                    Day {exercise.dayNumber}
+                    Day {dayConfig?.number ?? '—'}
                     <span style={styles.dayBadgeName}>
                       {dayConfig?.name}
                     </span>
@@ -590,19 +589,18 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
               <div style={{ marginBottom: 12 }}>
                 <label style={styles.fieldLabel}>Add to Day:</label>
                 <div style={styles.dayStrip}>
-                  {Object.entries(DAY_CONFIG).map(([dayNum, day]) => {
-                    const num = parseInt(dayNum);
+                  {getDays().map((day) => {
                     return (
                       <button
-                        key={num}
-                        onClick={() => setAddTargetDay(num)}
+                        key={day.slug}
+                        onClick={() => setAddTargetDay(day.slug)}
                         style={{
                           ...styles.dayPill,
-                          ...(num === addTargetDay ? styles.dayPillEnabled : styles.dayPillDisabled),
+                          ...(day.slug === addTargetDay ? styles.dayPillEnabled : styles.dayPillDisabled),
                         }}
                         title={day.name}
                       >
-                        {num}
+                        {day.number}
                       </button>
                     );
                   })}
@@ -629,7 +627,7 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
                   </div>
                 ) : (
                   addableExercises.map(ex => (
-                    <div key={`${ex.dayNumber}-${ex.name}`} style={styles.addListItem}>
+                    <div key={`${ex.daySlug}-${ex.name}`} style={styles.addListItem}>
                       <div>
                         <span style={{ color: colors.text.primary, fontWeight: 500, fontSize: 14 }}>
                           {ex.name}
@@ -639,7 +637,7 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
                             ({ex.equipment})
                           </span>
                         )}
-                        <span style={styles.fromDayBadge}>Day {ex.dayNumber}</span>
+                        <span style={styles.fromDayBadge}>Day {getDayInfo(ex.daySlug)?.number ?? '—'}</span>
                       </div>
                       <button
                         onClick={() => handleAddExisting(ex)}
@@ -673,19 +671,18 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
               <div style={{ marginBottom: 12 }}>
                 <label style={styles.fieldLabel}>Day:</label>
                 <div style={styles.dayStrip}>
-                  {Object.entries(DAY_CONFIG).map(([dayNum, day]) => {
-                    const num = parseInt(dayNum);
+                  {getDays().map((day) => {
                     return (
                       <button
-                        key={num}
-                        onClick={() => setNewTargetDay(num)}
+                        key={day.slug}
+                        onClick={() => setNewTargetDay(day.slug)}
                         style={{
                           ...styles.dayPill,
-                          ...(num === newTargetDay ? styles.dayPillEnabled : styles.dayPillDisabled),
+                          ...(day.slug === newTargetDay ? styles.dayPillEnabled : styles.dayPillDisabled),
                         }}
                         title={day.name}
                       >
-                        {num}
+                        {day.number}
                       </button>
                     );
                   })}

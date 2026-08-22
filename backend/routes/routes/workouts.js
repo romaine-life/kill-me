@@ -1,72 +1,95 @@
 import { Router } from 'express';
-import { workoutDays } from '../data/seed-data.js';
-
-// Cycle length comes from the seeded day definitions, so the route bounds follow
-// the cycle instead of a literal that has to be remembered separately.
-const MAX_DAY = workoutDays.length;
 
 /**
- * Workout day definitions, exercises, logged workouts, and current-day tracking.
+ * The workout model, exercises, logged workouts, and current-day tracking.
+ *
+ * Days are addressed by slug, not by position. The slug is a day's permanent
+ * identity; its number is an attribute of whichever model version it appears in,
+ * so reordering the cycle never rebinds an exercise or a log to a different day.
  *
  * Public endpoints (no auth):
- *   GET /api/workout-days/:dayNumber
+ *   GET /api/workout-model
+ *   GET /api/workout-days/:daySlug
  *   GET /api/exercises
- *   GET /api/exercises/day/:dayNumber
+ *   GET /api/exercises/day/:daySlug
  *   GET /api/logged-workouts
  *   GET /api/current-day
  *
  * Admin endpoints (requireAuth + requireAdmin):
- *   POST /api/log-workout
- *   PUT  /api/logged-workouts/:id
+ *   POST   /api/log-workout
+ *   PUT    /api/logged-workouts/:id
  *   DELETE /api/logged-workouts/:id
- *   PUT  /api/current-day
- *   POST /api/exercises
+ *   PUT    /api/current-day
+ *   POST   /api/exercises
  */
 export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
   const router = Router();
 
-  // Get workout day definition by day number
-  router.get('/api/workout-days/:dayNumber', async (req, res) => {
+  // The active model is read on nearly every request and changes only when a
+  // migration publishes a new one, so it is worth a short cache.
+  const MODEL_CACHE_MS = 60_000;
+  let cachedModel = null;
+  let cachedAt = 0;
+
+  async function activeModel() {
+    if (cachedModel && Date.now() - cachedAt < MODEL_CACHE_MS) return cachedModel;
+
+    const { resources } = await container.items
+      .query({
+        query: 'SELECT * FROM c WHERE c.type = @type AND c.active = true',
+        parameters: [{ name: '@type', value: 'workout-model' }]
+      })
+      .fetchAll();
+
+    // More than one active model means a migration published without retiring its
+    // predecessor. Prefer the newest rather than picking arbitrarily.
+    const model = resources.sort((a, b) => b.version - a.version)[0] ?? null;
+    if (!model) throw new Error('No active workout model — the database has not been migrated');
+
+    cachedModel = model;
+    cachedAt = Date.now();
+    return model;
+  }
+
+  const findDay = (model, daySlug) => model.days.find((day) => day.slug === daySlug) ?? null;
+
+  const unknownDay = (res, model, daySlug) =>
+    res.status(404).json({
+      error: `Unknown day "${daySlug}" in ${model.name}.`,
+      knownDays: model.days.map((day) => day.slug)
+    });
+
+  // The whole cycle in one call — days, order, names, focus, safety notes.
+  router.get('/api/workout-model', async (req, res) => {
     try {
-      const dayNumber = parseInt(req.params.dayNumber);
+      const model = await activeModel();
+      res.json({ model: { version: model.version, name: model.name, days: model.days } });
+    } catch (error) {
+      console.error('Error fetching workout model:', error);
+      res.status(500).json({ error: 'Failed to fetch workout model', message: error.message });
+    }
+  });
 
-      if (isNaN(dayNumber) || dayNumber < 1 || dayNumber > MAX_DAY) {
-        return res.status(400).json({ error: `Invalid day number. Must be between 1 and ${MAX_DAY}.` });
-      }
-
-      const querySpec = {
-        query: 'SELECT * FROM c WHERE c.type = @type AND c.dayNumber = @dayNumber',
-        parameters: [
-          { name: '@type', value: 'workout-day-definition' },
-          { name: '@dayNumber', value: dayNumber }
-        ]
-      };
-
-      const { resources } = await container.items.query(querySpec).fetchAll();
-
-      if (resources.length === 0) {
-        return res.status(404).json({ error: 'Workout day not found' });
-      }
-
-      res.json({ workoutDay: resources[0] });
+  router.get('/api/workout-days/:daySlug', async (req, res) => {
+    try {
+      const model = await activeModel();
+      const day = findDay(model, req.params.daySlug);
+      if (!day) return unknownDay(res, model, req.params.daySlug);
+      res.json({ workoutDay: day });
     } catch (error) {
       console.error('Error fetching workout day:', error);
       res.status(500).json({ error: 'Failed to fetch workout day', message: error.message });
     }
   });
 
-  // Get all exercises across all days (public).
   router.get('/api/exercises', async (req, res) => {
     try {
-      const querySpec = {
-        query: 'SELECT * FROM c WHERE c.type = @type ORDER BY c.dayNumber',
-        parameters: [
-          { name: '@type', value: 'exercise' }
-        ]
-      };
-
-      const { resources: exercises } = await container.items.query(querySpec).fetchAll();
-
+      const { resources: exercises } = await container.items
+        .query({
+          query: 'SELECT * FROM c WHERE c.type = @type ORDER BY c.dayNumber',
+          parameters: [{ name: '@type', value: 'exercise' }]
+        })
+        .fetchAll();
       res.json({ exercises });
     } catch (error) {
       console.error('Error fetching all exercises:', error);
@@ -74,24 +97,21 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
     }
   });
 
-  // Get exercises for a specific day
-  router.get('/api/exercises/day/:dayNumber', async (req, res) => {
+  router.get('/api/exercises/day/:daySlug', async (req, res) => {
     try {
-      const dayNumber = parseInt(req.params.dayNumber);
+      const model = await activeModel();
+      const day = findDay(model, req.params.daySlug);
+      if (!day) return unknownDay(res, model, req.params.daySlug);
 
-      if (isNaN(dayNumber) || dayNumber < 1 || dayNumber > MAX_DAY) {
-        return res.status(400).json({ error: `Invalid day number. Must be between 1 and ${MAX_DAY}.` });
-      }
-
-      const querySpec = {
-        query: 'SELECT * FROM c WHERE c.type = @type AND c.dayNumber = @dayNumber',
-        parameters: [
-          { name: '@type', value: 'exercise' },
-          { name: '@dayNumber', value: dayNumber }
-        ]
-      };
-
-      const { resources: exercises } = await container.items.query(querySpec).fetchAll();
+      const { resources: exercises } = await container.items
+        .query({
+          query: 'SELECT * FROM c WHERE c.type = @type AND c.daySlug = @daySlug',
+          parameters: [
+            { name: '@type', value: 'exercise' },
+            { name: '@daySlug', value: day.slug }
+          ]
+        })
+        .fetchAll();
 
       res.json({ exercises });
     } catch (error) {
@@ -100,18 +120,14 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
     }
   });
 
-  // Get all logged workouts (public).
   router.get('/api/logged-workouts', async (req, res) => {
     try {
-      const querySpec = {
-        query: 'SELECT * FROM c WHERE c.type = @type ORDER BY c.date DESC',
-        parameters: [
-          { name: '@type', value: 'logged-workout' }
-        ]
-      };
-
-      const { resources: workouts } = await container.items.query(querySpec).fetchAll();
-
+      const { resources: workouts } = await container.items
+        .query({
+          query: 'SELECT * FROM c WHERE c.type = @type ORDER BY c.date DESC',
+          parameters: [{ name: '@type', value: 'logged-workout' }]
+        })
+        .fetchAll();
       res.json({ workouts });
     } catch (error) {
       console.error('Error fetching logged workouts:', error);
@@ -119,50 +135,55 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
     }
   });
 
-  // Get current day in the 12-day cycle (public).
   router.get('/api/current-day', async (req, res) => {
     try {
-      const querySpec = {
-        query: 'SELECT * FROM c WHERE c.type = @type',
-        parameters: [
-          { name: '@type', value: 'settings' }
-        ]
-      };
+      const model = await activeModel();
+      const { resources: settings } = await container.items
+        .query({
+          query: 'SELECT * FROM c WHERE c.type = @type',
+          parameters: [{ name: '@type', value: 'settings' }]
+        })
+        .fetchAll();
 
-      const { resources: settings } = await container.items.query(querySpec).fetchAll();
-
-      // Defensive: if more than one settings doc exists (e.g. leftover from a
-      // legacy/duplicate identity), prefer the most recently updated so the
-      // "current day" pointer is stable instead of an arbitrary cross-partition hit.
+      // Defensive: if more than one settings document exists (a leftover from a
+      // duplicate identity), prefer the most recently updated so the pointer is
+      // stable rather than an arbitrary cross-partition hit.
       const latest = settings
         .slice()
         .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))[0];
-      const currentDay = Number(latest?.currentDay) || 1;
-      res.json({ currentDay });
+
+      const daySlug = findDay(model, latest?.currentDaySlug)
+        ? latest.currentDaySlug
+        : model.days[0].slug;
+
+      res.json({ currentDaySlug: daySlug });
     } catch (error) {
       console.error('Error fetching current day:', error);
       res.status(500).json({ error: 'Failed to fetch current day', message: error.message });
     }
   });
 
-  // Log a completed workout.
   router.post('/api/log-workout', requireAuth, requireAdmin, async (req, res) => {
     try {
       const userId = req.user.sub;
-      const { dayNumber, dayName, mode, date, time, exercises: completedExercises } = req.body;
+      const model = await activeModel();
+      const { daySlug, mode, date, time, exercises: completedExercises } = req.body;
 
-      if (!dayNumber) {
-        return res.status(400).json({ error: 'Missing required field: dayNumber' });
-      }
+      const day = findDay(model, daySlug);
+      if (!day) return unknownDay(res, model, daySlug);
 
       const today = date || new Date().toISOString().split('T')[0];
 
+      // The log records what happened, including what the day was called at the time.
+      // Nothing later — a rename, a reorder, a new model — may reach back and edit it.
       const workoutDoc = {
-        id: `logged-workout-${today}-day${dayNumber}-${Date.now()}`,
+        id: `logged-workout-${today}-${day.slug}-${Date.now()}`,
         type: 'logged-workout',
         userId,
-        dayNumber,
-        dayName,
+        daySlug: day.slug,
+        dayNumber: day.number,
+        dayName: day.name,
+        modelVersion: model.version,
         date: today,
         time: time || null,
         mode: mode || 'quick',
@@ -173,30 +194,35 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
 
       const { resource } = await container.items.create(workoutDoc);
 
-      // Auto-advance currentDay if the logged workout matches the current day.
-      // Scope the lookup to THIS user (partition) so we never read another
-      // identity's pointer, and always key the upsert on settings_<userId> so a
-      // stray/legacy doc id can't spawn a duplicate settings document.
+      // Advance the pointer if this was the day you were on. The wrap comes from the
+      // model's own length rather than a literal, so it follows the cycle.
       let advancedTo = null;
-      const { resources: settings } = await container.items.query({
-        query: 'SELECT * FROM c WHERE c.type = @type AND c.userId = @userId',
-        parameters: [
-          { name: '@type', value: 'settings' },
-          { name: '@userId', value: userId }
-        ]
-      }, { partitionKey: userId }).fetchAll();
-      const currentDay = Number(settings[0]?.currentDay) || 1;
-      if (Number(dayNumber) === currentDay) {
-        const nextDay = currentDay >= 12 ? 1 : currentDay + 1;
+      const { resources: settings } = await container.items
+        .query(
+          {
+            query: 'SELECT * FROM c WHERE c.type = @type AND c.userId = @userId',
+            parameters: [
+              { name: '@type', value: 'settings' },
+              { name: '@userId', value: userId }
+            ]
+          },
+          { partitionKey: userId }
+        )
+        .fetchAll();
+
+      const currentSlug = settings[0]?.currentDaySlug ?? model.days[0].slug;
+      if (day.slug === currentSlug) {
+        const index = model.days.findIndex((d) => d.slug === currentSlug);
+        const next = model.days[(index + 1) % model.days.length];
         await container.items.upsert({
           ...settings[0],
           id: `settings_${userId}`,
           userId,
           type: 'settings',
-          currentDay: nextDay,
+          currentDaySlug: next.slug,
           updatedAt: new Date().toISOString()
         });
-        advancedTo = nextDay;
+        advancedTo = next.slug;
       }
 
       res.status(201).json({ workout: resource, advancedTo });
@@ -206,33 +232,47 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
     }
   });
 
-  // Update a logged workout
   router.put('/api/logged-workouts/:id', requireAuth, requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      const { date, time, dayNumber, dayName, mode, exercises: updatedExercises } = req.body;
+      const { date, time, daySlug, mode, exercises: updatedExercises } = req.body;
 
-      const { resources } = await container.items.query({
-        query: 'SELECT * FROM c WHERE c.id = @id AND c.type = @type',
-        parameters: [
-          { name: '@id', value: id },
-          { name: '@type', value: 'logged-workout' }
-        ]
-      }).fetchAll();
+      const { resources } = await container.items
+        .query({
+          query: 'SELECT * FROM c WHERE c.id = @id AND c.type = @type',
+          parameters: [
+            { name: '@id', value: id },
+            { name: '@type', value: 'logged-workout' }
+          ]
+        })
+        .fetchAll();
 
-      if (resources.length === 0) {
-        return res.status(404).json({ error: 'Workout not found' });
-      }
+      if (resources.length === 0) return res.status(404).json({ error: 'Workout not found' });
 
       const existing = resources[0];
+
+      // Moving a log to a different day rewrites its label too, because the label is
+      // meant to describe the day it records.
+      let dayFields = {};
+      if (daySlug !== undefined && daySlug !== existing.daySlug) {
+        const model = await activeModel();
+        const day = findDay(model, daySlug);
+        if (!day) return unknownDay(res, model, daySlug);
+        dayFields = {
+          daySlug: day.slug,
+          dayNumber: day.number,
+          dayName: day.name,
+          modelVersion: model.version
+        };
+      }
+
       const updated = {
         ...existing,
         ...(date !== undefined && { date }),
         ...(time !== undefined && { time }),
-        ...(dayNumber !== undefined && { dayNumber }),
-        ...(dayName !== undefined && { dayName }),
         ...(mode !== undefined && { mode }),
         ...(updatedExercises !== undefined && { exercises: updatedExercises }),
+        ...dayFields,
         updatedAt: new Date().toISOString()
       };
 
@@ -244,88 +284,82 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
     }
   });
 
-  // Delete a logged workout
   router.delete('/api/logged-workouts/:id', requireAuth, requireAdmin, async (req, res) => {
     try {
       const { id } = req.params;
+      const { resources } = await container.items
+        .query({
+          query: 'SELECT * FROM c WHERE c.id = @id AND c.type = @type',
+          parameters: [
+            { name: '@id', value: id },
+            { name: '@type', value: 'logged-workout' }
+          ]
+        })
+        .fetchAll();
 
-      const { resources } = await container.items.query({
-        query: 'SELECT * FROM c WHERE c.id = @id AND c.type = @type',
-        parameters: [
-          { name: '@id', value: id },
-          { name: '@type', value: 'logged-workout' }
-        ]
-      }).fetchAll();
-
-      if (resources.length === 0) {
-        return res.status(404).json({ error: 'Workout not found' });
-      }
+      if (resources.length === 0) return res.status(404).json({ error: 'Workout not found' });
 
       await container.item(id, resources[0].userId).delete();
       res.status(204).send();
     } catch (error) {
-      if (error.code === 404) {
-        return res.status(404).json({ error: 'Workout not found' });
-      }
+      if (error.code === 404) return res.status(404).json({ error: 'Workout not found' });
       console.error('Error deleting workout:', error);
       res.status(500).json({ error: 'Failed to delete workout', message: error.message });
     }
   });
 
-  // Update current day in the 12-day cycle
   router.put('/api/current-day', requireAuth, requireAdmin, async (req, res) => {
     try {
       const userId = req.user.sub;
-      const currentDay = Number(req.body.currentDay);
+      const model = await activeModel();
+      const { currentDaySlug } = req.body;
 
-      if (!currentDay || currentDay < 1 || currentDay > MAX_DAY) {
-        return res.status(400).json({ error: `Invalid day number. Must be between 1 and ${MAX_DAY}.` });
-      }
+      const day = findDay(model, currentDaySlug);
+      if (!day) return unknownDay(res, model, currentDaySlug);
 
-      const settingsDoc = {
+      const { resource } = await container.items.upsert({
         id: `settings_${userId}`,
         userId,
         type: 'settings',
-        currentDay,
+        currentDaySlug: day.slug,
         updatedAt: new Date().toISOString()
-      };
+      });
 
-      const { resource } = await container.items.upsert(settingsDoc);
-      res.json({ currentDay: resource.currentDay });
+      res.json({ currentDaySlug: resource.currentDaySlug });
     } catch (error) {
       console.error('Error updating current day:', error);
       res.status(500).json({ error: 'Failed to update current day', message: error.message });
     }
   });
 
-  // Add a new exercise to a day (admin only).
   router.post('/api/exercises', requireAuth, requireAdmin, async (req, res) => {
     try {
-      const { dayNumber, name, equipment, location, notes, variations, tags } = req.body;
+      const model = await activeModel();
+      const { daySlug, name, equipment, location, notes, variations, tags } = req.body;
 
-      if (!dayNumber || !name) {
-        return res.status(400).json({ error: 'Missing required fields: dayNumber and name' });
-      }
-      if (dayNumber < 1 || dayNumber > MAX_DAY) {
-        return res.status(400).json({ error: `Invalid day number. Must be between 1 and ${MAX_DAY}.` });
+      if (!daySlug || !name) {
+        return res.status(400).json({ error: 'Missing required fields: daySlug and name' });
       }
 
-      const id = `exercise-${dayNumber}-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+      const day = findDay(model, daySlug);
+      if (!day) return unknownDay(res, model, daySlug);
 
       const exerciseDoc = {
-        id,
+        id: `exercise-${day.slug}-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
         type: 'exercise',
         userId: 'shared',
-        dayNumber,
+        daySlug: day.slug,
+        dayNumber: day.number,
         name,
         equipment: equipment || '',
         location: location || '',
         notes: notes || '',
         tags: Array.isArray(tags) ? tags : [],
-        variations: variations && variations.length > 0
-          ? variations
-          : [{ name: 'Standard', default: true, targetWeight: null, targetReps: null, targetSets: null }],
-        createdAt: new Date().toISOString(),
+        variations:
+          variations && variations.length > 0
+            ? variations
+            : [{ name: 'Standard', default: true, targetWeight: null, targetReps: null, targetSets: null }],
+        createdAt: new Date().toISOString()
       };
 
       const { resource } = await container.items.upsert(exerciseDoc);

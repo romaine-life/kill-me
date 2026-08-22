@@ -13,6 +13,7 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import { apiFetch } from './client.js';
 import {
   getCurrentDay,
+  getWorkoutModel,
   getWorkoutDay,
   getExercisesForDay,
   getAllExercises,
@@ -104,19 +105,24 @@ export function useDataSource() {
   const isLive = !!user || !db;
   const isReady = !snapshotLoading;
 
+  async function fetchWorkoutModel() {
+    if (isLive) return apiFetch('/api/workout-model');
+    return getWorkoutModel(db);
+  }
+
   async function fetchCurrentDay() {
     if (isLive) return apiFetch('/api/current-day');
     return getCurrentDay(db);
   }
 
-  async function fetchWorkoutDay(dayNumber) {
-    if (isLive) return apiFetch(`/api/workout-days/${dayNumber}`);
-    return getWorkoutDay(db, dayNumber);
+  async function fetchWorkoutDay(daySlug) {
+    if (isLive) return apiFetch(`/api/workout-days/${daySlug}`);
+    return getWorkoutDay(db, daySlug);
   }
 
-  async function fetchExercises(dayNumber) {
-    if (isLive) return apiFetch(`/api/exercises/day/${dayNumber}`);
-    return getExercisesForDay(db, dayNumber);
+  async function fetchExercises(daySlug) {
+    if (isLive) return apiFetch(`/api/exercises/day/${daySlug}`);
+    return getExercisesForDay(db, daySlug);
   }
 
   async function fetchAllExercises() {
@@ -145,6 +151,7 @@ export function useDataSource() {
   }
 
   return {
+    fetchWorkoutModel,
     fetchCurrentDay,
     fetchWorkoutDay,
     fetchExercises,

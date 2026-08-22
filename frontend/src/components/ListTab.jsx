@@ -5,12 +5,12 @@
 // Pixel-matched to the synergy design system (workout-tracker.html).
 
 import { useState, useEffect, useMemo } from 'react';
-import { DAY_CONFIG } from '../utils/dayConfig';
+import { describeLoggedDay } from '../utils/dayConfig';
 import { useDataSource } from '../api/snapshotContext.jsx';
 import { formatTime12h, todayLocal } from '../utils/dateUtils';
 import { formatIntervalSummary } from '../utils/cardioTemplates.js';
 import {
-  DAY_DESIGN,
+  dayWarns,
   dayColor,
   dayMuscle,
   anatomyUrl,
@@ -239,7 +239,7 @@ function DateGroup({ date, items, onWorkoutClick, onCardioClick }) {
 }
 
 // ── Day chip ───────────────────────────────────────────────────────────
-function DayChip({ n, size = 'md' }) {
+function DayChip({ daySlug, number, size = 'md' }) {
   const sz = size === 'sm' ? { fs: 10, py: 2, px: 6, dot: 5 } : { fs: 11, py: 3, px: 8, dot: 7 };
   return (
     <span
@@ -261,8 +261,8 @@ function DayChip({ n, size = 'md' }) {
         whiteSpace: 'nowrap',
       }}
     >
-      <span style={{ width: sz.dot, height: sz.dot, borderRadius: '50%', background: dayColor(n) }} />
-      D{pad2(n)}
+      <span style={{ width: sz.dot, height: sz.dot, borderRadius: '50%', background: dayColor(daySlug) }} />
+      D{pad2(number)}
     </span>
   );
 }
@@ -270,9 +270,7 @@ function DayChip({ n, size = 'md' }) {
 // ── Workout card ───────────────────────────────────────────────────────
 function WorkoutCard({ w, onClick }) {
   const [open, setOpen] = useState(false);
-  const design = DAY_DESIGN[w.dayNumber] || {};
-  const dayInfo = DAY_CONFIG[w.dayNumber];
-  const muscle = dayMuscle(w.dayNumber);
+  const muscle = dayMuscle(w.daySlug);
   const sets = (w.exercises || []).reduce((s, e) => s + (e.sets || 0), 0);
   const handleHeader = (e) => {
     e.stopPropagation();
@@ -287,7 +285,7 @@ function WorkoutCard({ w, onClick }) {
         overflow: 'hidden',
       }}
     >
-      <div style={{ height: 2, background: dayColor(w.dayNumber) }} />
+      <div style={{ height: 2, background: dayColor(w.daySlug) }} />
       <button
         onClick={handleHeader}
         style={{
@@ -321,9 +319,9 @@ function WorkoutCard({ w, onClick }) {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <DayChip n={w.dayNumber} />
+            <DayChip daySlug={w.daySlug} number={w.dayNumber} />
             <span style={{ fontFamily: 'var(--font-primary)', fontWeight: 600, fontSize: 15, color: 'var(--fg-primary)' }}>
-              {w.dayName || dayInfo?.name}
+              {w.dayName || describeLoggedDay(w)}
             </span>
             {w.mode === 'quick' && (
               <span
@@ -340,7 +338,7 @@ function WorkoutCard({ w, onClick }) {
                 quick log
               </span>
             )}
-            {design.warn && (
+            {dayWarns(w.daySlug) && (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--status-warn)', fontFamily: 'var(--font-mono)' }}>
                 <AlertTriangle size={12} /> shoulder-safe
               </span>
@@ -357,7 +355,7 @@ function WorkoutCard({ w, onClick }) {
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 28 }}>
           {(w.exercises || []).map((e, i) => {
             const h = Math.max(6, Math.min(28, ((e.weight || 0) / 4) + 6));
-            return <div key={i} style={{ width: 4, height: h, background: dayColor(w.dayNumber), opacity: 0.6, borderRadius: 1 }} />;
+            return <div key={i} style={{ width: 4, height: h, background: dayColor(w.daySlug), opacity: 0.6, borderRadius: 1 }} />;
           })}
         </div>
         <div
@@ -397,7 +395,7 @@ function WorkoutCard({ w, onClick }) {
               <div className="tnum" style={{ color: 'var(--fg-secondary)', display: 'flex', gap: 10 }}>
                 {e.weight != null && <span>{e.weight} lb</span>}
                 {e.reps != null && <span>×{e.reps}</span>}
-                {e.sets != null && <span style={{ color: dayColor(w.dayNumber) }}>×{e.sets} sets</span>}
+                {e.sets != null && <span style={{ color: dayColor(w.daySlug) }}>×{e.sets} sets</span>}
               </div>
             </div>
           ))}

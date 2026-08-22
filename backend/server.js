@@ -18,10 +18,10 @@ import {
   createWorkoutRoutes,
   createSorenessRoutes,
   createCardioRoutes,
-  createAdminRoutes,
 } from './routes/index.js';
 import { createRequireAuth, requireAdmin, currentCaller } from './auth.js';
 import { fetchConfig } from './config.js';
+import { runMigrations, pendingMigrations } from './migrations/runner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.join(__dirname, '..', 'frontend', 'dist');
@@ -63,19 +63,31 @@ async function start() {
   });
   const workoutContainer = cosmosClient.database('WorkoutTrackerDB').container('workouts');
 
+  // Migrations run before any route is mounted, and the 503 gate above keeps traffic
+  // out until they finish. A failure here throws, which exits the process and fails the
+  // deploy — a half-migrated database serving requests is worse than a rollout that stops.
+  //
+  // Only in the cluster, though. Local development runs against the live database, so
+  // auto-applying on `npm run dev` would let a half-written migration reach production
+  // just because someone started their dev server. Locally it reports and waits.
+  if (process.env.RUN_MIGRATIONS_ON_BOOT === 'true') {
+    await runMigrations({ container: workoutContainer });
+  } else {
+    const pending = await pendingMigrations({ container: workoutContainer });
+    if (pending.length > 0) {
+      console.warn(
+        `[kill-me] ${pending.length} migration(s) pending and not applied here: ` +
+        `${pending.map((m) => m.file).join(', ')}. ` +
+        `Preview with \`npm run migrate:dry-run\`; they apply on deploy.`
+      );
+    }
+  }
+
   const requireAuth = createRequireAuth();
 
   app.use(createWorkoutRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
   app.use(createSorenessRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
   app.use(createCardioRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
-  app.use(createAdminRoutes({
-    container: workoutContainer,
-    cosmosDbEndpoint: config.cosmosDbEndpoint,
-    databaseName: 'WorkoutTrackerDB',
-    containerName: 'workouts',
-    requireAuth,
-    requireAdmin,
-  }));
 
   app.use(express.static(FRONTEND_DIR));
   app.get(/.*/, (req, res) => {
