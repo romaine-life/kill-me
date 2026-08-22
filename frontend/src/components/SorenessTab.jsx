@@ -13,14 +13,15 @@
 // show up as "unattributed"; they still render and can still be edited.
 //
 // Data model: { id, date, muscles: [{ group, muscle, level }],
-//               sourceWorkoutId, sourceWorkoutDay, sourceWorkoutDate }.
+//               sourceWorkoutId, sourceWorkoutDaySlug, sourceWorkoutDay,
+//               sourceWorkoutDate }.
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { apiFetch } from '../api/client';
 import { useDataSource } from '../api/snapshotContext.jsx';
 import { MUSCLE_TAXONOMY, MUSCLE_GROUPS, searchMuscles } from '../utils/muscleTaxonomy';
 import { todayLocal } from '../utils/dateUtils';
-import { DAY_CONFIG } from '../utils/dayConfig';
+import { getDayInfo, describeLoggedDay } from '../utils/dayConfig';
 import { dayColor, pad2, sorenessTierColor } from '../utils/dayDesign';
 import { buildRecoveryCurves, daysBetween, groupsForDay, sorenessDocId } from '../utils/sorenessLink';
 import { AnatomyDiagram } from './AnatomyDiagrams';
@@ -72,8 +73,9 @@ function toSource(workout) {
   if (!workout) return null;
   return {
     id: workout.id,
+    daySlug: workout.daySlug,
     dayNumber: workout.dayNumber,
-    dayName: workout.dayName || DAY_CONFIG[workout.dayNumber]?.name || `Day ${workout.dayNumber}`,
+    dayName: describeLoggedDay(workout),
     date: workout.date,
   };
 }
@@ -103,7 +105,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   const [editing, setEditing] = useState(false);
   const [editorStep, setEditorStep] = useState('source'); // 'source' | 'muscles'
   const [editDate, setEditDate] = useState(todayStr());
-  const [editSource, setEditSource] = useState(null); // { id, dayNumber, dayName, date }
+  const [editSource, setEditSource] = useState(null); // { id, daySlug, dayNumber, dayName, date }
   const [originalId, setOriginalId] = useState(null); // pre-edit doc id, for moves
   const [editMuscles, setEditMuscles] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -157,7 +159,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   // Search results, restricted to the source day's groups unless overridden
   const visibleGroups = useMemo(() => {
     if (showAllGroups || !editSource) return MUSCLE_GROUPS;
-    return groupsForDay(editSource.dayNumber);
+    return groupsForDay(editSource.daySlug);
   }, [showAllGroups, editSource]);
 
   const searchResults = useMemo(() => {
@@ -219,8 +221,9 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
       entry.sourceWorkoutId
         ? {
             id: entry.sourceWorkoutId,
+            daySlug: entry.sourceWorkoutDaySlug,
             dayNumber: entry.sourceWorkoutDay,
-            dayName: DAY_CONFIG[entry.sourceWorkoutDay]?.name || `Day ${entry.sourceWorkoutDay}`,
+            dayName: getDayInfo(entry.sourceWorkoutDaySlug)?.name || `Day ${entry.sourceWorkoutDay}`,
             date: entry.sourceWorkoutDate,
           }
         : null,
@@ -286,6 +289,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
             date: editDate,
             muscles: cleanMuscles,
             sourceWorkoutId: editSource?.id || null,
+            sourceWorkoutDaySlug: editSource?.daySlug || null,
             sourceWorkoutDay: editSource?.dayNumber ?? null,
             sourceWorkoutDate: editSource?.date || null,
           }),
@@ -341,13 +345,13 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
             const logged = entries.filter((e) => e.sourceWorkoutId === w.id).length;
             return (
               <button key={w.id} onClick={() => beginEntryFor(toSource(w))} style={styles.sourceOption}>
-                <span style={{ ...styles.dayChip, borderColor: dayColor(w.dayNumber) }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: dayColor(w.dayNumber) }} />
+                <span style={{ ...styles.dayChip, borderColor: dayColor(w.daySlug) }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: dayColor(w.daySlug) }} />
                   D{pad2(w.dayNumber)}
                 </span>
                 <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
                   <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text.primary }}>
-                    {w.dayName || DAY_CONFIG[w.dayNumber]?.name}
+                    {describeLoggedDay(w)}
                   </span>
                   <span style={{ display: 'block', fontSize: 11, color: colors.text.tertiary }}>
                     {formatShortDate(w.date)} · {since === 0 ? 'today' : `${since} day${since === 1 ? '' : 's'} ago`}
@@ -389,8 +393,8 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
         <div style={styles.sourceBanner}>
           {editSource ? (
             <>
-              <span style={{ ...styles.dayChip, borderColor: dayColor(editSource.dayNumber) }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: dayColor(editSource.dayNumber) }} />
+              <span style={{ ...styles.dayChip, borderColor: dayColor(editSource.daySlug) }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: dayColor(editSource.daySlug) }} />
                 D{pad2(editSource.dayNumber)}
               </span>
               <span style={{ fontSize: 13, color: colors.text.primary, fontWeight: 600 }}>{editSource.dayName}</span>
@@ -658,12 +662,12 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                         {entry.sourceWorkoutId ? (
                           <>
-                            <span style={{ ...styles.dayChip, borderColor: dayColor(entry.sourceWorkoutDay) }}>
-                              <span style={{ width: 5, height: 5, borderRadius: '50%', background: dayColor(entry.sourceWorkoutDay) }} />
+                            <span style={{ ...styles.dayChip, borderColor: dayColor(entry.sourceWorkoutDaySlug) }}>
+                              <span style={{ width: 5, height: 5, borderRadius: '50%', background: dayColor(entry.sourceWorkoutDaySlug) }} />
                               D{pad2(entry.sourceWorkoutDay)}
                             </span>
                             <span style={{ fontSize: 11, color: colors.text.tertiary }}>
-                              {DAY_CONFIG[entry.sourceWorkoutDay]?.name}
+                              {getDayInfo(entry.sourceWorkoutDaySlug)?.name}
                               {offset != null && ` · ${relativeLabel(offset)}`}
                             </span>
                           </>
@@ -836,7 +840,7 @@ function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onLogSoreness,
 }
 
 function WorkoutRecoveryCard({ workout, curve, isAdmin, isMobile, onLogSoreness }) {
-  const color = dayColor(workout.dayNumber);
+  const color = dayColor(workout.daySlug);
   const span = curve ? Math.max(1, ...curve.muscles.map((m) => m.spanDays)) : 0;
   const columns = span + 1; // day 0 (the workout) through the last log
   const labelWidth = isMobile ? undefined : 150;
@@ -852,7 +856,7 @@ function WorkoutRecoveryCard({ workout, curve, isAdmin, isMobile, onLogSoreness 
           D{pad2(workout.dayNumber)}
         </span>
         <span style={{ fontSize: 14, fontWeight: 600, color: colors.text.primary }}>
-          {workout.dayName || DAY_CONFIG[workout.dayNumber]?.name}
+          {describeLoggedDay(workout)}
         </span>
         <span style={{ fontSize: 11, color: colors.text.tertiary }}>{formatShortDate(workout.date)}</span>
         {!isMobile && <span style={{ flex: 1 }} />}

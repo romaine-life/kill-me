@@ -1,4 +1,4 @@
-// SVG anatomy reference diagrams for each muscle group in the Synergy 12 cycle.
+// SVG anatomy reference diagrams for each muscle group in the Synergy cycle.
 // Renders simplified schematic outlines with labeled muscle regions.
 // Every muscle in the taxonomy (muscleTaxonomy.js) has a corresponding highlightable
 // shape so the soreness picker can visually identify each individual muscle.

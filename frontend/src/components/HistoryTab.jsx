@@ -1,8 +1,10 @@
 // Calendar view of workout history with week/month/year views. Each day cell is
-// color-coded by workout type using DAY_CONFIG colors. Clicking a day opens the
+// color-coded by the day's accent color, looked up by slug so a workout logged
+// under a day that has since been renamed or retired keeps its own color. Clicking
+// a day opens the
 // WorkoutDrawer pre-filled with that day's workout type and date.
 //
-// Filter bar lets you toggle visibility of specific workout types (days 1-12) —
+// Filter bar lets you toggle visibility of specific workout types —
 // useful for seeing patterns like "how often do I do compound days?"
 //
 // Hover interaction: hovering a workout type in the legend or calendar dims all
@@ -12,7 +14,8 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { DAY_CONFIG } from '../utils/dayConfig';
+import { getDays } from '../utils/dayConfig';
+import { dayColor } from '../utils/dayDesign';
 import { CARDIO_CONFIG } from '../utils/cardioConfig';
 import { useDataSource } from '../api/snapshotContext.jsx';
 import { dateToLocal } from '../utils/dateUtils';
@@ -26,9 +29,10 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
   const [sorenessEntries, setSorenessEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
-  // Filter state: tracks which workout types (days 1-12) and cardio types are enabled
+  // Filter state: tracks which workout types and cardio types are enabled, keyed by
+  // day slug so a filter follows its day rather than a position.
   const [enabledWorkoutTypes, setEnabledWorkoutTypes] = useState({
-    ...Object.fromEntries(Object.keys(DAY_CONFIG).map(day => [day, true])),
+    ...Object.fromEntries(getDays().map(day => [day.slug, true])),
     treadmill: true,
     bike: true,
     soreness: true,
@@ -75,7 +79,7 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
   const getWorkoutsForDate = (date) => {
     const dateString = dateToLocal(date);
     return workouts.filter(w =>
-      w.date === dateString && enabledWorkoutTypes[w.dayNumber]
+      w.date === dateString && enabledWorkoutTypes[w.daySlug]
     );
   };
 
@@ -160,16 +164,8 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
     });
   };
 
-  const getDayColor = (dayNumber) => {
-    return DAY_CONFIG[dayNumber]?.color || 'bg-slate-500';
-  };
-
-  // Get color for any calendar item (workout, cardio, or soreness)
-  const getItemColor = (item) => {
-    if (item._kind === 'cardio' || item._kind === 'soreness') return null; // uses inline style
-    return getDayColor(item.dayNumber);
-  };
-
+  // Every calendar swatch is painted inline now. Day colors used to be Tailwind
+  // class names on DAY_CONFIG; they live in dayDesign.js keyed by slug, as hex.
   const getItemColorStyle = (item) => {
     if (item._kind === 'cardio') {
       return { backgroundColor: CARDIO_CONFIG[item.activity]?.color || '#10b981' };
@@ -177,13 +173,13 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
     if (item._kind === 'soreness') {
       return { backgroundColor: SORENESS_COLOR };
     }
-    return {};
+    return { backgroundColor: dayColor(item.daySlug) };
   };
 
   const getItemFilterKey = (item) => {
     if (item._kind === 'cardio') return item.activity;
     if (item._kind === 'soreness') return 'soreness';
-    return item.dayNumber.toString();
+    return item.daySlug;
   };
 
   const getItemTitle = (item) => {
@@ -211,16 +207,16 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
     }
   };
 
-  const toggleWorkoutType = (dayNumber) => {
+  const toggleWorkoutType = (key) => {
     setEnabledWorkoutTypes(prev => ({
       ...prev,
-      [dayNumber]: !prev[dayNumber]
+      [key]: !prev[key]
     }));
   };
 
   const enableAllWorkoutTypes = () => {
     setEnabledWorkoutTypes({
-      ...Object.fromEntries(Object.keys(DAY_CONFIG).map(day => [day, true])),
+      ...Object.fromEntries(getDays().map(day => [day.slug, true])),
       treadmill: true,
       bike: true,
       soreness: true,
@@ -229,7 +225,7 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
 
   const disableAllWorkoutTypes = () => {
     setEnabledWorkoutTypes({
-      ...Object.fromEntries(Object.keys(DAY_CONFIG).map(day => [day, false])),
+      ...Object.fromEntries(getDays().map(day => [day.slug, false])),
       treadmill: false,
       bike: false,
       soreness: false,
@@ -270,7 +266,7 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
           </div>
           <div>
             <div className="text-2xl sm:text-4xl font-black text-white">
-              {new Set(workouts.map(w => w.dayNumber)).size}
+              {new Set(workouts.map(w => w.daySlug)).size}
             </div>
             <div className="text-slate-300 text-[10px] sm:text-sm uppercase tracking-wide">Cycle Days</div>
           </div>
@@ -406,7 +402,7 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
                             {dayItems.map((item, idx) => (
                               <div
                                 key={idx}
-                                className={`${getItemColor(item) || ''} flex-1 transition-opacity ${
+                                className={`flex-1 transition-opacity ${
                                   idx < dayItems.length - 1 ? 'border-b border-black/20' : ''
                                 } ${hoveredWorkoutType && hoveredWorkoutType !== getItemFilterKey(item) ? 'opacity-30' : 'opacity-100'}`}
                                 style={getItemColorStyle(item)}
@@ -490,7 +486,7 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
                           {dayItems.map((item, idx) => (
                             <div
                               key={idx}
-                              className={`${getItemColor(item) || ''} flex-1 transition-opacity ${
+                              className={`flex-1 transition-opacity ${
                                 idx < dayItems.length - 1 ? 'border-b border-black/20' : ''
                               } ${hoveredWorkoutType && hoveredWorkoutType !== getItemFilterKey(item) ? 'opacity-30' : 'opacity-100'}`}
                               style={getItemColorStyle(item)}
@@ -569,10 +565,10 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
                         // For year view color, pick the first item's color
                         const firstItem = dayItems[0];
                         const yearCellClass = firstItem
-                          ? (firstItem._kind === 'cardio' ? '' : `${getDayColor(firstItem.dayNumber)} text-white hover:ring-white/50`)
+                          ? 'text-white hover:ring-white/50'
                           : 'bg-slate-800/40 text-slate-500 hover:bg-slate-700/40';
-                        const yearCellStyle = firstItem?._kind === 'cardio'
-                          ? { backgroundColor: CARDIO_CONFIG[firstItem.activity]?.color || '#10b981', color: 'white' }
+                        const yearCellStyle = firstItem
+                          ? { ...getItemColorStyle(firstItem), color: 'white' }
                           : {};
 
                         return (
@@ -633,29 +629,32 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-2 text-xs">
-              {Object.entries(DAY_CONFIG).map(([dayNum, config]) => {
-                const isEnabled = enabledWorkoutTypes[dayNum];
-                const isDimmed = hoveredWorkoutType && hoveredWorkoutType !== dayNum;
+              {getDays().map((day) => {
+                const isEnabled = enabledWorkoutTypes[day.slug];
+                const isDimmed = hoveredWorkoutType && hoveredWorkoutType !== day.slug;
                 return (
                   <button
-                    key={dayNum}
-                    onClick={() => toggleWorkoutType(dayNum)}
+                    key={day.slug}
+                    onClick={() => toggleWorkoutType(day.slug)}
                     className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border transition-all ${
                       isEnabled
                         ? 'border-slate-600 bg-slate-700/40 hover:bg-slate-700/60'
                         : 'border-slate-800 bg-slate-900/40 opacity-40 hover:opacity-60'
                     } ${isDimmed ? 'opacity-30' : ''}`}
-                    title={`Click to ${isEnabled ? 'hide' : 'show'} ${config.name}`}
+                    title={`Click to ${isEnabled ? 'hide' : 'show'} ${day.name}`}
                   >
-                    <div className={`w-4 h-4 rounded-full ${config.color} flex-shrink-0 transition-all ${
-                      isEnabled ? 'shadow-lg' : 'grayscale'
-                    }`} />
+                    <div
+                      className={`w-4 h-4 rounded-full flex-shrink-0 transition-all ${
+                        isEnabled ? 'shadow-lg' : 'grayscale'
+                      }`}
+                      style={{ backgroundColor: dayColor(day.slug) }}
+                    />
                     <div className="text-left flex-1">
                       <div className={`font-bold ${isEnabled ? 'text-slate-200' : 'text-slate-600'}`}>
-                        {config.name}
+                        {day.name}
                       </div>
                       <div className={`text-[10px] ${isEnabled ? 'text-slate-400' : 'text-slate-700'}`}>
-                        Day {dayNum}
+                        Day {day.number}
                       </div>
                     </div>
                     <div className={`text-lg ${isEnabled ? 'text-green-400' : 'text-slate-700'}`}>

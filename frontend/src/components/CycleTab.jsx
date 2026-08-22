@@ -1,20 +1,35 @@
-// Displays the full Synergy 12 cycle overview — philosophy, day-by-day breakdown,
+// Displays the full Synergy cycle overview — philosophy, day-by-day breakdown,
 // recovery sequencing rationale, and CNS-aware compound day highlighting.
+//
+// The day list and cycle length come from the active workout model; only the
+// compound-day set and the recovery notes are curated here.
+//
+// Both are keyed by day slug rather than number, so reordering the cycle moves the
+// notes with their days instead of leaving them pointing at whoever moved in.
 
-import { DAY_CONFIG } from '../utils/dayConfig';
+import { getDays, getDayInfo, getTotalDays } from '../utils/dayConfig';
 
-const COMPOUND_DAYS = new Set([1, 5, 9]);
+const COMPOUND_DAYS = new Set(['compound-legs', 'compound-pulls', 'compound-push']);
 
 const RECOVERY_NOTES = {
-  1: 'Starts the cycle — systemic leg strength sets the recovery baseline',
-  3: 'Hamstring isolation is safe here because Day 1 squat volume has cleared',
-  7: 'Placed to save the lower back for Day 1 when the cycle wraps around',
-  8: 'Primes the shoulder capsule for Day 9 heavy pressing — light work only',
-  9: 'Dips and heavy pressing belong here, never on Day 8',
-  12: 'Ends the cycle at near-zero CNS load before restarting',
+  'compound-legs': 'Starts the cycle — systemic leg strength sets the recovery baseline',
+  knee: 'Tendon work is safe here because Day 1 squat volume has cleared. Defined by intent — slow eccentrics and holds, not a second leg day',
+  back: 'The only loaded spinal extension, placed 8 days clear of Day 1 to spare the lower back for squats',
+  'pecs-mobility': 'Primes the shoulder capsule for heavy pressing the next day — light work only',
+  'compound-push': 'Dips and heavy pressing belong here, never on the mobility day before it',
+  grip: 'Sits 8 days clear of Pulls and Bicep so forearm loading never stacks',
+  hips: 'Primes the hips the day before Day 1 squats, mirroring how Pecs Mobility primes Push',
 };
 
 export function CycleTab({ currentDay }) {
+  const days = getDays();
+  const TOTAL_DAYS = getTotalDays();
+
+  // The shoulder-safety callout names two specific days, so it reads them off the
+  // model instead of hardcoding numbers that go stale the moment the cycle moves.
+  const mobilityDay = getDayInfo('pecs-mobility');
+  const pushDay = getDayInfo('compound-push');
+
   return (
     <div className="space-y-8 max-w-3xl">
       {/* Header */}
@@ -23,7 +38,7 @@ export function CycleTab({ currentDay }) {
           The Cycle
         </h2>
         <p className="text-slate-400 mt-2 text-lg">
-          Synergy 12 — a custom 12-day training cycle
+          Synergy {TOTAL_DAYS} — a custom {TOTAL_DAYS}-day training cycle
         </p>
       </div>
 
@@ -46,26 +61,30 @@ export function CycleTab({ currentDay }) {
           <Principle
             number={3}
             title="CNS-aware sequencing"
-            text="Only three days (1, 5, 9) are systemically taxing compound lifts. They are evenly spaced with isolation and recovery work between them to avoid stacking central nervous system fatigue."
+            text="Only three days (1, 6, 12) are systemically taxing compound lifts. They are evenly spaced with isolation and recovery work between them to avoid stacking central nervous system fatigue."
+          />
+          <Principle
+            number={4}
+            title="Coverage over optimization"
+            text="The cycle exists to prevent atrophy, not to optimize any one adaptation. Its job is making sure nothing gets left out — every day is a short, fixed list requiring zero decisions."
           />
         </div>
       </div>
 
-      {/* 12-Day Breakdown */}
+      {/* Day-by-day breakdown */}
       <div className="space-y-3">
         <h3 className="text-lg font-bold text-slate-100 uppercase tracking-wide">
-          12-Day Breakdown
+          {TOTAL_DAYS}-Day Breakdown
         </h3>
         <div className="space-y-2">
-          {Object.entries(DAY_CONFIG).map(([dayNum, day]) => {
-            const num = parseInt(dayNum);
-            const isCompound = COMPOUND_DAYS.has(num);
-            const isCurrent = num === currentDay;
-            const recoveryNote = RECOVERY_NOTES[num];
+          {days.map((day) => {
+            const isCompound = COMPOUND_DAYS.has(day.slug);
+            const isCurrent = day.slug === currentDay;
+            const recoveryNote = RECOVERY_NOTES[day.slug];
 
             return (
               <div
-                key={num}
+                key={day.slug}
                 className={`rounded-xl border p-4 transition-all ${
                   isCurrent
                     ? 'bg-green-500/10 border-green-500/50 ring-1 ring-green-500/30'
@@ -85,7 +104,7 @@ export function CycleTab({ currentDay }) {
                           : 'bg-slate-700/60 text-slate-400'
                     }`}
                   >
-                    {num}
+                    {day.number}
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -127,16 +146,19 @@ export function CycleTab({ currentDay }) {
       </div>
 
       {/* Shoulder Safety Callout */}
-      <div className="bg-amber-900/20 border-2 border-amber-500/40 rounded-xl p-6">
-        <h3 className="text-lg font-bold text-amber-300 mb-2">
-          Day 8 Shoulder Safety
-        </h3>
-        <p className="text-amber-200/80 text-sm leading-relaxed">
-          Historical shoulder injuries (both shoulders, healed but with underlying limitations).
-          Day 8 is strictly mobility-focused — no dips, no heavy pressing. Light flys, holds, and
-          stretches only. Dips are permitted on Day 9 (assisted machine at -90 lbs), never on Day 8.
-        </p>
-      </div>
+      {mobilityDay && pushDay && (
+        <div className="bg-amber-900/20 border-2 border-amber-500/40 rounded-xl p-6">
+          <h3 className="text-lg font-bold text-amber-300 mb-2">
+            Day {mobilityDay.number} Shoulder Safety
+          </h3>
+          <p className="text-amber-200/80 text-sm leading-relaxed">
+            Historical shoulder injuries (both shoulders, healed but with underlying limitations).
+            Day {mobilityDay.number} is strictly mobility-focused — no dips, no heavy pressing.
+            Light flys, holds, and stretches only. Dips are permitted on Day {pushDay.number}{' '}
+            (assisted machine at -90 lbs), never on Day {mobilityDay.number}.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

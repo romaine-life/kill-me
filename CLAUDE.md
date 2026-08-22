@@ -1,6 +1,6 @@
 # kill-me — Workout Tracker
 
-Personal workout tracker built around a custom 12-day training cycle called **Synergy 12**.
+Personal workout tracker built around a custom 16-day training cycle called **Synergy 16**.
 
 The repo name comes from a Tom Platz video where he screams "KILL ME" during an
 agonizing set of leg extensions under hypnotherapy coaching.
@@ -15,39 +15,70 @@ content-fingerprint tag (`romainecr.azurecr.io/kill-me:app-<sha256>`); fork PRs
 stay build-only with `push: false`. Release/deploy workflows publish or reuse
 that same fingerprint tag and bump `k8s/values.yaml` to it.
 
-## The 12-Day Synergy System
+## The 16-Day Synergy System
 
 The cycle is Nelson's own design, optimized for **consistent daily activity** rather
-than traditional rest-heavy programming. Three guiding principles:
+than traditional rest-heavy programming. Four guiding principles:
 
 1. **Daily activity over rest** — the cycle alternates intensity so every day has
-   something to do. Grip, calves, and mobility days are deliberately low-impact,
+   something to do. Grip, calves, neck, and mobility days are deliberately low-impact,
    keeping the habit of daily training without taxing recovery.
 2. **Wellness over hypertrophy** — the goal is muscle-mind connection and joint health,
    not progressive overload. Nelson's muscles grow readily; the priority is controlled
    movement and avoiding excessive bulk.
-3. **CNS-aware sequencing** — only three days (1, 5, 9) are systemically taxing compound
-   lifts. They are evenly spaced with isolation and recovery work between them to avoid
-   stacking central nervous system fatigue.
+3. **CNS-aware sequencing** — only three days (1, 6, 12) are systemically taxing compound
+   lifts. They are evenly spaced (5, 6, 5 apart including the wrap) with isolation and
+   recovery work between them to avoid stacking central nervous system fatigue.
+4. **Coverage over optimization** — the cycle exists to prevent atrophy, not to optimize
+   any one adaptation. Its job is making sure nothing gets left out. Traditional splits
+   drop the peripheral work (ankles, neck, hip rotation, grip) because a four-day week
+   has no room for it; giving each its own slot is the whole point of a long cycle.
+
+### Short days are the design, not an oversight
+
+Nelson works ~12-hour days. Logged sessions run 1-3 exercises regardless of how many the
+day lists, so **every day is a fixed, fully specified list of 2-4 exercises requiring zero
+decisions** — open the app, do what today says. Two consequences worth preserving:
+
+- **More days means shorter days, not more work.** The same coverage distributed into
+  smaller pieces is what makes it survivable. Adding a day is cheap; lengthening one is not.
+- **Nothing rides along as an optional add-on.** Work bolted onto other days gets cut when
+  he's tired, so ankles, neck, and stretching are scheduled days rather than warmup riders.
+  This is also why stretching stays its own day: it is long, home-based, and the first
+  thing dropped when combined with anything else.
 
 ### Recovery sequencing in the cycle order
 
 The day ordering is not arbitrary — each placement accounts for what came before:
 
-- **Day 1 (Legs/Squat)** → **Day 3 (Hamstrings)**: hamstring isolation is safe because
-  Day 1's squat volume has cleared by Day 3
-- **Day 7 (Torso)** is placed to save the lower back for Day 1 when the cycle wraps
-- **Day 8 (Pecs Mobility)** primes the shoulder capsule for Day 9's heavy pressing —
+- **Day 1 (Legs/Squat)** → **Day 5 (Knee)**: tendon-focused knee work is safe here because
+  Day 1's squat volume has cleared. Day 5 is defined by *intent* (slow eccentrics,
+  isometric holds, controlled range), not by its exercise list — otherwise it is just a
+  second leg day
+- **Day 9 (Back)** carries the only loaded spinal extension, placed 8 days clear of Day 1
+  to spare the lower back for squats when the cycle wraps
+- **Day 11 (Pecs Mobility)** primes the shoulder capsule for Day 12's heavy pressing —
   light flys, holds, and stretches only
-- **Day 9 (Compound Push)** is where dips and heavy pressing belong — never on Day 8
-- **Day 12 (Grip)** ends the cycle as a near-zero CNS load before restarting
+- **Day 12 (Compound Push)** is where dips and heavy pressing belong — never on Day 11
+- **Day 15 (Grip)** sits 8 days clear of Day 6 (Pulls) and Day 7 (Bicep) so forearm
+  loading never stacks on consecutive days
+- **Day 16 (Hips)** primes the hips the day before Day 1 squats, mirroring how Day 11
+  primes Day 12
 
-### Day 8 shoulder safety
+### Day 11 shoulder safety
 
 Nelson has historical shoulder injuries (both shoulders, 15-20 years ago). They healed
-well but have underlying limitations. Day 8's strict "no heavy pressing" rule protects
+well but have underlying limitations. Day 11's strict "no heavy pressing" rule protects
 the shoulder joint by keeping pec work light and mobility-focused before compound push
-day. Dips are fine on Day 9 (assisted machine at -90 lbs), but never on Day 8.
+day. Dips are fine on Day 12 (assisted machine at -90 lbs), but never on Day 11.
+
+### Known gap: no hip hinge
+
+The cycle contains no deadlift, RDL, or good morning. Squats are knee-dominant, leg curl
+is isolated knee flexion, and the Day 9 back extension is spinal extension with the hips
+fixed — none of them train the hinge pattern. This is a deliberate deferral, not an
+oversight: a hinge day is the most demanding thing that could be added and would be the
+first session skipped on a 12-hour workday. Revisit only if capacity changes.
 
 ## Architecture
 
@@ -67,9 +98,13 @@ snapshot/          SQLite snapshot generator (Node 20)
   ├── Writes a SQLite .db file consumed by the frontend
   └── Runs every 4 hours via GitHub Actions cron
 
-backend/routes/    Express router factories (workouts, soreness, cardio, admin)
-  ├── Imported locally by backend/server.js — no longer published to GitHub Packages
-  └── Seed data included (data/seed-data.js, data/seed-soreness.js)
+backend/routes/    Express router factories (workouts, soreness, cardio)
+  └── Imported locally by backend/server.js — no longer published to GitHub Packages
+
+backend/migrations/  Forward-only database migrations
+  ├── runner.js — finds NNN-*.js, skips applied, runs the rest at pod startup
+  ├── dry-run.js — `npm run migrate:dry-run`, previews against real data, writes nothing
+  └── apply.js — `npm run migrate`, applies deliberately from a workstation
 
 tofu/              OpenTofu infrastructure-as-code
   └── App-specific resources on top of shared infra (no backend — decommissioned)
@@ -128,17 +163,69 @@ distinguished by a `type` field:
 
 | Type | Purpose | Key fields |
 | ---- | ------- | ---------- |
-| `workout-day-definition` | Static cycle definition (days 1-12) | `dayNumber`, `name`, `focus`, `primaryMuscleGroups` |
-| `exercise` | Exercise library entries per day | `dayNumber`, `name`, `equipment`, `tags[]`, `variations[]` (`{name, default, targetWeight/Reps/Sets}`) |
-| `logged-workout` | A completed workout session | `userId`, `dayNumber`, `date`, `time` (HH:MM, nullable), `mode` (quick/detailed), `exercises[]` (`{name, variation, weight, reps, sets}`) |
+| `workout-model` | One generation of the cycle. Exactly one is `active`; retired ones stay so old logs still resolve | `version`, `name`, `active`, `days[]` (`{slug, number, name, focus, description, muscleGroups, safetyNotes}`) |
+| `exercise` | Exercise library entries per day | `daySlug`, `dayNumber`, `name`, `equipment`, `tags[]`, `variations[]` (`{name, default, targetWeight/Reps/Sets}`) |
+| `logged-workout` | A completed workout session | `userId`, `daySlug`, `dayNumber`, `dayName`, `modelVersion`, `date`, `time` (HH:MM, nullable), `mode` (quick/detailed), `exercises[]` (`{name, variation, weight, reps, sets}`) |
+| `schema-migration` | Record that a migration ran. Its existence is what stops it running again | `version`, `name`, `appliedAt`, `durationMs` |
 | `cardio-session` | A completed cardio session | `userId`, `date`, `time` (HH:MM, nullable), `activity` (treadmill/bike), `durationMinutes`, `treadmill{}`, `bike{}` |
 | `cardio-template` | Shared treadmill interval template (library) | `userId` (`shared`), `templateId`, `name`, `description`, `activity`, `intervals[]` (`{type, speedMph, durationMinutes}`), `sortOrder` |
 | `soreness-entry` | Daily soreness journal entry | `userId`, `date`, `muscles[]` (`{group, muscle, level}`) |
-| `settings` | Per-user settings (current day) | `userId`, `currentDay` |
+| `settings` | Per-user settings (current day) | `userId`, `currentDaySlug` |
 | `account` | Microsoft auth account record | `userId`, `provider`, `name`, `email`, `role` |
 
 All document types share the same container and partition key. The `type` field is
 used in queries to distinguish them.
+
+### Days are identified by slug, never by number
+
+A day's `slug` (`compound-legs`, `transverse`, `pecs-mobility`) is permanent. Its
+`number` is only its position in one version of the model, so reordering the cycle
+changes numbers and nothing else — no exercise or log is rebound.
+
+This is what makes a cycle change safe, and it is worth not undoing. Before it, the
+cycle was addressed positionally in three places at once (a bundled `DAY_CONFIG`, a
+bundled `DAY_DESIGN`, and the database), and moving a day silently repointed every
+historical record at whichever day moved into its slot.
+
+Two rules follow:
+
+- **A logged workout is a faithful record.** It stores `daySlug`, `dayNumber`,
+  `dayName` and `modelVersion` as they were on the day it happened. Nothing later may
+  edit it — not a rename, not a reorder, not a new model.
+- **Retired days are retired, not deleted.** `torso` no longer appears in the active
+  model but its record survives, and `dayDesign.js` keeps its color forever, so a 2025
+  Torso workout still renders as Torso.
+
+The program is *not* versioned per-day with valid-from/valid-to dates. That was
+considered and cut: history lives in the logs, and a day's exercise list is a default
+for pre-filling the log form rather than a specification of what was done.
+
+### Schema and data changes are migrations
+
+There is no seed step and no admin "initialize database" button; both were removed
+along with `seed-data.js`. A change to the cycle is a numbered file in
+`backend/migrations/`, it ships inside the same image as the code that expects it, and
+it runs at pod startup before any route is mounted. A failure exits the process and
+fails the rollout, because a half-migrated database serving traffic is worse than a
+deploy that stops.
+
+Cosmos has no cross-document transaction, so a migration can die partway and be retried
+from the top. **Every migration must be safe to re-run**, and `npm run migrate:dry-run`
+checks exactly that by replaying against the already-migrated result.
+
+Migrations auto-apply only in the cluster, gated on `RUN_MIGRATIONS_ON_BOOT=true` in
+`k8s/templates/deployment.yaml`. Local development points at the *live* database, so
+`npm run dev` deliberately reports what is pending instead of applying it — otherwise
+starting a dev server on a branch would push a half-written migration to production.
+
+`frontend/public/snapshot.db` is committed and baked into the image, so it has to be
+regenerated in the same commit as any migration that changes its schema. Otherwise
+anonymous visitors read a snapshot the new frontend cannot parse until the 4-hourly
+cron catches up:
+
+```bash
+cd snapshot && node generate-snapshot.js --preview-migrations --output ../frontend/public/snapshot.db
+```
 
 ## CI/CD
 
@@ -174,8 +261,10 @@ cd frontend && npm run dev  # Frontend only (Vite :5173)
 
 The frontend reads `VITE_API_URL`. The auth service URL is fetched at runtime from the backend's `/api/config` endpoint.
 
-Admin mode (database init, data migration) is available only on localhost in dev
-mode when signed in as admin.
+Admin mode is available only on localhost in dev mode when signed in as admin. It
+holds the day-override control; database initialization and the hand-run data
+migrations that used to live there are gone (see **Schema and data changes are
+migrations**).
 
 ### Visual verification (screenshots)
 

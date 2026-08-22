@@ -47,6 +47,10 @@ spec:
               value: "3000"
             - name: AZURE_APP_CONFIG_ENDPOINT
               value: https://infra-appconfig.azconfig.io
+            # Pending migrations apply here and nowhere else. Local development points at
+            # the same database, so it deliberately reports pending work instead of running it.
+            - name: RUN_MIGRATIONS_ON_BOOT
+              value: "true"
           resources:
             requests:
               cpu: 50m

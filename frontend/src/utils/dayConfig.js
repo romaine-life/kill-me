@@ -1,108 +1,50 @@
-// Static metadata for the 12-day Synergy cycle: names, colors, focus descriptions,
-// and safety notes. Used by HistoryTab (color coding), WorkoutDrawer (day info),
-// and TodayTab (override dropdown labels).
+// Access to the active workout model — the cycle's days, their order, names, focus
+// text and safety notes.
 //
-// The actual exercise library lives in the database (seeded from backend/seed-data.js).
-// This file intentionally does NOT contain exercise lists — components that need
-// exercises fetch them from the API.
+// None of that lives here any more. The model is data: it comes from the database
+// (or the SQLite snapshot for anonymous visitors) and is installed once at boot by
+// WorkoutModelProvider before anything renders. This module is the read side of it.
+//
+// A day is identified by its `slug`, which is permanent. `number` is only that day's
+// position in this version of the model, so it may change when the cycle is
+// reordered — never use it as an identity, and never persist it as one.
+//
+// The model is held in a module singleton rather than React state on purpose: it
+// changes only when a migration publishes a new version, which means a deploy, which
+// means a fresh page load. There is nothing to re-render for.
 
-export const DAY_CONFIG = {
-  1: {
-    name: "Compound: Legs",
-    focus: "Squat focus",
-    description: "Heavy compound leg work with emphasis on squat variations",
-    color: "bg-blue-600",
-    safetyNotes: null
-  },
-  2: {
-    name: "Calves",
-    focus: "Active recovery",
-    description: "Calf isolation for recovery and ankle stability",
-    color: "bg-green-600",
-    safetyNotes: null
-  },
-  3: {
-    name: "Hamstrings",
-    focus: "Main Lift: RDL",
-    description: "Posterior chain emphasis with Romanian deadlifts",
-    color: "bg-purple-600",
-    safetyNotes: null
-  },
-  4: {
-    name: "Abs",
-    focus: "Flexion focus",
-    description: "Core flexion and anti-extension work",
-    color: "bg-yellow-600",
-    safetyNotes: null
-  },
-  5: {
-    name: "Compound: Pulls",
-    focus: "Back/Rows",
-    description: "Horizontal and vertical pulling movements",
-    color: "bg-indigo-600",
-    safetyNotes: null
-  },
-  6: {
-    name: "Bicep",
-    focus: "Accessory",
-    description: "Bicep isolation work following pull day",
-    color: "bg-pink-600",
-    safetyNotes: null
-  },
-  7: {
-    name: "Torso",
-    focus: "Extension/Rotation",
-    description: "Core extension and rotational strength",
-    color: "bg-teal-600",
-    safetyNotes: null
-  },
-  8: {
-    name: "Pecs (Mobility)",
-    focus: "⚠️ CRITICAL: NO DIPS or HEAVY PRESSING",
-    description: "Light mobility work only - shoulder injury protection",
-    color: "bg-red-600",
-    safetyNotes: "⚠️ SHOULDER SAFETY: Do NOT perform dips or heavy pressing movements. Light flys and holds only. Focus on mobility and control."
-  },
-  9: {
-    name: "Compound: Push",
-    focus: "DB Bench - Dips allowed here",
-    description: "Heavy pressing work (dips are safe on this day)",
-    color: "bg-orange-600",
-    safetyNotes: null
-  },
-  10: {
-    name: "Triceps",
-    focus: "Cable High Cross - NO pushdowns",
-    description: "Tricep isolation (user prefers no pushdowns)",
-    color: "bg-cyan-600",
-    safetyNotes: "User preference: Avoid tricep pushdowns"
-  },
-  11: {
-    name: "Deltoid",
-    focus: "Rear/Side isolation",
-    description: "Shoulder isolation with rear and side delt focus",
-    color: "bg-violet-600",
-    safetyNotes: null
-  },
-  12: {
-    name: "Grip",
-    focus: "Forearm burnout",
-    description: "Grip strength and forearm endurance",
-    color: "bg-lime-600",
-    safetyNotes: null
-  }
+let model = null;
+
+export function setWorkoutModel(nextModel) {
+  model = nextModel;
+}
+
+export const getWorkoutModel = () => model;
+
+export const getDays = () => model?.days ?? [];
+
+export const getTotalDays = () => getDays().length;
+
+export const getDaySlugs = () => getDays().map((day) => day.slug);
+
+export const getDayInfo = (daySlug) => getDays().find((day) => day.slug === daySlug) ?? null;
+
+export const isValidDay = (daySlug) => getDayInfo(daySlug) !== null;
+
+// The cycle wraps, so the day after the last is the first.
+const step = (daySlug, offset) => {
+  const days = getDays();
+  if (days.length === 0) return null;
+  const index = days.findIndex((day) => day.slug === daySlug);
+  if (index === -1) return days[0].slug;
+  return days[(index + offset + days.length) % days.length].slug;
 };
 
-export const getTotalDays = () => 12;
+export const getNextDay = (daySlug) => step(daySlug, 1);
+export const getPreviousDay = (daySlug) => step(daySlug, -1);
 
-export const getNextDay = (currentDay) => {
-  return currentDay >= 12 ? 1 : currentDay + 1;
-};
-
-export const getPreviousDay = (currentDay) => {
-  return currentDay <= 1 ? 12 : currentDay - 1;
-};
-
-export const getDayInfo = (dayNumber) => {
-  return DAY_CONFIG[dayNumber] || null;
-};
+// Historical logs record the number they were performed under, which may no longer
+// match anything in the current model. Prefer the slug; fall back to the recorded
+// name so a log from a retired day still reads correctly.
+export const describeLoggedDay = (workout) =>
+  getDayInfo(workout?.daySlug)?.name ?? workout?.dayName ?? 'Unknown day';

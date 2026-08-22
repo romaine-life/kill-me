@@ -56,8 +56,9 @@ export function createSorenessRoutes({ container, requireAuth, requireAdmin }) {
   //
   // Identified by (date, sourceWorkoutId). Pass sourceWorkoutId to attribute the
   // entry to a logged workout; omit it for a free-floating entry. The workout's
-  // day number and date are denormalised onto the entry so the timeline view can
-  // render without joining against the workout list.
+  // day and date are denormalised onto the entry so the timeline view can render
+  // without joining against the workout list — the slug is what identifies the
+  // day, and the number rides along as the label it carried at the time.
   router.post('/api/soreness', requireAuth, requireAdmin, async (req, res) => {
     try {
       const userId = req.user.sub;
@@ -65,6 +66,7 @@ export function createSorenessRoutes({ container, requireAuth, requireAdmin }) {
         date,
         muscles,
         sourceWorkoutId = null,
+        sourceWorkoutDaySlug = null,
         sourceWorkoutDay = null,
         sourceWorkoutDate = null,
       } = req.body;
@@ -101,6 +103,7 @@ export function createSorenessRoutes({ container, requireAuth, requireAdmin }) {
         date,
         muscles,
         sourceWorkoutId,
+        sourceWorkoutDaySlug,
         sourceWorkoutDay,
         sourceWorkoutDate,
         updatedAt: new Date().toISOString()

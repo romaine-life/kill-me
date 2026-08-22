@@ -11,30 +11,43 @@ import { MUSCLE_GROUPS } from './muscleTaxonomy';
 
 // Cycle day → muscle taxonomy groups that day plausibly makes sore.
 //
+// Keyed by day slug rather than number: a day's position changes when the cycle
+// is reordered, and this map must follow the day itself, not whoever moved into
+// its slot.
+//
 // Deliberately generous rather than minimal: this only sets the *default*
 // filter on the muscle picker, and the picker always offers an escape hatch to
 // the full taxonomy. Missing a real group costs more than showing a spare one.
 // Groups are keyed by MUSCLE_TAXONOMY names, not the informal lowercase tags on
-// `primaryMuscleGroups` in the day definitions.
+// a day's `muscleGroups`.
+//
+// Days with no entry — Neck, which the taxonomy has no group for — fall through
+// to the whole taxonomy, which is the right default rather than a gap.
 export const DAY_MUSCLE_GROUPS = {
-  1:  ['Quadriceps', 'Glutes', 'Hamstrings', 'Hip & Adductors', 'Abs & Core', 'Lats & Back'],
-  2:  ['Calves'],
-  3:  ['Hamstrings', 'Glutes', 'Lats & Back'],
-  4:  ['Abs & Core', 'Hip & Adductors'],
-  5:  ['Lats & Back', 'Biceps', 'Deltoids', 'Forearms & Grip'],
-  6:  ['Biceps', 'Forearms & Grip'],
-  7:  ['Abs & Core', 'Lats & Back', 'Hip & Adductors'],
-  8:  ['Pecs', 'Deltoids'],
-  9:  ['Pecs', 'Deltoids', 'Triceps'],
-  10: ['Triceps', 'Deltoids'],
-  11: ['Deltoids', 'Lats & Back'],
-  12: ['Forearms & Grip', 'Biceps'],
+  'compound-legs':  ['Quadriceps', 'Glutes', 'Hamstrings', 'Hip & Adductors', 'Abs & Core', 'Lats & Back'],
+  calves:           ['Calves'],
+  abs:              ['Abs & Core'],
+  stretching:       ['Hamstrings', 'Glutes', 'Hip & Adductors'],
+  knee:             ['Quadriceps'],
+  'compound-pulls': ['Lats & Back', 'Biceps', 'Deltoids', 'Forearms & Grip'],
+  bicep:            ['Biceps', 'Forearms & Grip'],
+  transverse:       ['Abs & Core', 'Lats & Back'],
+  back:             ['Lats & Back', 'Abs & Core'],
+  'pecs-mobility':  ['Pecs', 'Deltoids'],
+  'compound-push':  ['Pecs', 'Deltoids', 'Triceps'],
+  triceps:          ['Triceps', 'Deltoids'],
+  deltoid:          ['Deltoids', 'Lats & Back'],
+  grip:             ['Forearms & Grip', 'Biceps'],
+  hips:             ['Hip & Adductors', 'Glutes'],
+
+  // Retired, but soreness logged against a Torso workout still has to resolve.
+  torso:            ['Abs & Core', 'Lats & Back', 'Hip & Adductors'],
 };
 
 // Groups to show for a source workout. Falls back to the whole taxonomy when
 // the day is unknown or unattributed.
-export function groupsForDay(dayNumber) {
-  return DAY_MUSCLE_GROUPS[dayNumber] || MUSCLE_GROUPS;
+export function groupsForDay(daySlug) {
+  return DAY_MUSCLE_GROUPS[daySlug] || MUSCLE_GROUPS;
 }
 
 // Whole days between two YYYY-MM-DD strings (b - a). Parsed at noon so DST
@@ -51,7 +64,7 @@ export const muscleKey = (m) => `${m.group}\u0000${m.muscle || ''}`;
  * Fold soreness entries into recovery curves, one per originating workout.
  *
  * Returns a Map of sourceWorkoutId → {
- *   sourceWorkoutId, sourceWorkoutDay, sourceWorkoutDate,
+ *   sourceWorkoutId, sourceWorkoutDaySlug, sourceWorkoutDay, sourceWorkoutDate,
  *   entries: [...]                       // ascending by date
  *   muscles: [{ group, muscle, points: [{ date, dayOffset, level }],
  *               peak, lastLevel, lastDate, spanDays, resolved }]
@@ -71,6 +84,7 @@ export function buildRecoveryCurves(entries) {
     if (!curve) {
       curve = {
         sourceWorkoutId: entry.sourceWorkoutId,
+        sourceWorkoutDaySlug: entry.sourceWorkoutDaySlug ?? null,
         sourceWorkoutDay: entry.sourceWorkoutDay ?? null,
         sourceWorkoutDate: entry.sourceWorkoutDate ?? null,
         entries: [],
@@ -81,6 +95,7 @@ export function buildRecoveryCurves(entries) {
     curve.entries.push(entry);
     // Denormalised workout fields are written on every entry; keep the first
     // non-null in case an older entry was saved without them.
+    curve.sourceWorkoutDaySlug ??= entry.sourceWorkoutDaySlug ?? null;
     curve.sourceWorkoutDay ??= entry.sourceWorkoutDay ?? null;
     curve.sourceWorkoutDate ??= entry.sourceWorkoutDate ?? null;
 
@@ -171,6 +186,7 @@ export function buildTracks(entries, mode = 'workout') {
         key,
         group,
         sourceWorkoutId: entry.sourceWorkoutId,
+        sourceWorkoutDaySlug: entry.sourceWorkoutDaySlug ?? null,
         sourceWorkoutDay: entry.sourceWorkoutDay ?? null,
         sourceWorkoutDate: entry.sourceWorkoutDate ?? null,
         levels: new Map(), // date -> worst level that day

@@ -19,7 +19,7 @@
 // alignment, inside a horizontally scrollable box for narrow screens.
 
 import { useMemo, useState, useEffect } from 'react';
-import { DAY_CONFIG } from '../utils/dayConfig';
+import { getDayInfo, describeLoggedDay } from '../utils/dayConfig';
 import { dayColor, pad2 } from '../utils/dayDesign';
 import { buildTracks, packLanes, datesBetween, daysBetween } from '../utils/sorenessLink';
 import { todayLocal } from '../utils/dateUtils';
@@ -279,7 +279,7 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
                   key={`c-${t.key}`}
                   d={`M${x1} ${y1} C${x1 + 34} ${y1} ${x2 - 30} ${y2} ${x2} ${y2}`}
                   fill="none"
-                  stroke={dayColor(t.sourceWorkoutDay)}
+                  stroke={dayColor(t.sourceWorkoutDaySlug)}
                   strokeWidth={1.5}
                   opacity={dim ? 0.18 : 0.75}
                 />
@@ -289,7 +289,7 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
             {/* Stripes */}
             {tracks.map((t) => {
               const x = laneX0 + t.lane * LANE_PITCH;
-              const color = dayColor(t.sourceWorkoutDay);
+              const color = dayColor(t.sourceWorkoutDaySlug);
               const dim = hover && hover.workoutId !== t.sourceWorkoutId;
               return (
                 <g key={t.key} opacity={dim ? 0.2 : 1}>
@@ -328,6 +328,7 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
                         onMouseEnter={() =>
                           setHover({
                             workoutId: t.sourceWorkoutId,
+                            daySlug: t.sourceWorkoutDaySlug,
                             day: t.sourceWorkoutDay,
                             workoutDate: t.sourceWorkoutDate,
                             date: d,
@@ -367,7 +368,7 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
               .map((r) =>
                 (workoutsByDate.get(r.date) || []).map((w, i) => {
                   const dim = hover && hover.workoutId !== w.id;
-                  const c = dayColor(w.dayNumber);
+                  const c = dayColor(w.daySlug);
                   return (
                     <g
                       key={w.id}
@@ -391,7 +392,7 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
                         y={r.y + 4}
                         style={{ fontSize: 11, fill: colors.text.primary, fontWeight: 600 }}
                       >
-                        D{pad2(w.dayNumber)} · {(w.dayName || DAY_CONFIG[w.dayNumber]?.name || '').slice(0, 15)}
+                        D{pad2(w.dayNumber)} · {describeLoggedDay(w).slice(0, 15)}
                       </text>
                     </g>
                   );
@@ -423,9 +424,9 @@ function HoverPanel({ hover, laneCount, trackCount, group, narrow }) {
       {hover ? (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: dayColor(hover.day) }} />
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: dayColor(hover.daySlug) }} />
             <span style={{ fontSize: 12, fontWeight: 600, color: colors.text.primary }}>
-              D{pad2(hover.day)} · {DAY_CONFIG[hover.day]?.name}
+              D{pad2(hover.day)} · {getDayInfo(hover.daySlug)?.name}
             </span>
           </div>
           <div style={{ fontSize: 11, color: colors.text.tertiary, marginBottom: 8 }}>
