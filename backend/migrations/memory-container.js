@@ -27,6 +27,8 @@ export function memoryContainer(documents) {
     if (sql.includes('c.userId = @userId') && doc.userId !== p['@userId']) return false;
     if (sql.includes('c.active = true') && doc.active !== true) return false;
     if (sql.includes('NOT IS_DEFINED(c.daySlug)') && doc.daySlug !== undefined) return false;
+    if (sql.includes('IS_DEFINED(c.sourceWorkoutDay)') && doc.sourceWorkoutDay === undefined) return false;
+    if (sql.includes('NOT IS_DEFINED(c.sourceWorkoutDaySlug)') && doc.sourceWorkoutDaySlug !== undefined) return false;
     if (sql.includes('NOT IS_DEFINED(c.currentDaySlug)') && doc.currentDaySlug !== undefined) return false;
     return true;
   };

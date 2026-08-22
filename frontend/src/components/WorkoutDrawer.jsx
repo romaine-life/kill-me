@@ -26,6 +26,7 @@ export function LogTab({
   onViewCardio,
   onWorkoutChanged,
   onCardioChanged,
+  onLogSoreness,
   viewWorkout = null,
   viewCardio = null,
   currentDay = null,
@@ -883,6 +884,16 @@ export function LogTab({
             </>
           )}
         </div>
+      )}
+
+      {/* Record the soreness this workout caused (edit mode only) */}
+      {isEditMode && onLogSoreness && (
+        <button
+          onClick={() => onLogSoreness(viewWorkout)}
+          className="w-full mt-4 bg-slate-800 hover:bg-orange-900/40 text-orange-300 px-6 py-3 rounded-xl font-bold uppercase tracking-wide border border-orange-500/30 hover:border-orange-500/60 transition-all"
+        >
+          Log Soreness From This Workout
+        </button>
       )}
 
       {/* Delete (edit mode only) */}

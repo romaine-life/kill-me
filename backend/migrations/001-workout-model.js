@@ -120,7 +120,20 @@ export default {
       await container.items.upsert({ ...log, daySlug, modelVersion: MODEL_VERSION });
     }
 
-    // 4. The current-day pointer becomes a slug too.
+    // 4. Soreness entries name the workout that caused them, and denormalise that
+    //    workout's day for display. Give them the slug alongside the number so the
+    //    recovery lanes colour by day identity rather than by position.
+    const soreness = await query(
+      container,
+      'SELECT * FROM c WHERE c.type = @type AND IS_DEFINED(c.sourceWorkoutDay) AND NOT IS_DEFINED(c.sourceWorkoutDaySlug)',
+      [{ name: '@type', value: 'soreness-entry' }]
+    );
+    for (const entry of soreness) {
+      const sourceWorkoutDaySlug = slugByNumber.get(entry.sourceWorkoutDay) ?? null;
+      await container.items.upsert({ ...entry, sourceWorkoutDaySlug });
+    }
+
+    // 5. The current-day pointer becomes a slug too.
     const settings = await query(
       container,
       'SELECT * FROM c WHERE c.type = @type AND NOT IS_DEFINED(c.currentDaySlug)',
@@ -131,7 +144,7 @@ export default {
       await container.items.upsert({ ...setting, currentDaySlug });
     }
 
-    // 5. The loose day documents are now superseded by the model record.
+    // 6. The loose day documents are now superseded by the model record.
     for (const day of existingDays) {
       await container.item(day.id, day.userId ?? undefined).delete();
     }
@@ -140,6 +153,7 @@ export default {
       days: days.length,
       exercises: exercises.length,
       logs: logs.length,
+      soreness: soreness.length,
       settings: settings.length
     };
   }
