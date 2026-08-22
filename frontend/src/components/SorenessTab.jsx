@@ -99,7 +99,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   const { fetchSoreness, fetchWorkouts, isReady } = useDataSource();
   const isMobile = useIsMobile();
 
-  const [view, setView] = useState('journal'); // 'journal' | 'timeline' | 'lanes'
+  const [view, setView] = useState('lanes'); // 'lanes' | 'journal' | 'timeline'
 
   // Editor state
   const [editing, setEditing] = useState(false);
