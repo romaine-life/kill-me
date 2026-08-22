@@ -38,9 +38,6 @@ const LABEL_GAP = 14;
 const LABEL_COL = 100; // per-stripe label column, for stripes sharing a start day
 const TOP = 34;
 
-// Severity drives the day colour's opacity: faint when mild, solid when severe.
-const levelOpacity = (level) => 0.28 + 0.072 * level;
-
 const shortDate = (d) =>
   new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
@@ -296,9 +293,8 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
                   {datesBetween(t.startDate, t.endDate).map((d) => {
                     const rowY = y(d);
                     if (rowY == null) return null;
-                    const level = t.levels.get(d);
                     const top = rowY - ROW_H / 2 + 1;
-                    if (level == null) {
+                    if (!t.logged.has(d)) {
                       // A day you didn't log. Bridge it (the soreness was
                       // presumably still there) or break the stripe.
                       if (gaps === 'break') return null;
@@ -323,7 +319,6 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
                         height={ROW_H - 2}
                         rx={2}
                         fill={color}
-                        opacity={levelOpacity(level)}
                         style={{ cursor: 'pointer' }}
                         onMouseEnter={() =>
                           setHover({
@@ -357,7 +352,9 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
                   style={{ fontSize: 10, fontFamily: 'monospace', fill: colors.text.tertiary }}
                   opacity={dim ? 0.25 : 1}
                 >
-                  {group === 'muscle' ? t.group : `${t.spanDays}d · peak ${t.peak}`}
+                  {group === 'muscle'
+                    ? t.group
+                    : `${t.spanDays}d${t.peak == null ? '' : ` · peak ${t.peak}`}`}
                 </text>
               );
             })}
