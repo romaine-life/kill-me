@@ -174,11 +174,16 @@ export function datesBetween(a, b) {
  *                    Still anchored to its workout, just finer grained.
  *
  * Unattributed entries have no workout to spawn from, so they get no track.
+ *
+ * An entry naming no muscles is still a track: the stripe records that the
+ * workout left you sore on that date, which is the whole point of the view.
+ * Muscles and levels are detail on top of that, not a precondition for it.
  */
 export function buildTracks(entries, mode = 'workout') {
   const tracks = new Map();
 
-  // Record one day of one stripe. `muscles` is what the tooltip shows.
+  // Record one day of one stripe. `muscles` is what the tooltip shows, and may
+  // be empty — the day was logged either way.
   const add = (key, group, date, muscles, entry) => {
     let t = tracks.get(key);
     if (!t) {
@@ -189,21 +194,25 @@ export function buildTracks(entries, mode = 'workout') {
         sourceWorkoutDaySlug: entry.sourceWorkoutDaySlug ?? null,
         sourceWorkoutDay: entry.sourceWorkoutDay ?? null,
         sourceWorkoutDate: entry.sourceWorkoutDate ?? null,
-        levels: new Map(), // date -> worst level that day
-        detail: new Map(), // date -> [{ name, level }]
+        logged: new Set(),  // every date this stripe was logged on
+        levels: new Map(),  // date -> worst level that day, absent if no muscles
+        detail: new Map(),  // date -> [{ name, level }]
       };
       tracks.set(key, t);
     }
-    const worst = Math.max(...muscles.map((m) => m.level));
-    // Two entries should never share a (track, date), but guard anyway.
-    t.levels.set(date, Math.max(t.levels.get(date) ?? 0, worst));
+    t.logged.add(date);
+    if (muscles.length) {
+      const worst = Math.max(...muscles.map((m) => m.level));
+      // Two entries should never share a (track, date), but guard anyway.
+      t.levels.set(date, Math.max(t.levels.get(date) ?? 0, worst));
+    }
     t.detail.set(date, muscles.map((m) => ({ name: m.muscle || m.group, level: m.level })));
   };
 
   for (const entry of entries) {
-    if (!entry.sourceWorkoutId || !entry.muscles?.length) continue;
+    if (!entry.sourceWorkoutId) continue;
 
-    if (mode === 'muscle') {
+    if (mode === 'muscle' && entry.muscles?.length) {
       // One stripe per taxonomy group this workout made sore.
       const byGroup = new Map();
       for (const m of entry.muscles) {
@@ -214,16 +223,19 @@ export function buildTracks(entries, mode = 'workout') {
         add(`${entry.sourceWorkoutId} :: ${group}`, group, entry.date, muscles, entry);
       }
     } else {
-      add(entry.sourceWorkoutId, null, entry.date, entry.muscles, entry);
+      // Plain workout mode, and the muscle mode's fallback for an entry that
+      // named no muscles: there is no group to split it by, so it stays whole.
+      add(entry.sourceWorkoutId, null, entry.date, entry.muscles || [], entry);
     }
   }
 
   for (const t of tracks.values()) {
-    t.dates = [...t.levels.keys()].sort();
+    t.dates = [...t.logged].sort();
     t.startDate = t.dates[0];
     t.endDate = t.dates[t.dates.length - 1];
-    t.peak = Math.max(...t.levels.values());
-    t.lastLevel = t.levels.get(t.endDate);
+    // Null rather than -Infinity when the stripe carries no levels at all.
+    t.peak = t.levels.size ? Math.max(...t.levels.values()) : null;
+    t.lastLevel = t.levels.get(t.endDate) ?? null;
     t.spanDays = t.sourceWorkoutDate ? daysBetween(t.sourceWorkoutDate, t.endDate) : t.dates.length;
   }
 

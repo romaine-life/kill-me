@@ -104,6 +104,10 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   // Editor state
   const [editing, setEditing] = useState(false);
   const [editorStep, setEditorStep] = useState('source'); // 'source' | 'muscles'
+  // True while the source picker was reached from "Change workout" mid-edit, as
+  // opposed to starting a new entry. Re-attributing an entry must not throw away
+  // the muscles and date already filled in.
+  const [changingSource, setChangingSource] = useState(false);
   const [editDate, setEditDate] = useState(todayStr());
   const [editSource, setEditSource] = useState(null); // { id, daySlug, dayNumber, dayName, date }
   const [originalId, setOriginalId] = useState(null); // pre-edit doc id, for moves
@@ -184,15 +188,30 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
     setEditSource(null);
     setOriginalId(null);
     setEditMuscles([]);
+    setChangingSource(false);
     setEditorStep('source');
     setEditing(true);
     resetPicker();
   }
 
   // Source chosen (or explicitly skipped) — move on to the muscles.
-  function beginEntryFor(source) {
+  //
+  // `keepEdits` is set when the picker was reached from "Change workout" on an
+  // entry already being filled in: only the attribution changes, so the date and
+  // the muscles already entered survive. Without it, re-attributing silently
+  // emptied the muscle list and reset the date back to today, and a Save on that
+  // empty list read as "all muscles removed" and deleted instead of writing.
+  function beginEntryFor(source, { keepEdits = false } = {}) {
     setEditSource(source);
     setShowAllGroups(!source);
+    setChangingSource(false);
+
+    if (keepEdits) {
+      setEditorStep('muscles');
+      setEditing(true);
+      resetPicker();
+      return;
+    }
 
     // An entry already logged today for this workout is an edit, not a new one.
     const date = todayStr();
@@ -273,28 +292,22 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
       setError(null);
       const targetId = sorenessDocId(editDate, editSource?.id || null);
 
-      if (editMuscles.length === 0) {
-        // If all muscles removed, delete the entry
-        try {
-          await apiFetch(`/api/soreness/${encodeURIComponent(targetId)}`, { method: 'DELETE' });
-        } catch {
-          // Entry might not exist yet, that's fine
-        }
-      } else {
-        // Strip carryForward flag before persisting
-        const cleanMuscles = editMuscles.map(({ carryForward, ...rest }) => rest);
-        await apiFetch('/api/soreness', {
-          method: 'POST',
-          body: JSON.stringify({
-            date: editDate,
-            muscles: cleanMuscles,
-            sourceWorkoutId: editSource?.id || null,
-            sourceWorkoutDaySlug: editSource?.daySlug || null,
-            sourceWorkoutDay: editSource?.dayNumber ?? null,
-            sourceWorkoutDate: editSource?.date || null,
-          }),
-        });
-      }
+      // An entry with no muscles is a real entry: it records that this workout
+      // left you sore on this date, which is what the lanes view draws. Muscles
+      // are detail on top. Emptying the list is therefore no longer a covert
+      // delete — deleting is its own button.
+      const cleanMuscles = editMuscles.map(({ carryForward, ...rest }) => rest);
+      await apiFetch('/api/soreness', {
+        method: 'POST',
+        body: JSON.stringify({
+          date: editDate,
+          muscles: cleanMuscles,
+          sourceWorkoutId: editSource?.id || null,
+          sourceWorkoutDaySlug: editSource?.daySlug || null,
+          sourceWorkoutDay: editSource?.dayNumber ?? null,
+          sourceWorkoutDate: editSource?.date || null,
+        }),
+      });
       // Changing the date or the source workout changes the entry's identity,
       // so the document it used to live in has to go.
       if (originalId && originalId !== targetId) {
@@ -304,6 +317,23 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
           // Old entry might already be gone
         }
       }
+      setEditing(false);
+      await loadData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Remove the entry being edited. Only reachable for an entry that already
+  // exists — there is nothing to delete before the first save.
+  async function deleteEntry() {
+    if (!originalId) return;
+    try {
+      setSaving(true);
+      setError(null);
+      await apiFetch(`/api/soreness/${encodeURIComponent(originalId)}`, { method: 'DELETE' });
       setEditing(false);
       await loadData();
     } catch (err) {
@@ -329,7 +359,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
           <button onClick={() => setEditing(false)} style={styles.backBtn}>
             <ChevronLeft size={13} style={{ verticalAlign: -2 }} /> Back
           </button>
-          <h2 style={styles.heading}>What caused it?</h2>
+          <h2 style={styles.heading}>What made you sore?</h2>
         </div>
         <p style={{ color: colors.text.tertiary, fontSize: 12, margin: '0 0 18px 0' }}>
           Pick the workout this soreness came from. The muscle picker narrows to that
@@ -344,7 +374,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
             const since = daysBetween(w.date, todayStr());
             const logged = entries.filter((e) => e.sourceWorkoutId === w.id).length;
             return (
-              <button key={w.id} onClick={() => beginEntryFor(toSource(w))} style={styles.sourceOption}>
+              <button key={w.id} onClick={() => beginEntryFor(toSource(w), { keepEdits: changingSource })} style={styles.sourceOption}>
                 <span style={{ ...styles.dayChip, borderColor: dayColor(w.daySlug) }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: dayColor(w.daySlug) }} />
                   D{pad2(w.dayNumber)}
@@ -364,7 +394,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
         </div>
 
         <button
-          onClick={() => beginEntryFor(null)}
+          onClick={() => beginEntryFor(null, { keepEdits: changingSource })}
           style={{ ...styles.sourceOption, marginTop: 12, borderStyle: 'dashed' }}
         >
           <span style={{ fontSize: 13, color: colors.text.secondary }}>
@@ -407,7 +437,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
             <span style={{ fontSize: 12, color: colors.text.tertiary }}>Not attributed to a workout</span>
           )}
           <span style={{ flex: 1 }} />
-          <button onClick={() => setEditorStep('source')} style={styles.linkBtn}>
+          <button onClick={() => { setChangingSource(true); setEditorStep('source'); }} style={styles.linkBtn}>
             {editSource ? 'Change workout' : 'Link a workout'}
           </button>
         </div>
@@ -527,6 +557,15 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
               <button onClick={() => setEditing(false)} style={styles.cancelBtn}>
                 Cancel
               </button>
+              {originalId && (
+                <button
+                  onClick={deleteEntry}
+                  disabled={saving}
+                  style={{ ...styles.cancelBtn, marginLeft: 'auto', color: colors.accent.red }}
+                >
+                  Delete entry
+                </button>
+              )}
             </div>
 
             {error && <p style={{ color: colors.accent.red, fontSize: 12, marginTop: 8 }}>{error}</p>}
