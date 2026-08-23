@@ -193,6 +193,42 @@ function devBackend(port) {
   }
 }
 
+// devctl — the local dev-server supervisor — refuses to mark an environment ready
+// until the process holding the port proves it is the exact instance, project,
+// worktree and revision it was asked for. It probes this endpoint over IPv4
+// loopback, so a managed run must also bind 127.0.0.1 (see `server.host` below);
+// Vite's default host resolves to ::1 only on Windows, which the probe and the
+// Caddy route in front of it can't reach. Serve-only, and inert unless devctl
+// launched us, so it can never exist in a production build.
+function devctlHealth() {
+  return {
+    name: 'devctl-health',
+    apply: 'serve',
+    configureServer(server) {
+      if (process.env.DEVCTL_MANAGED !== '1') return
+      server.middlewares.use('/__devctl/health', (req, res, next) => {
+        if (req.method !== 'GET') {
+          next()
+          return
+        }
+        res.statusCode = 200
+        res.setHeader('Cache-Control', 'no-store')
+        res.setHeader('Content-Type', 'application/json')
+        res.end(JSON.stringify({
+          managed: true,
+          environment: process.env.DEVCTL_ENVIRONMENT_NAME || '',
+          project: process.env.DEVCTL_PROJECT || '',
+          repo_dir: process.env.DEVCTL_REPO_DIR || '',
+          revision: process.env.DEVCTL_SOURCE_REVISION || '',
+          configuration_id: process.env.DEVCTL_CONFIGURATION_ID || '',
+          port: Number(process.env.DEVCTL_FRONTEND_PORT || process.env.PORT || 0),
+          pid: process.pid,
+        }))
+      })
+    },
+  }
+}
+
 const noBackend = process.env.DEV_NO_BACKEND === '1'
 
 // https://vite.dev/config/
@@ -203,17 +239,32 @@ export default defineConfig(async ({ command }) => {
   const isVitest = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test'
   const useBackend = command === 'serve' && !noBackend && !isVitest
   const backendPort = useBackend ? await getFreePort() : 0
+  // devctl owns the port when it is the launcher; honour what it assigned so the
+  // health endpoint above reports the port devctl recorded even if the flag is
+  // ever dropped from the command line.
+  const devctlPort = Number.parseInt(process.env.DEVCTL_FRONTEND_PORT || '', 10)
+  const managedPort = process.env.DEVCTL_MANAGED === '1' && devctlPort > 0 ? devctlPort : 0
+
   return {
     plugins: [
       react(),
       copySqlJsWasm(),
+      devctlHealth(),
       ...(useBackend ? [devBackend(backendPort)] : []),
     ],
     define: {
       __BUILD_NUMBER__: JSON.stringify(getGitCommit()),
     },
-    ...(useBackend
-      ? { server: { proxy: { '/api': { target: `http://localhost:${backendPort}`, changeOrigin: true, secure: false, ws: true } } } }
-      : {}),
+    server: {
+      // Bind IPv4 loopback explicitly. Vite's default host is 'localhost', which
+      // Node resolves verbatim to ::1 alone on this platform — an address any
+      // tool reaching for 127.0.0.1 (devctl's probe, its Caddy route, curl)
+      // gets connection-refused on. A CLI --host still overrides this.
+      host: '127.0.0.1',
+      ...(managedPort ? { port: managedPort, strictPort: true } : {}),
+      ...(useBackend
+        ? { proxy: { '/api': { target: `http://localhost:${backendPort}`, changeOrigin: true, secure: false, ws: true } } }
+        : {}),
+    },
   }
 })

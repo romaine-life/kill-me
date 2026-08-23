@@ -278,7 +278,8 @@ right edge is invisible to a `scrollWidth` check because page overflow is hidden
 those. So screenshots are required for any layout/mobile verification, not
 optional.
 
-Working method (dev server started via `devctl`, see the dev-servers skill):
+Working method (dev server started via `devctl`, see the dev-servers skill —
+`devctl up kill-me-frontend -Cwd <worktree>\frontend -Name <session>`):
 
 ```bash
 chrome --headless=new --disable-gpu --hide-scrollbars \
@@ -286,12 +287,16 @@ chrome --headless=new --disable-gpu --hide-scrollbars \
   --window-size=390,844 \          # 390w = mobile; app's isMobile triggers <760px
   --virtual-time-budget=9000 \     # let async load (sql.js WASM + snapshot.db) settle
   --screenshot="<temp>/shot.png" \
-  "http://localhost:<vite-port>/<route>"
+  "http://127.0.0.1:<vite-port>/<route>"
 ```
 
-Then read the PNG. Notes: use an isolated `--user-data-dir` so it can't disturb
-a real Chrome profile; bump `--virtual-time-budget` for data-heavy routes (the
-History calendar needs ~20000); routes are `/`, `/today`, `/history`,
+Then read the PNG. Notes: address the server as `127.0.0.1`, never `localhost` —
+the dev server binds IPv4 loopback (devctl probes and routes over it), and
+`localhost` resolves to `::1` alone on Windows, which headless Chrome does not
+fall back from: you get a silent failure and no PNG at all. Use an isolated
+`--user-data-dir` so it can't disturb a real Chrome profile; bump
+`--virtual-time-budget` for data-heavy routes (the History calendar needs
+~20000); routes are `/`, `/today`, `/history`,
 `/exercises`, `/cycle`, `/soreness`, `/log` (admin-gated). On Windows the binary
 is typically `C:\Program Files\Google\Chrome\Application\chrome.exe` or Edge's
 `msedge.exe`.

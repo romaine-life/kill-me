@@ -255,6 +255,16 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
     resetPicker();
   }
 
+  // Open the editor for whatever entry lives at (date, workout) — the identity
+  // pair every view already knows. Lets the graphical views hand off to the
+  // same editor the journal's wrench opens.
+  function editEntryAt(date, sourceWorkoutId) {
+    const entry = entries.find(
+      (e) => e.date === date && (e.sourceWorkoutId || null) === (sourceWorkoutId || null),
+    );
+    if (entry) startEdit(entry);
+  }
+
   function resetPicker() {
     setPickerOpen(false);
     setExpandedGroup(null);
@@ -628,6 +638,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
           workouts={workoutsByDate}
           isAdmin={isAdmin}
           onLogSoreness={(w) => beginEntryFor(toSource(w))}
+          onEditEntry={({ date, sourceWorkoutId }) => editEntryAt(date, sourceWorkoutId)}
         />
       </div>
     );
@@ -646,6 +657,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
           isMobile={isMobile}
           onLogSoreness={(w) => beginEntryFor(toSource(w))}
           onEditEntry={startEdit}
+          onEditEntryAt={editEntryAt}
         />
       </div>
     );
@@ -825,7 +837,7 @@ function ViewToggle({ view, onChange }) {
 // Every workout in reverse-chronological order with its recovery curve beneath
 // it. Workouts with nothing logged are still listed — the gaps are part of the
 // picture, and they double as the entry point for logging.
-function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onLogSoreness, onEditEntry }) {
+function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onLogSoreness, onEditEntry, onEditEntryAt }) {
   const curves = useMemo(() => buildRecoveryCurves(entries), [entries]);
   const unattributed = useMemo(
     () => entries.filter((e) => !e.sourceWorkoutId),
@@ -846,6 +858,7 @@ function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onLogSoreness,
           isAdmin={isAdmin}
           isMobile={isMobile}
           onLogSoreness={onLogSoreness}
+          onEditEntryAt={onEditEntryAt}
         />
       ))}
 
@@ -878,7 +891,7 @@ function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onLogSoreness,
   );
 }
 
-function WorkoutRecoveryCard({ workout, curve, isAdmin, isMobile, onLogSoreness }) {
+function WorkoutRecoveryCard({ workout, curve, isAdmin, isMobile, onLogSoreness, onEditEntryAt }) {
   const color = dayColor(workout.daySlug);
   const span = curve ? Math.max(1, ...curve.muscles.map((m) => m.spanDays)) : 0;
   const columns = span + 1; // day 0 (the workout) through the last log
@@ -964,14 +977,23 @@ function WorkoutRecoveryCard({ workout, curve, isAdmin, isMobile, onLogSoreness 
                 <div style={{ display: 'flex', gap: 2 }}>
                   {Array.from({ length: columns }, (_, i) => {
                     const point = m.points.find((p) => p.dayOffset === i);
+                    // A filled cell is a real logged entry, so it opens the
+                    // editor for that day rather than only showing a tooltip.
+                    const editable = isAdmin && point && onEditEntryAt;
                     return (
                       <span
                         key={i}
-                        title={point ? `${point.date} — level ${point.level}` : undefined}
+                        title={
+                          point
+                            ? `${point.date} — level ${point.level}${isAdmin ? ' · click to edit' : ''}`
+                            : undefined
+                        }
+                        onClick={() => editable && onEditEntryAt(point.date, workout.id)}
                         style={{
                           ...styles.levelCell,
                           background: point ? sorenessTierColor(point.level) : 'rgba(255,255,255,0.04)',
                           color: point ? '#101010' : 'transparent',
+                          cursor: editable ? 'pointer' : 'default',
                         }}
                       >
                         {point ? point.level : ''}
