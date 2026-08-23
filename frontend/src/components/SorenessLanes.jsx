@@ -61,7 +61,7 @@ function shiftDays(date, delta) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
+export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness, onEditEntry }) {
   const [group, setGroup] = useState('workout');   // 'workout' | 'muscle'
   const [gaps, setGaps] = useState('bridge');     // 'bridge' | 'break'
   const [order, setOrder] = useState('oldest');    // 'oldest' | 'newest'
@@ -310,6 +310,11 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
                         />
                       );
                     }
+                    // A logged day is the entry itself, so clicking it opens
+                    // that entry in the editor — the same place the journal
+                    // wrench goes. Without this the only way to fix a mislogged
+                    // day was to leave the view you spotted it in.
+                    const editable = isAdmin && !!onEditEntry;
                     return (
                       <rect
                         key={d}
@@ -319,7 +324,10 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
                         height={ROW_H - 2}
                         rx={2}
                         fill={color}
-                        style={{ cursor: 'pointer' }}
+                        style={{ cursor: editable ? 'pointer' : 'default' }}
+                        onClick={() =>
+                          editable && onEditEntry({ date: d, sourceWorkoutId: t.sourceWorkoutId })
+                        }
                         onMouseEnter={() =>
                           setHover({
                             workoutId: t.sourceWorkoutId,
@@ -398,13 +406,20 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
           </svg>
         </div>
 
-        <HoverPanel hover={hover} laneCount={laneCount} trackCount={tracks.length} group={group} narrow={narrow} />
+        <HoverPanel
+          hover={hover}
+          laneCount={laneCount}
+          trackCount={tracks.length}
+          group={group}
+          narrow={narrow}
+          canEdit={isAdmin && !!onEditEntry}
+        />
       </div>
     </div>
   );
 }
 
-function HoverPanel({ hover, laneCount, trackCount, group, narrow }) {
+function HoverPanel({ hover, laneCount, trackCount, group, narrow, canEdit }) {
   return (
     <div
       style={{
@@ -444,7 +459,7 @@ function HoverPanel({ hover, laneCount, trackCount, group, narrow }) {
         </>
       ) : (
         <div style={{ fontSize: 11, color: colors.text.tertiary, lineHeight: 1.6 }}>
-          Hover a stripe for detail.
+          Hover a stripe for detail.{canEdit && ' Click one to edit that day’s log.'}
           <div style={{ marginTop: 8, fontFamily: 'monospace', color: colors.text.disabled }}>
             {trackCount} stripe{trackCount === 1 ? '' : 's'}
             <br />
