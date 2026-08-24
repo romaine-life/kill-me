@@ -41,6 +41,16 @@ const TOP = 34;
 const shortDate = (d) =>
   new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
+// A darker cast of a day's colour, for the seams between days in one stripe.
+// Deliberately derived from the stripe rather than reaching for the page
+// background: a seam has to be opaque paint so nothing can pass behind it, and
+// tinting it keeps it reading as a drawn edge instead of a hole punched through.
+const shade = (hex, f = 0.55) => {
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (c) => Math.round(c * (1 - f));
+  return `rgb(${mix((n >> 16) & 255)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
+};
+
 // The rail is read to answer "was that a weekend?" as often as "what date was
 // that?", so the weekday sits with the date rather than being inferred.
 const weekday = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' });
@@ -273,7 +283,12 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness, onEdi
               if (y1 == null || y2raw == null) return null;
               const x1 = WO_X + WO_W;
               const x2 = laneX0 + t.lane * LANE_PITCH;
-              const y2 = y2raw - ROW_H / 2 + 1;
+              // Land on the middle of the first day, not on the edge above it.
+              // The edge is where a day boundary is scored, so arriving there
+              // made a spawning workout and a day tick draw the same mark at
+              // the same height — the connector looked like it ran through the
+              // stripe it was passing behind.
+              const y2 = y2raw;
               const dim = hover && hover.workoutId !== t.sourceWorkoutId;
               return (
                 <path
@@ -287,47 +302,114 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness, onEdi
               );
             })}
 
-            {/* Stripes */}
+            {/* Stripes — one shape per unbroken run of days, not one per day.
+                Length is the thing this view exists to show, so a stripe has to
+                read as a single object; a rect per day seamed it every row and
+                let the spawn connectors show through the joins, so a curve
+                crossing a lane looked like it ended there. The per-day boxes
+                survive as invisible hit targets over the fill, so a click or a
+                hover still resolves to exactly one date. */}
             {tracks.map((t) => {
               const x = laneX0 + t.lane * LANE_PITCH;
               const color = dayColor(t.sourceWorkoutDaySlug);
               const dim = hover && hover.workoutId !== t.sourceWorkoutId;
+              const editable = isAdmin && !!onEditEntry;
+
+              // Consecutive days of like kind collapse into one segment. An
+              // unlogged day therefore ends the solid run whether it is bridged
+              // (thin bar — the soreness was presumably still there) or broken
+              // (nothing at all): the narrowing is the signal, so it is the only
+              // break the stripe is allowed to have.
+              const segments = [];
+              for (const d of datesBetween(t.startDate, t.endDate)) {
+                const rowY = y(d);
+                if (rowY == null) continue;
+                const logged = t.logged.has(d);
+                const last = segments[segments.length - 1];
+                if (last && last.logged === logged) last.days.push({ date: d, rowY });
+                else segments.push({ logged, days: [{ date: d, rowY }] });
+              }
+
+              // Rows run down the page oldest-first or newest-first, so span the
+              // segment by extremes rather than by its first and last member.
+              const span = (days) => {
+                const ys = days.map((d) => d.rowY);
+                const top = Math.min(...ys) - ROW_H / 2 + 1;
+                return { top, height: Math.max(...ys) + ROW_H / 2 - 1 - top };
+              };
+
               return (
                 <g key={t.key} opacity={dim ? 0.2 : 1}>
-                  {datesBetween(t.startDate, t.endDate).map((d) => {
-                    const rowY = y(d);
-                    if (rowY == null) return null;
-                    const top = rowY - ROW_H / 2 + 1;
-                    if (!t.logged.has(d)) {
-                      // A day you didn't log. Bridge it (the soreness was
-                      // presumably still there) or break the stripe.
-                      if (gaps === 'break') return null;
+                  {segments.map((seg) => {
+                    if (!seg.logged && gaps === 'break') return null;
+                    const { top, height } = span(seg.days);
+                    if (!seg.logged) {
                       return (
                         <rect
-                          key={d}
+                          key={seg.days[0].date}
                           x={x + LANE_W / 2 - 1.5}
                           y={top}
                           width={3}
-                          height={ROW_H - 2}
+                          height={height}
                           fill={color}
                           opacity={0.3}
                         />
                       );
                     }
-                    // A logged day is the entry itself, so clicking it opens
-                    // that entry in the editor — the same place the journal
-                    // wrench goes. Without this the only way to fix a mislogged
-                    // day was to leave the view you spotted it in.
-                    const editable = isAdmin && !!onEditEntry;
+                    // Days read as cells in one bar: an outline around the run
+                    // and an opaque seam at every boundary, both in a darker
+                    // cast of the stripe's own colour.
+                    //
+                    // The distinction that matters is paint vs. hole. The seam
+                    // is as visible as the old 2px gap was, but it is drawn on
+                    // top of solid fill, so a connector routed behind the
+                    // stripe stays behind it — where the gap used to let one
+                    // through and make the crossing look like a join.
+                    const edge = shade(color);
+                    const rows = seg.days.map((d) => d.rowY).sort((a, b) => a - b);
                     return (
+                      <g key={seg.days[0].date}>
+                        <rect
+                          x={x}
+                          y={top}
+                          width={LANE_W}
+                          height={height}
+                          rx={2}
+                          fill={color}
+                          stroke={edge}
+                          strokeWidth={1}
+                        />
+                        {rows.slice(1).map((rowY, i) => (
+                          <line
+                            key={rowY}
+                            x1={x}
+                            x2={x + LANE_W}
+                            y1={(rows[i] + rowY) / 2}
+                            y2={(rows[i] + rowY) / 2}
+                            stroke={edge}
+                            strokeWidth={2}
+                          />
+                        ))}
+                      </g>
+                    );
+                  })}
+
+                  {/* A logged day is the entry itself, so clicking it opens that
+                      entry in the editor — the same place the journal wrench
+                      goes. Without this the only way to fix a mislogged day was
+                      to leave the view you spotted it in. */}
+                  {segments
+                    .filter((seg) => seg.logged)
+                    .flatMap((seg) => seg.days)
+                    .map(({ date: d, rowY }) => (
                       <rect
                         key={d}
                         x={x}
-                        y={top}
+                        y={rowY - ROW_H / 2}
                         width={LANE_W}
-                        height={ROW_H - 2}
-                        rx={2}
-                        fill={color}
+                        height={ROW_H}
+                        fill="transparent"
+                        pointerEvents="all"
                         style={{ cursor: editable ? 'pointer' : 'default' }}
                         onClick={() =>
                           editable && onEditEntry({ date: d, sourceWorkoutId: t.sourceWorkoutId })
@@ -345,8 +427,7 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness, onEdi
                         }
                         onMouseLeave={() => setHover(null)}
                       />
-                    );
-                  })}
+                    ))}
                 </g>
               );
             })}
