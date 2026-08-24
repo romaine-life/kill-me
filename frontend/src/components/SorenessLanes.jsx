@@ -28,7 +28,7 @@ import { colors } from '../colors';
 const ROW_H = 30;
 const GAP_H = 22; // a collapsed run of dates with nothing in them
 const DATE_X = 0;
-const DATE_W = 56;
+const DATE_W = 74; // wide enough for "Sat Aug 13" in 10px monospace
 const WO_X = DATE_W + 6;
 const WO_W = 146;
 const GUTTER = 64; // room for the spawn connector to slope
@@ -40,6 +40,10 @@ const TOP = 34;
 
 const shortDate = (d) =>
   new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+// The rail is read to answer "was that a weekend?" as often as "what date was
+// that?", so the weekday sits with the date rather than being inferred.
+const weekday = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' });
 
 // The chart is intrinsically wide, so on a phone the side panel has to move
 // below it — otherwise the row's fixed-width panel pushes the whole thing past
@@ -230,7 +234,7 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness, onEdi
                     strokeWidth={0.5}
                     strokeDasharray="1 5"
                   />
-                  <rect x={DATE_X} y={r.y + GAP_H / 2 - 7} width={80} height={14} fill={colors.bg.base} />
+                  <rect x={DATE_X} y={r.y + GAP_H / 2 - 7} width={DATE_W + 24} height={14} fill={colors.bg.base} />
                   <text
                     x={DATE_X}
                     y={r.y + GAP_H / 2 + 3}
@@ -244,9 +248,9 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness, onEdi
                   <text
                     x={DATE_X}
                     y={r.y + 4}
-                    style={{ fontSize: 10, fontFamily: 'monospace', fill: colors.text.disabled }}
+                    style={{ fontSize: 10, fontFamily: 'monospace', fill: colors.text.tertiary }}
                   >
-                    {shortDate(r.date)}
+                    {weekday(r.date)} {shortDate(r.date)}
                   </text>
                   <line
                     x1={DATE_W - 4}
@@ -406,20 +410,18 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness, onEdi
           </svg>
         </div>
 
-        <HoverPanel
-          hover={hover}
-          laneCount={laneCount}
-          trackCount={tracks.length}
-          group={group}
-          narrow={narrow}
-          canEdit={isAdmin && !!onEditEntry}
-        />
+        <HoverPanel hover={hover} narrow={narrow} />
       </div>
     </div>
   );
 }
 
-function HoverPanel({ hover, laneCount, trackCount, group, narrow, canEdit }) {
+function HoverPanel({ hover, narrow }) {
+  // Nothing hovered means nothing to say. On a phone the panel sits below the
+  // chart, so it can simply go; on desktop it is a fixed column beside the
+  // chart, and dropping it outright would reflow the chart on every hover.
+  if (!hover) return narrow ? null : <div style={{ width: 200, flexShrink: 0 }} />;
+
   return (
     <div
       style={{
@@ -433,42 +435,27 @@ function HoverPanel({ hover, laneCount, trackCount, group, narrow, canEdit }) {
         ...(narrow ? {} : { position: 'sticky', top: 12 }),
       }}
     >
-      {hover ? (
-        <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: dayColor(hover.daySlug) }} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: colors.text.primary }}>
-              D{pad2(hover.day)} · {getDayInfo(hover.daySlug)?.name}
-            </span>
-          </div>
-          <div style={{ fontSize: 11, color: colors.text.tertiary, marginBottom: 8 }}>
-            {shortDate(hover.date)}
-            {hover.workoutDate && ` · +${daysBetween(hover.workoutDate, hover.date)}d`}
-          </div>
-          {hover.group && (
-            <div style={{ fontSize: 11, color: colors.text.secondary, marginBottom: 6 }}>{hover.group}</div>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {hover.detail.map((m) => (
-              <div key={m.name} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11 }}>
-                <span style={{ color: colors.text.secondary }}>{m.name}</span>
-                <span style={{ color: colors.text.primary, fontFamily: 'monospace' }}>{m.level}</span>
-              </div>
-            ))}
-          </div>
-        </>
-      ) : (
-        <div style={{ fontSize: 11, color: colors.text.tertiary, lineHeight: 1.6 }}>
-          Hover a stripe for detail.{canEdit && ' Click one to edit that day’s log.'}
-          <div style={{ marginTop: 8, fontFamily: 'monospace', color: colors.text.disabled }}>
-            {trackCount} stripe{trackCount === 1 ? '' : 's'}
-            <br />
-            {laneCount} lane{laneCount === 1 ? '' : 's'} at peak
-            <br />
-            per {group}
-          </div>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <span style={{ width: 8, height: 8, borderRadius: '50%', background: dayColor(hover.daySlug) }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: colors.text.primary }}>
+          D{pad2(hover.day)} · {getDayInfo(hover.daySlug)?.name}
+        </span>
+      </div>
+      <div style={{ fontSize: 11, color: colors.text.tertiary, marginBottom: 8 }}>
+        {weekday(hover.date)} {shortDate(hover.date)}
+        {hover.workoutDate && ` · +${daysBetween(hover.workoutDate, hover.date)}d`}
+      </div>
+      {hover.group && (
+        <div style={{ fontSize: 11, color: colors.text.secondary, marginBottom: 6 }}>{hover.group}</div>
       )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {hover.detail.map((m) => (
+          <div key={m.name} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11 }}>
+            <span style={{ color: colors.text.secondary }}>{m.name}</span>
+            <span style={{ color: colors.text.primary, fontFamily: 'monospace' }}>{m.level}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
