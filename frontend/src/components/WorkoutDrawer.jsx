@@ -18,6 +18,23 @@ import { useDataSource } from '../api/snapshotContext.jsx';
 import { getTotalDuration } from '../utils/cardioTemplates.js';
 import { CARDIO_CONFIG } from '../utils/cardioConfig.js';
 
+const buildWeightEntries = (variation = {}, savedWeights = []) => {
+  const savedByKey = new Map(
+    Array.isArray(savedWeights)
+      ? savedWeights.map((entry) => [entry.key, entry])
+      : Object.entries(savedWeights || {}).map(([key, value]) => [key, { key, value }])
+  );
+
+  return (variation.weightFields || []).map((field) => {
+    const saved = savedByKey.get(field.key);
+    return {
+      key: field.key,
+      label: saved?.label ?? field.label,
+      value: saved?.value ?? field.targetWeight ?? '',
+    };
+  });
+};
+
 export function LogTab({
   initialDay = null,
   initialDate = null,
@@ -241,6 +258,8 @@ export function LogTab({
             variation: savedVarName,
             completed: true,
             weight: saved.weight ?? matchedVar.targetWeight ?? '',
+            weights: buildWeightEntries(matchedVar, saved.weights),
+            inclineDegrees: saved.inclineDegrees ?? matchedVar.targetInclineDegrees ?? '',
             reps: saved.reps ?? matchedVar.targetReps ?? '',
             sets: saved.sets ?? matchedVar.targetSets ?? '',
             cableSetting: saved.cableSetting ?? matchedVar.cableSetting ?? '',
@@ -250,10 +269,12 @@ export function LogTab({
           name: ex.name,
           variation: dv.name,
           completed: false,
-          weight: dv.targetWeight || '',
-          reps: dv.targetReps || '',
-          sets: dv.targetSets || '',
-          cableSetting: dv.cableSetting || '',
+          weight: dv.targetWeight ?? '',
+          weights: buildWeightEntries(dv),
+          inclineDegrees: dv.targetInclineDegrees ?? '',
+          reps: dv.targetReps ?? '',
+          sets: dv.targetSets ?? '',
+          cableSetting: dv.cableSetting ?? '',
         };
       });
 
@@ -264,6 +285,8 @@ export function LogTab({
           variation: ex.variation || 'Standard',
           completed: true,
           weight: ex.weight ?? '',
+          weights: ex.weights ?? [],
+          inclineDegrees: ex.inclineDegrees ?? '',
           reps: ex.reps ?? '',
           sets: ex.sets ?? '',
           cableSetting: ex.cableSetting ?? '',
@@ -346,6 +369,27 @@ export function LogTab({
     setCompletedExercises(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const updateExerciseFields = (index, fields) => {
+    setCompletedExercises(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], ...fields };
+      return updated;
+    });
+  };
+
+  const updateExerciseWeight = (index, key, value) => {
+    setCompletedExercises(prev => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        weights: (updated[index].weights || []).map((entry) =>
+          entry.key === key ? { ...entry, value } : entry
+        ),
+      };
       return updated;
     });
   };
@@ -785,11 +829,15 @@ export function LogTab({
                                         type="button"
                                         aria-pressed={exercise.variation === v.name}
                                         onClick={() => {
-                                          updateExercise(idx, 'variation', v.name);
-                                          updateExercise(idx, 'weight', v.targetWeight || '');
-                                          updateExercise(idx, 'reps', v.targetReps || '');
-                                          updateExercise(idx, 'sets', v.targetSets || '');
-                                          updateExercise(idx, 'cableSetting', v.cableSetting || '');
+                                          updateExerciseFields(idx, {
+                                            variation: v.name,
+                                            weight: v.targetWeight ?? '',
+                                            weights: buildWeightEntries(v),
+                                            inclineDegrees: v.targetInclineDegrees ?? '',
+                                            reps: v.targetReps ?? '',
+                                            sets: v.targetSets ?? '',
+                                            cableSetting: v.cableSetting ?? '',
+                                          });
                                         }}
                                         className={`text-xs px-2.5 py-1 rounded-full border cursor-pointer transition-all ${
                                           exercise.variation === v.name
@@ -802,20 +850,25 @@ export function LogTab({
                                     ))}
                                   </div>
                                 )}
-                                {(selectedVar.targetWeight || selectedVar.targetReps || selectedVar.targetSets || selectedVar.cableSetting) && (
-                                  <div className="text-sm text-slate-400 mb-3">
+                                {(selectedVar.targetWeight != null || selectedVar.weightFields?.length > 0 || selectedVar.targetInclineDegrees != null || selectedVar.targetReps != null || selectedVar.targetSets != null || selectedVar.cableSetting) && (
+                                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-400 mb-3">
                                     {selectedVar.cableSetting && (
                                       <span className="text-amber-400">Cable: {selectedVar.cableSetting}</span>
                                     )}
-                                    {selectedVar.cableSetting && selectedVar.targetWeight && <span> · </span>}
-                                    {selectedVar.targetWeight && (
+                                    {selectedVar.targetWeight != null && (
                                       <span>Target: {selectedVar.targetWeight} lbs</span>
                                     )}
-                                    {selectedVar.targetReps && (
-                                      <span> × {selectedVar.targetReps} reps</span>
+                                    {(selectedVar.weightFields || []).map((field) => (
+                                      <span key={field.key}>{field.label}: {field.targetWeight} lbs</span>
+                                    ))}
+                                    {selectedVar.targetInclineDegrees != null && (
+                                      <span>Incline: {selectedVar.targetInclineDegrees}°</span>
                                     )}
-                                    {selectedVar.targetSets && (
-                                      <span> × {selectedVar.targetSets} sets</span>
+                                    {selectedVar.targetReps != null && (
+                                      <span>{selectedVar.targetReps} reps</span>
+                                    )}
+                                    {selectedVar.targetSets != null && (
+                                      <span>{selectedVar.targetSets} sets</span>
                                     )}
                                   </div>
                                 )}
@@ -823,9 +876,13 @@ export function LogTab({
                             );
                           })()}
 
-                          {exercise.completed && (
+                          {exercise.completed && (() => {
+                            const exDef = exercises[idx];
+                            const vars = exDef?.variations || [];
+                            const selectedVar = vars.find(v => v.name === exercise.variation) || getDefaultVariation(exDef || {});
+                            return (
                             <div className="space-y-2">
-                              {exercises[idx]?.equipment?.toLowerCase().includes('cable') && (
+                              {Object.hasOwn(selectedVar, 'cableSetting') && (
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs text-slate-400 font-bold uppercase tracking-wide whitespace-nowrap">Cable</span>
                                   <input
@@ -837,15 +894,44 @@ export function LogTab({
                                   />
                                 </div>
                               )}
-                              <div className="grid grid-cols-3 gap-2">
-                                <input
-                                  type="text"
-                                  inputMode="decimal"
-                                  placeholder="Weight (lbs)"
-                                  value={exercise.weight}
-                                  onChange={(e) => updateExercise(idx, 'weight', e.target.value)}
-                                  className="bg-slate-800 border border-slate-600 rounded px-3 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-                                />
+                              {selectedVar.weightFields?.length > 0 && (
+                                <div className="grid grid-cols-2 gap-2">
+                                  {selectedVar.weightFields.map((field) => (
+                                    <label key={field.key} className="text-xs text-slate-400 font-bold uppercase tracking-wide">
+                                      {field.label} (lbs)
+                                      <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={exercise.weights?.find((entry) => entry.key === field.key)?.value ?? ''}
+                                        onChange={(e) => updateExerciseWeight(idx, field.key, e.target.value)}
+                                        className="mt-1 w-full bg-slate-800 border border-slate-600 rounded px-3 py-3 text-base font-normal normal-case tracking-normal text-slate-200 focus:outline-none focus:border-cyan-500"
+                                      />
+                                    </label>
+                                  ))}
+                                </div>
+                              )}
+                              <div className={`grid gap-2 ${selectedVar.targetInclineDegrees != null ? 'grid-cols-3' : selectedVar.weightFields?.length > 0 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                                {selectedVar.weightFields?.length > 0 ? null : (
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="Weight (lbs)"
+                                    value={exercise.weight}
+                                    onChange={(e) => updateExercise(idx, 'weight', e.target.value)}
+                                    className="bg-slate-800 border border-slate-600 rounded px-3 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                                  />
+                                )}
+                                {selectedVar.targetInclineDegrees != null && (
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    aria-label="Incline degrees"
+                                    placeholder="Incline (°)"
+                                    value={exercise.inclineDegrees}
+                                    onChange={(e) => updateExercise(idx, 'inclineDegrees', e.target.value)}
+                                    className="bg-slate-800 border border-slate-600 rounded px-3 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                                  />
+                                )}
                                 <input
                                   type="text"
                                   inputMode="numeric"
@@ -864,7 +950,8 @@ export function LogTab({
                                 />
                               </div>
                             </div>
-                          )}
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
