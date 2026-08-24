@@ -38,6 +38,22 @@ const daysSince = (iso) => {
   return Math.round((b - a) / (1000 * 60 * 60 * 24));
 };
 
+const loggedWeights = (exercise) => {
+  if (Array.isArray(exercise.weights)) return exercise.weights;
+  return Object.entries(exercise.weights || {}).map(([key, value]) => ({
+    key,
+    label: key.charAt(0).toUpperCase() + key.slice(1),
+    value,
+  }));
+};
+
+const chartWeight = (exercise) => {
+  const values = [exercise.weight, ...loggedWeights(exercise).map((entry) => entry.value)]
+    .map(Number)
+    .filter(Number.isFinite);
+  return values.length > 0 ? Math.max(...values) : 0;
+};
+
 export function ListTab({ onWorkoutClick, onCardioClick, onLogSoreness, viewToggle }) {
   const [workouts, setWorkouts] = useState([]);
   const [cardioSessions, setCardioSessions] = useState([]);
@@ -355,7 +371,7 @@ function WorkoutCard({ w, onClick, onLogSoreness }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 28 }}>
           {(w.exercises || []).map((e, i) => {
-            const h = Math.max(6, Math.min(28, ((e.weight || 0) / 4) + 6));
+            const h = Math.max(6, Math.min(28, (chartWeight(e) / 4) + 6));
             return <div key={i} style={{ width: 4, height: h, background: dayColor(w.daySlug), opacity: 0.6, borderRadius: 1 }} />;
           })}
         </div>
@@ -394,7 +410,13 @@ function WorkoutCard({ w, onClick, onLogSoreness }) {
                 )}
               </div>
               <div className="tnum" style={{ color: 'var(--fg-secondary)', display: 'flex', gap: 10 }}>
-                {e.weight != null && <span>{e.weight} lb</span>}
+                {e.weight != null && e.weight !== '' && <span>{e.weight} lb</span>}
+                {loggedWeights(e).map((entry) => (
+                  entry.value != null && entry.value !== ''
+                    ? <span key={entry.key}>{entry.label} {entry.value} lb</span>
+                    : null
+                ))}
+                {e.inclineDegrees != null && e.inclineDegrees !== '' && <span>{e.inclineDegrees}° incline</span>}
                 {e.reps != null && <span>×{e.reps}</span>}
                 {e.sets != null && <span style={{ color: dayColor(w.daySlug) }}>×{e.sets} sets</span>}
               </div>

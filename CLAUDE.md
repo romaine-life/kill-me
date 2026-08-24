@@ -164,8 +164,8 @@ distinguished by a `type` field:
 | Type | Purpose | Key fields |
 | ---- | ------- | ---------- |
 | `workout-model` | One generation of the cycle. Exactly one is `active`; retired ones stay so old logs still resolve | `version`, `name`, `active`, `days[]` (`{slug, number, name, focus, description, muscleGroups, safetyNotes}`) |
-| `exercise` | Exercise library entries per day | `daySlug`, `dayNumber`, `name`, `equipment`, `tags[]`, `variations[]` (`{name, default, targetWeight/Reps/Sets}`) |
-| `logged-workout` | A completed workout session | `userId`, `daySlug`, `dayNumber`, `dayName`, `modelVersion`, `date`, `time` (HH:MM, nullable), `mode` (quick/detailed), `exercises[]` (`{name, variation, weight, reps, sets}`) |
+| `exercise` | Exercise library entries per day | `daySlug`, `dayNumber`, `name`, `equipment`, `tags[]`, `variations[]` (`{name, default, targetWeight/Reps/Sets, weightFields[]?, targetInclineDegrees?}`) |
+| `logged-workout` | A completed workout session | `userId`, `daySlug`, `dayNumber`, `dayName`, `modelVersion`, `date`, `time` (HH:MM, nullable), `mode` (quick/detailed), `exercises[]` (`{name, variation, weight, weights[]?, inclineDegrees?, reps, sets}`; multi-load movements use labelled `{key, label, value}` weight entries) |
 | `schema-migration` | Record that a migration ran. Its existence is what stops it running again | `version`, `name`, `appliedAt`, `durationMs` |
 | `cardio-session` | A completed cardio session | `userId`, `date`, `time` (HH:MM, nullable), `activity` (treadmill/bike), `durationMinutes`, `treadmill{}`, `bike{}` |
 | `cardio-template` | Shared treadmill interval template (library) | `userId` (`shared`), `templateId`, `name`, `description`, `activity`, `intervals[]` (`{type, speedMph, durationMinutes}`), `sortOrder` |

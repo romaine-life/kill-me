@@ -265,9 +265,11 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
           variations: [{
             name: defaultVar.name || 'Standard',
             default: true,
-            targetWeight: defaultVar.targetWeight || null,
-            targetReps: defaultVar.targetReps || null,
-            targetSets: defaultVar.targetSets || null,
+            targetWeight: defaultVar.targetWeight ?? null,
+            weightFields: defaultVar.weightFields,
+            targetInclineDegrees: defaultVar.targetInclineDegrees ?? null,
+            targetReps: defaultVar.targetReps ?? null,
+            targetSets: defaultVar.targetSets ?? null,
           }],
         }),
       });
@@ -508,6 +510,14 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
                         <div style={styles.variationTargets}>
                           {v.targetWeight != null && (
                             <span style={styles.targetChip}>{v.targetWeight} lbs</span>
+                          )}
+                          {(v.weightFields || []).map((field) => (
+                            <span key={field.key} style={styles.targetChip}>
+                              {field.label}: {field.targetWeight} lbs
+                            </span>
+                          ))}
+                          {v.targetInclineDegrees != null && (
+                            <span style={styles.targetChip}>{v.targetInclineDegrees}° incline</span>
                           )}
                           {v.targetReps != null && (
                             <span style={styles.targetChip}>{v.targetReps} reps</span>
