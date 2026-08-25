@@ -539,7 +539,7 @@ export function LogTab({
       </div>
 
       {/* Date & Time Picker */}
-      <div className="mb-4 flex gap-3">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row">
         <div className="flex-1">
           <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">
             Workout Date
@@ -556,7 +556,7 @@ export function LogTab({
             className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 transition-all cursor-pointer"
           />
         </div>
-        <div className="w-32">
+        <div className="w-full sm:w-40 sm:shrink-0">
           <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">
             Time
           </label>
@@ -564,7 +564,7 @@ export function LogTab({
             type="time"
             value={selectedTime}
             onChange={(e) => setSelectedTime(e.target.value)}
-            className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 transition-all cursor-pointer"
+            className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-3 text-slate-200 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 transition-all cursor-pointer"
           />
         </div>
       </div>
@@ -1065,7 +1065,7 @@ export function LogTab({
         </div>
 
         {/* Cardio Date & Time Picker */}
-        <div className="mb-4 flex gap-3">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row">
           <div className="flex-1">
             <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">
               Date
@@ -1080,7 +1080,7 @@ export function LogTab({
               className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 transition-all cursor-pointer"
             />
           </div>
-          <div className="w-32">
+          <div className="w-full sm:w-40 sm:shrink-0">
             <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">
               Time
             </label>
@@ -1088,7 +1088,7 @@ export function LogTab({
               type="time"
               value={cardioTime}
               onChange={(e) => setCardioTime(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 transition-all cursor-pointer"
+              className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-3 text-slate-200 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 transition-all cursor-pointer"
             />
           </div>
         </div>
