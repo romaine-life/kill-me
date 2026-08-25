@@ -101,12 +101,12 @@ const SCHEMA = `
     value TEXT NOT NULL
   );
 
-  -- One row per (date, source workout). Several rows can share a date when the
-  -- soreness from two different workouts overlaps, so date alone is not the key.
+  -- Soreness records have unique ids. Date and source are attributes, not identity.
   CREATE TABLE soreness_entries (
     id                  TEXT PRIMARY KEY,
     date                TEXT NOT NULL,
     muscles             TEXT NOT NULL,
+    level               INTEGER,
     source_workout_id        TEXT,
     source_workout_day_slug  TEXT,
     source_workout_day       INTEGER,
@@ -266,12 +266,13 @@ async function main() {
 
     // Soreness entries
     const insertSoreness = db.prepare(
-      'INSERT INTO soreness_entries (id, date, muscles, source_workout_id, source_workout_day_slug, source_workout_day, source_workout_date) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO soreness_entries (id, date, level, muscles, source_workout_id, source_workout_day_slug, source_workout_day, source_workout_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     );
     for (const doc of results.soreness) {
       insertSoreness.run(
         doc.id,
         doc.date,
+        doc.level ?? (doc.muscles?.length ? Math.max(...doc.muscles.map((m) => m.level)) : null),
         JSON.stringify(doc.muscles),
         doc.sourceWorkoutId || null,
         doc.sourceWorkoutDaySlug || null,

@@ -137,10 +137,8 @@ export function buildRecoveryCurves(entries) {
   return byWorkout;
 }
 
-// Deterministic document id for a (date, sourceWorkoutId) pair — mirrors
-// `sorenessDocId` in backend/routes/routes/soreness.js. The frontend needs it
-// to notice when an edit moves an entry to a different date or workout, since
-// that changes its identity and the old document has to be removed.
+// Historical records used a deterministic (date, sourceWorkoutId) id. Keep the
+// helper only as a fallback for those rows; new records have unique ids.
 export function sorenessDocId(date, sourceWorkoutId) {
   return sourceWorkoutId ? `soreness-${date}-${sourceWorkoutId}` : `soreness-${date}`;
 }
@@ -175,9 +173,8 @@ export function datesBetween(a, b) {
  *
  * Unattributed entries have no workout to spawn from, so they get no track.
  *
- * An entry naming no muscles is still a track: the stripe records that the
- * workout left you sore on that date, which is the whole point of the view.
- * Muscles and levels are detail on top of that, not a precondition for it.
+ * An entry naming no muscles is still a track. Its record-level intensity is
+ * the stripe value; muscles are optional detail.
  */
 export function buildTracks(entries, mode = 'workout') {
   const tracks = new Map();
@@ -195,7 +192,7 @@ export function buildTracks(entries, mode = 'workout') {
         sourceWorkoutDay: entry.sourceWorkoutDay ?? null,
         sourceWorkoutDate: entry.sourceWorkoutDate ?? null,
         logged: new Set(),  // every date this stripe was logged on
-        levels: new Map(),  // date -> worst level that day, absent if no muscles
+        levels: new Map(),  // date -> record-level intensity
         detail: new Map(),  // date -> [{ name, level }]
       };
       tracks.set(key, t);
@@ -205,6 +202,8 @@ export function buildTracks(entries, mode = 'workout') {
       const worst = Math.max(...muscles.map((m) => m.level));
       // Two entries should never share a (track, date), but guard anyway.
       t.levels.set(date, Math.max(t.levels.get(date) ?? 0, worst));
+    } else if (entry.level) {
+      t.levels.set(date, Math.max(t.levels.get(date) ?? 0, entry.level));
     }
     t.detail.set(date, muscles.map((m) => ({ name: m.muscle || m.group, level: m.level })));
   };

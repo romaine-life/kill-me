@@ -169,7 +169,7 @@ distinguished by a `type` field:
 | `schema-migration` | Record that a migration ran. Its existence is what stops it running again | `version`, `name`, `appliedAt`, `durationMs` |
 | `cardio-session` | A completed cardio session | `userId`, `date`, `time` (HH:MM, nullable), `activity` (treadmill/bike), `durationMinutes`, `treadmill{}`, `bike{}` |
 | `cardio-template` | Shared treadmill interval template (library) | `userId` (`shared`), `templateId`, `name`, `description`, `activity`, `intervals[]` (`{type, speedMph, durationMinutes}`), `sortOrder` |
-| `soreness-entry` | Daily soreness journal entry | `userId`, `date`, `muscles[]` (`{group, muscle, level}`) |
+| `soreness-entry` | Soreness record linked to an optional originating workout | `userId`, `date`, required `level` (1–10), optional `muscles[]` (`{group, muscle, level}`), optional source-workout fields |
 | `settings` | Per-user settings (current day) | `userId`, `currentDaySlug` |
 | `account` | Microsoft auth account record | `userId`, `provider`, `name`, `email`, `role` |
 
