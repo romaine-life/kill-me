@@ -5,14 +5,13 @@
 // An entry names the workout that caused the soreness, and you log against that
 // same workout repeatedly as it fades. Squat on the 19th, then log level 7 on
 // the 20th, 5 on the 21st, 2 on the 22nd — those three entries are one recovery
-// curve, which is what the Timeline view draws. Because identity is
-// (date, source workout) rather than date alone, two workouts' soreness can
-// overlap on the same day without fighting over one record.
+// curve, which is what the Timeline view draws. Every record has its own id;
+// date and originating workout are editable attributes, not hidden identity.
 //
 // Entries written before workout attribution existed have no source workout and
 // show up as "unattributed"; they still render and can still be edited.
 //
-// Data model: { id, date, muscles: [{ group, muscle, level }],
+// Data model: { id, date, level, muscles: [{ group, muscle, level }],
 //               sourceWorkoutId, sourceWorkoutDaySlug, sourceWorkoutDay,
 //               sourceWorkoutDate }.
 
@@ -27,7 +26,7 @@ import { buildRecoveryCurves, daysBetween, groupsForDay, sorenessDocId } from '.
 import { AnatomyDiagram } from './AnatomyDiagrams';
 import { SorenessLanes } from './SorenessLanes';
 import { colors } from '../colors';
-import { Wrench, ChevronLeft } from 'lucide-react';
+import { Check, Wrench, ChevronLeft } from 'lucide-react';
 
 // Map soreness levels to colors (green → yellow → red gradient)
 function getLevelColor(level) {
@@ -44,6 +43,16 @@ function getLevelLabel(level) {
   if (level <= 6) return 'Moderate';
   if (level <= 8) return 'Significant';
   return 'Severe';
+}
+
+// Legacy entries stored intensity only on each muscle. New entries have one
+// record-level intensity; deriving the old value keeps historical rows editable.
+function entryLevel(entry) {
+  if (Number.isInteger(entry?.level) && entry.level >= 1 && entry.level <= 10) {
+    return entry.level;
+  }
+  const levels = (entry?.muscles || []).map((m) => m.level).filter(Number.isFinite);
+  return levels.length ? Math.max(...levels) : null;
 }
 
 // Format date as "Mon, Jan 15"
@@ -100,6 +109,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   const isMobile = useIsMobile();
 
   const [view, setView] = useState('lanes'); // 'lanes' | 'journal' | 'timeline'
+  const [workoutDetail, setWorkoutDetail] = useState(null);
 
   // Editor state
   const [editing, setEditing] = useState(false);
@@ -111,6 +121,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   const [editDate, setEditDate] = useState(todayStr());
   const [editSource, setEditSource] = useState(null); // { id, daySlug, dayNumber, dayName, date }
   const [originalId, setOriginalId] = useState(null); // pre-edit doc id, for moves
+  const [editLevel, setEditLevel] = useState(null);
   const [editMuscles, setEditMuscles] = useState([]);
   const [saving, setSaving] = useState(false);
 
@@ -156,7 +167,8 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   useEffect(() => {
     if (!initialSource || consumedSource.current === initialSource) return;
     consumedSource.current = initialSource;
-    beginEntryFor(toSource(initialSource));
+    setWorkoutDetail(initialSource);
+    beginCreateForWorkout(initialSource);
     onSourceConsumed?.();
   }, [initialSource, entries]);
 
@@ -172,64 +184,46 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
     return all.filter((r) => visibleGroups.includes(r.group));
   }, [searchQuery, visibleGroups, showAllGroups, editSource]);
 
-  // Most recent entry attributed to the same workout — the levels a follow-up
-  // log starts from, since re-logging a workout's soreness is mostly a matter of
-  // dragging yesterday's numbers down.
-  function lastEntryForSource(sourceId) {
-    const matching = entries
-      .filter((e) => (e.sourceWorkoutId || null) === (sourceId || null))
-      .sort((a, b) => b.date.localeCompare(a.date));
-    return matching[0] || null;
-  }
-
-  // Start a brand-new entry — begins at the workout picker.
+  // The global Add action opens the workout browser. Choosing a workout is
+  // navigation to its detail page, never an implicit create or edit command.
   function startNew() {
-    setEditDate(todayStr());
-    setEditSource(null);
-    setOriginalId(null);
-    setEditMuscles([]);
+    setWorkoutDetail(null);
     setChangingSource(false);
     setEditorStep('source');
     setEditing(true);
     resetPicker();
   }
 
-  // Source chosen (or explicitly skipped) — move on to the muscles.
-  //
-  // `keepEdits` is set when the picker was reached from "Change workout" on an
-  // entry already being filled in: only the attribution changes, so the date and
-  // the muscles already entered survive. Without it, re-attributing silently
-  // emptied the muscle list and reset the date back to today, and a Save on that
-  // empty list read as "all muscles removed" and deleted instead of writing.
-  function beginEntryFor(source, { keepEdits = false } = {}) {
+  function showWorkout(workout) {
+    setWorkoutDetail(workout);
+    setEditing(false);
+    setChangingSource(false);
+    resetPicker();
+  }
+
+  // Only the explicit Add soreness command on a workout detail page reaches
+  // this function. It always starts a clean record.
+  function beginCreateForWorkout(workout = null) {
+    const source = workout ? toSource(workout) : null;
+    setEditDate(todayStr());
+    setEditSource(source);
+    setOriginalId(null);
+    setEditLevel(null);
+    setEditMuscles([]);
+    setShowAllGroups(!source);
+    setChangingSource(false);
+    setEditorStep('muscles');
+    setEditing(true);
+    resetPicker();
+  }
+
+  // Changing the source is an explicit edit action and preserves every other
+  // field on the record.
+  function changeEntrySource(source) {
     setEditSource(source);
     setShowAllGroups(!source);
     setChangingSource(false);
-
-    if (keepEdits) {
-      setEditorStep('muscles');
-      setEditing(true);
-      resetPicker();
-      return;
-    }
-
-    // An entry already logged today for this workout is an edit, not a new one.
-    const date = todayStr();
-    const existing = entries.find(
-      (e) => e.date === date && (e.sourceWorkoutId || null) === (source?.id || null),
-    );
-    if (existing) {
-      setEditDate(existing.date);
-      setOriginalId(existing.id || sorenessDocId(existing.date, existing.sourceWorkoutId));
-      setEditMuscles(existing.muscles.map((m) => ({ ...m })));
-    } else {
-      setEditDate(date);
-      setOriginalId(null);
-      const previous = lastEntryForSource(source?.id || null);
-      setEditMuscles((previous?.muscles || []).map((m) => ({ ...m, carryForward: true })));
-    }
     setEditorStep('muscles');
-    setEditing(true);
     resetPicker();
   }
 
@@ -249,45 +243,44 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
     );
     setShowAllGroups(!entry.sourceWorkoutId);
     setOriginalId(entry.id || sorenessDocId(entry.date, entry.sourceWorkoutId));
+    setEditLevel(entryLevel(entry));
     setEditMuscles(entry.muscles.map((m) => ({ ...m })));
     setEditorStep('muscles');
     setEditing(true);
     resetPicker();
   }
 
-  // Open the editor for whatever entry lives at (date, workout) — the identity
-  // pair every view already knows. Lets the graphical views hand off to the
-  // same editor the journal's wrench opens.
-  function editEntryAt(date, sourceWorkoutId) {
-    const entry = entries.find(
-      (e) => e.date === date && (e.sourceWorkoutId || null) === (sourceWorkoutId || null),
-    );
-    if (entry) startEdit(entry);
-  }
-
-  function resetPicker() {
-    setPickerOpen(false);
+  function resetPicker(open = false) {
+    setPickerOpen(open);
     setExpandedGroup(null);
     setSearchQuery('');
     setHoveredMuscle(null);
   }
 
-  // Add a muscle to the current edit. muscleName can be null for group-level soreness.
-  function addMuscle(group, muscleName) {
-    // Don't add duplicates
-    if (editMuscles.some(m => m.group === group && m.muscle === muscleName)) return;
-    setEditMuscles([...editMuscles, { group, muscle: muscleName, level: 5 }]);
-    setPickerOpen(false);
-    setSearchQuery('');
+  // Select a muscle in the draft. The picker stays open: Save, not the muscle
+  // row, is the action that commits the visible selection.
+  function selectMuscle(group, muscleName) {
+    setEditMuscles((current) => {
+      if (current.some(m => m.group === group && m.muscle === muscleName)) return current;
+
+      // A whole-group selection and its individual muscles are alternative
+      // levels of specificity, so replace one with the other within a group.
+      const withoutConflicts = muscleName === null
+        ? current.filter(m => m.group !== group)
+        : current.filter(m => !(m.group === group && m.muscle === null));
+      return [...withoutConflicts, { group, muscle: muscleName, level: editLevel || 1 }];
+    });
   }
 
-  // Update level for a muscle in the edit — also clears carryForward flag
-  // since adjusting the slider means the user has accepted this muscle.
-  function setLevel(index, level) {
-    const updated = [...editMuscles];
-    const { carryForward, ...rest } = updated[index];
-    updated[index] = { ...rest, level };
-    setEditMuscles(updated);
+  // Expanding a previously untouched group visibly primes its general option.
+  // If that group already has draft selections, expanding it only reveals them.
+  function expandAndSelectGroup(group) {
+    if (expandedGroup === group) {
+      setExpandedGroup(null);
+      return;
+    }
+    setExpandedGroup(group);
+    if (!editMuscles.some(m => m.group === group)) selectMuscle(group, null);
   }
 
   // Remove a muscle from the edit
@@ -297,20 +290,19 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
 
   // Save the entry
   async function saveEntry() {
+    if (editLevel == null) {
+      setError('Choose an overall soreness intensity.');
+      return;
+    }
     try {
       setSaving(true);
       setError(null);
-      const targetId = sorenessDocId(editDate, editSource?.id || null);
-
-      // An entry with no muscles is a real entry: it records that this workout
-      // left you sore on this date, which is what the lanes view draws. Muscles
-      // are detail on top. Emptying the list is therefore no longer a covert
-      // delete — deleting is its own button.
-      const cleanMuscles = editMuscles.map(({ carryForward, ...rest }) => rest);
-      await apiFetch('/api/soreness', {
-        method: 'POST',
+      const cleanMuscles = editMuscles.map(({ carryForward, ...rest }) => ({ ...rest, level: editLevel }));
+      await apiFetch(originalId ? `/api/soreness/${encodeURIComponent(originalId)}` : '/api/soreness', {
+        method: originalId ? 'PUT' : 'POST',
         body: JSON.stringify({
           date: editDate,
+          level: editLevel,
           muscles: cleanMuscles,
           sourceWorkoutId: editSource?.id || null,
           sourceWorkoutDaySlug: editSource?.daySlug || null,
@@ -318,15 +310,6 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
           sourceWorkoutDate: editSource?.date || null,
         }),
       });
-      // Changing the date or the source workout changes the entry's identity,
-      // so the document it used to live in has to go.
-      if (originalId && originalId !== targetId) {
-        try {
-          await apiFetch(`/api/soreness/${encodeURIComponent(originalId)}`, { method: 'DELETE' });
-        } catch {
-          // Old entry might already be gone
-        }
-      }
       setEditing(false);
       await loadData();
     } catch (err) {
@@ -361,19 +344,44 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   // the hovered muscle's group (hovered takes priority for search results).
   const diagramGroup = hoveredMuscle?.group || expandedGroup;
 
+  // ── Workout detail (read-only until an explicit Add/Edit command) ─────
+  if (workoutDetail && !editing) {
+    return (
+      <SorenessWorkoutDetail
+        workout={workoutDetail}
+        entries={entries.filter((entry) => entry.sourceWorkoutId === workoutDetail.id)}
+        isAdmin={isAdmin}
+        onBack={() => setWorkoutDetail(null)}
+        onAdd={() => beginCreateForWorkout(workoutDetail)}
+        onEdit={startEdit}
+      />
+    );
+  }
+
   // ── Source picker step ───────────────────────────────────────────────
   if (editing && isAdmin && editorStep === 'source') {
     return (
       <div style={{ maxWidth: 720 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-          <button onClick={() => setEditing(false)} style={styles.backBtn}>
+          <button
+            onClick={() => {
+              if (changingSource) {
+                setChangingSource(false);
+                setEditorStep('muscles');
+              } else {
+                setEditing(false);
+              }
+            }}
+            style={styles.backBtn}
+          >
             <ChevronLeft size={13} style={{ verticalAlign: -2 }} /> Back
           </button>
-          <h2 style={styles.heading}>What made you sore?</h2>
+          <h2 style={styles.heading}>{changingSource ? 'Change originating workout' : 'Workouts'}</h2>
         </div>
         <p style={{ color: colors.text.tertiary, fontSize: 12, margin: '0 0 18px 0' }}>
-          Pick the workout this soreness came from. The muscle picker narrows to that
-          day's muscles, and repeat logs against the same workout build its recovery curve.
+          {changingSource
+            ? 'Choose a different workout. The rest of the soreness record stays intact.'
+            : 'Select a workout to view it and its associated soreness records.'}
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 460, overflowY: 'auto' }}>
@@ -384,7 +392,11 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
             const since = daysBetween(w.date, todayStr());
             const logged = entries.filter((e) => e.sourceWorkoutId === w.id).length;
             return (
-              <button key={w.id} onClick={() => beginEntryFor(toSource(w), { keepEdits: changingSource })} style={styles.sourceOption}>
+              <button
+                key={w.id}
+                onClick={() => changingSource ? changeEntrySource(toSource(w)) : showWorkout(w)}
+                style={styles.sourceOption}
+              >
                 <span style={{ ...styles.dayChip, borderColor: dayColor(w.daySlug) }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: dayColor(w.daySlug) }} />
                   D{pad2(w.dayNumber)}
@@ -398,17 +410,21 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
                     {logged > 0 && ` · ${logged} soreness log${logged === 1 ? '' : 's'}`}
                   </span>
                 </span>
+                <span style={styles.sourceAction}>{changingSource ? 'Select workout' : 'View workout'} →</span>
               </button>
             );
           })}
         </div>
 
         <button
-          onClick={() => beginEntryFor(null, { keepEdits: changingSource })}
+          onClick={() => changingSource ? changeEntrySource(null) : beginCreateForWorkout(null)}
           style={{ ...styles.sourceOption, marginTop: 12, borderStyle: 'dashed' }}
         >
           <span style={{ fontSize: 13, color: colors.text.secondary }}>
-            No specific workout — log unattributed soreness
+            {changingSource ? 'Remove originating workout' : 'Add soreness without an originating workout'}
+          </span>
+          <span style={{ ...styles.sourceAction, marginLeft: 'auto' }}>
+            {changingSource ? 'Remove link' : 'Create record'} →
           </span>
         </button>
       </div>
@@ -419,17 +435,28 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   if (editing && isAdmin) {
     const offset = editSource?.date ? daysBetween(editSource.date, editDate) : null;
     const filtered = !showAllGroups && editSource;
+    const isEditingEntry = Boolean(originalId);
+    const canSave = editLevel != null;
+    const saveSummary = editLevel == null
+      ? 'Choose an overall intensity'
+      : `Intensity ${editLevel} · ${editMuscles.length === 0
+        ? 'no muscles specified'
+        : `${editMuscles.length} muscle${editMuscles.length === 1 ? '' : 's'}`}`;
 
     return (
-      <div style={{ maxWidth: 960, overflowX: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+      <div style={{ maxWidth: 960 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
           <button onClick={() => setEditing(false)} style={styles.backBtn}>
             <ChevronLeft size={13} style={{ verticalAlign: -2 }} /> Back
           </button>
-          <h2 style={styles.heading}>{formatDate(editDate)}</h2>
+          <h2 style={styles.heading}>{isEditingEntry ? 'Edit soreness' : 'Add soreness'}</h2>
         </div>
+        <p style={{ color: colors.text.tertiary, fontSize: 12, margin: '0 0 14px 0' }}>
+          {isEditingEntry ? `Editing ${formatDate(editDate)}` : `New entry for ${formatDate(editDate)}`}
+        </p>
 
         {/* Originating workout */}
+        <div style={styles.fieldLabel}>Originating workout</div>
         <div style={styles.sourceBanner}>
           {editSource ? (
             <>
@@ -469,77 +496,65 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
           />
         </div>
 
+        <div style={styles.fieldLabel}>Overall intensity</div>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, minmax(32px, 1fr))', gap: 6, maxWidth: 560 }}>
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((level) => (
+              <button
+                key={level}
+                type="button"
+                onClick={() => { setEditLevel(level); setError(null); }}
+                aria-pressed={editLevel === level}
+                style={{
+                  ...styles.intensityBtn,
+                  ...(editLevel === level ? {
+                    color: colors.bg.base,
+                    background: getLevelColor(level),
+                    borderColor: getLevelColor(level),
+                  } : {}),
+                }}
+              >
+                {level}
+              </button>
+            ))}
+          </div>
+          <div style={{ minHeight: 18, marginTop: 6, color: editLevel ? getLevelColor(editLevel) : colors.text.tertiary, fontSize: 12 }}>
+            {editLevel ? getLevelLabel(editLevel) : 'Choose 1–10'}
+          </div>
+        </div>
+
         {/* Two-column layout: left = muscles + picker, right = anatomy diagram (single column on mobile) */}
         <div style={{ display: 'flex', gap: isMobile ? 16 : 24, alignItems: 'flex-start', overflowX: isMobile ? 'auto' : undefined }}>
           {/* Left column — muscle list + picker */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Current muscles */}
+            <div style={styles.fieldLabel}>Muscles (optional)</div>
             <div style={{ marginBottom: 16 }}>
-              {editMuscles.some(m => m.carryForward) && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '6px 10px', borderRadius: 6, background: colors.bg.tertiary }}>
-                  <span style={{ fontSize: 12, color: colors.text.secondary, flex: 1 }}>
-                    Carried forward from the last log for this workout
-                  </span>
-                  <button
-                    onClick={() => setEditMuscles(editMuscles.filter(m => !m.carryForward))}
-                    style={{ fontSize: 11, color: colors.accent.amber, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}
-                  >
-                    Dismiss all
-                  </button>
-                </div>
-              )}
               {editMuscles.length === 0 ? (
-                <p style={{ color: colors.text.tertiary, fontSize: 13 }}>No muscles added yet. Use the picker below.</p>
+                <p style={{ color: colors.text.tertiary, fontSize: 13, margin: '0 0 10px' }}>
+                  No muscles specified.
+                </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {editMuscles.map((m, i) => (
-                    <div key={`${m.group}-${m.muscle || 'group'}`} style={{
-                      ...styles.muscleEntry,
-                      ...(m.carryForward ? { borderLeft: `3px solid ${colors.accent.amber}` } : {}),
-                      ...(isMobile ? { flexWrap: 'wrap', gap: 8, padding: '8px 10px' } : {}),
-                    }}>
+                    <div key={`${m.group}-${m.muscle || 'group'}`} style={styles.muscleEntry}>
+                      <Check size={15} color={colors.accent.cyan} />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 14, color: colors.text.primary, fontWeight: 600 }}>
                           {m.muscle || m.group}
                         </div>
                         {m.muscle && <div style={{ fontSize: 11, color: colors.text.tertiary }}>{m.group}</div>}
                       </div>
-
-                      {/* Level slider */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input
-                          type="range"
-                          min={1}
-                          max={10}
-                          value={m.level}
-                          onChange={(e) => setLevel(i, parseInt(e.target.value))}
-                          style={{ width: 100, accentColor: getLevelColor(m.level) }}
-                        />
-                        <span style={{
-                          fontSize: 14,
-                          fontWeight: 'bold',
-                          color: getLevelColor(m.level),
-                          minWidth: 20,
-                          textAlign: 'center'
-                        }}>
-                          {m.level}
-                        </span>
-                        <span style={{ fontSize: 10, color: colors.text.tertiary, minWidth: 60 }}>
-                          {getLevelLabel(m.level)}
-                        </span>
-                      </div>
-
-                      <button onClick={() => removeMuscle(i)} style={styles.removeBtn}>✕</button>
+                      <button onClick={() => removeMuscle(i)} style={styles.removeBtn} aria-label={`Remove ${m.muscle || m.group}`}>✕</button>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Add muscle button / picker */}
+            {/* Muscle draft picker */}
             {!pickerOpen ? (
               <button onClick={() => setPickerOpen(true)} style={styles.addBtn}>
-                + Add Muscle
+                {editMuscles.length ? '+ Add or change muscles' : '+ Add optional muscles'}
               </button>
             ) : (
               <MusclePicker
@@ -548,8 +563,8 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
                 sourceLabel={editSource?.dayName}
                 onShowAll={() => setShowAllGroups(true)}
                 expandedGroup={expandedGroup}
-                onExpandGroup={setExpandedGroup}
-                onSelect={addMuscle}
+                onExpandGroup={expandAndSelectGroup}
+                onSelect={selectMuscle}
                 onClose={() => { setPickerOpen(false); setSearchQuery(''); setHoveredMuscle(null); }}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
@@ -558,25 +573,6 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
                 onHoverMuscle={setHoveredMuscle}
               />
             )}
-
-            {/* Save */}
-            <div style={{ marginTop: 24, display: 'flex', gap: 12 }}>
-              <button onClick={saveEntry} disabled={saving} style={styles.saveBtn}>
-                {saving ? 'Saving...' : 'Save'}
-              </button>
-              <button onClick={() => setEditing(false)} style={styles.cancelBtn}>
-                Cancel
-              </button>
-              {originalId && (
-                <button
-                  onClick={deleteEntry}
-                  disabled={saving}
-                  style={{ ...styles.cancelBtn, marginLeft: 'auto', color: colors.accent.red }}
-                >
-                  Delete entry
-                </button>
-              )}
-            </div>
 
             {error && <p style={{ color: colors.accent.red, fontSize: 12, marginTop: 8 }}>{error}</p>}
           </div>
@@ -600,6 +596,37 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
             </div>
           )}
         </div>
+
+        {/* Sticky commit bar — the selection scrolls, the action never disappears. */}
+        <div style={styles.saveBar}>
+          <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+            <div style={{ color: colors.text.tertiary, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+              {isEditingEntry ? 'Editing soreness' : 'New soreness entry'}
+            </div>
+            <div style={{ color: canSave ? colors.text.primary : colors.text.secondary, fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {saveSummary}
+            </div>
+          </div>
+          <button
+            onClick={saveEntry}
+            disabled={saving || !canSave}
+            style={{ ...styles.saveBtn, ...(!canSave ? styles.disabledBtn : {}) }}
+          >
+            {saving ? 'Saving...' : isEditingEntry ? 'Save changes' : 'Create soreness'}
+          </button>
+          <button onClick={() => setEditing(false)} style={styles.cancelBtn}>
+            Cancel
+          </button>
+          {originalId && (
+            <button
+              onClick={deleteEntry}
+              disabled={saving}
+              style={{ ...styles.cancelBtn, color: colors.accent.red }}
+            >
+              Delete entry
+            </button>
+          )}
+        </div>
       </div>
     );
   }
@@ -620,7 +647,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
         <ViewToggle view={view} onChange={setView} />
         {isAdmin && (
           <button onClick={startNew} style={styles.addBtn}>
-            + Log Soreness
+            + Add soreness
           </button>
         )}
       </div>
@@ -636,9 +663,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
         <SorenessLanes
           entries={entries}
           workouts={workoutsByDate}
-          isAdmin={isAdmin}
-          onLogSoreness={(w) => beginEntryFor(toSource(w))}
-          onEditEntry={({ date, sourceWorkoutId }) => editEntryAt(date, sourceWorkoutId)}
+          onOpenWorkout={showWorkout}
         />
       </div>
     );
@@ -655,9 +680,8 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
           entries={entries}
           isAdmin={isAdmin}
           isMobile={isMobile}
-          onLogSoreness={(w) => beginEntryFor(toSource(w))}
+          onOpenWorkout={showWorkout}
           onEditEntry={startEdit}
-          onEditEntryAt={editEntryAt}
         />
       </div>
     );
@@ -702,9 +726,10 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
                         <button
                           onClick={() => startEdit(entry)}
                           style={styles.editIconBtn}
-                          title="Edit entry"
+                          title="Edit soreness"
                         >
                           <Wrench size={13} />
+                          Edit
                         </button>
                       )}
                     </div>
@@ -728,6 +753,11 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
                           </span>
                         )}
                       </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                        <span style={{ color: entryLevel(entry) ? getLevelColor(entryLevel(entry)) : colors.accent.amber, fontSize: 13, fontWeight: 700 }}>
+                          {entryLevel(entry) ? `Intensity ${entryLevel(entry)}` : 'Intensity not recorded'}
+                        </span>
+                      </div>
                       {entry.muscles.map((m) => {
                         const isPinned = pinnedMuscle?.group === m.group && pinnedMuscle?.muscle === m.muscle;
                         return (
@@ -748,9 +778,6 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
                               backgroundColor: isPinned ? 'rgba(34, 211, 238, 0.08)' : 'transparent',
                             }}
                           >
-                            <span style={{ color: getLevelColor(m.level), fontWeight: 'bold', minWidth: 16, textAlign: 'right' }}>
-                              {m.level}
-                            </span>
                             <span style={{ color: isPinned ? colors.accent.cyan : colors.text.secondary }}>
                               {m.muscle
                                 ? <>{m.group} <span style={{ color: colors.text.tertiary }}>›</span> {m.muscle}</>
@@ -760,6 +787,11 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
                           </div>
                         );
                       })}
+                      {entry.muscles.length === 0 && (
+                        <div style={{ fontSize: 12, color: colors.text.tertiary }}>
+                          No muscles specified
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -805,6 +837,95 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
 // Timeline — workout history and the soreness each workout caused, side by side
 // ---------------------------------------------------------------------------
 
+function SorenessWorkoutDetail({ workout, entries, isAdmin, onBack, onAdd, onEdit }) {
+  const color = dayColor(workout.daySlug);
+  const sortedEntries = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+
+  return (
+    <div style={{ maxWidth: 900 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <button onClick={onBack} style={styles.backBtn}>
+          <ChevronLeft size={13} style={{ verticalAlign: -2 }} /> Back
+        </button>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ ...styles.dayChip, borderColor: color }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
+              D{pad2(workout.dayNumber)}
+            </span>
+            <h2 style={styles.heading}>{describeLoggedDay(workout)}</h2>
+          </div>
+          <div style={{ marginTop: 4, color: colors.text.tertiary, fontSize: 12 }}>
+            {formatDate(workout.date)}{workout.time ? ` · ${workout.time}` : ''}
+          </div>
+        </div>
+      </div>
+
+      {(workout.exercises || []).length > 0 && (
+        <div style={{ ...styles.timelineCard, marginBottom: 18 }}>
+          <div style={styles.fieldLabel}>Workout</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {workout.exercises.map((exercise, index) => (
+              <div key={`${exercise.name}-${index}`} style={{ color: colors.text.secondary, fontSize: 13 }}>
+                <span style={{ color: colors.text.primary, fontWeight: 600 }}>{exercise.name}</span>
+                {exercise.variation ? ` · ${exercise.variation}` : ''}
+                {exercise.sets && exercise.reps ? ` · ${exercise.sets} × ${exercise.reps}` : ''}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
+        <div>
+          <h3 style={{ ...styles.heading, fontSize: 16 }}>Soreness records</h3>
+          <div style={{ marginTop: 3, color: colors.text.tertiary, fontSize: 11 }}>
+            {sortedEntries.length} record{sortedEntries.length === 1 ? '' : 's'} associated with this workout
+          </div>
+        </div>
+        {isAdmin && (
+          <button onClick={onAdd} style={styles.addBtn}>+ Add soreness</button>
+        )}
+      </div>
+
+      {sortedEntries.length === 0 ? (
+        <div style={{ ...styles.timelineCard, color: colors.text.tertiary, fontSize: 13 }}>
+          No soreness records for this workout.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {sortedEntries.map((entry) => {
+            const level = entryLevel(entry);
+            return (
+              <div key={entry.id || `${entry.date}-${entry.updatedAt || ''}`} style={styles.entryRow}>
+                <div style={{ minWidth: 120 }}>
+                  <div style={{ color: colors.text.primary, fontSize: 13, fontWeight: 600 }}>{formatDate(entry.date)}</div>
+                  <div style={{ color: colors.text.disabled, fontSize: 10 }}>{entry.date}</div>
+                </div>
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <div style={{ color: level ? getLevelColor(level) : colors.accent.amber, fontSize: 13, fontWeight: 700 }}>
+                    {level ? `Intensity ${level} · ${getLevelLabel(level)}` : 'Intensity not recorded'}
+                  </div>
+                  <div style={{ marginTop: 2, color: colors.text.tertiary, fontSize: 11 }}>
+                    {entry.muscles.length
+                      ? entry.muscles.map((m) => m.muscle || m.group).join(' · ')
+                      : 'No muscles specified'}
+                  </div>
+                </div>
+                {isAdmin && (
+                  <button onClick={() => onEdit(entry)} style={styles.editIconBtn}>
+                    <Wrench size={13} /> Edit
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ViewToggle({ view, onChange }) {
   const opts = [
     { id: 'journal', label: 'Journal' },
@@ -837,7 +958,7 @@ function ViewToggle({ view, onChange }) {
 // Every workout in reverse-chronological order with its recovery curve beneath
 // it. Workouts with nothing logged are still listed — the gaps are part of the
 // picture, and they double as the entry point for logging.
-function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onLogSoreness, onEditEntry, onEditEntryAt }) {
+function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onOpenWorkout, onEditEntry }) {
   const curves = useMemo(() => buildRecoveryCurves(entries), [entries]);
   const unattributed = useMemo(
     () => entries.filter((e) => !e.sourceWorkoutId),
@@ -855,10 +976,8 @@ function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onLogSoreness,
           key={w.id}
           workout={w}
           curve={curves.get(w.id)}
-          isAdmin={isAdmin}
           isMobile={isMobile}
-          onLogSoreness={onLogSoreness}
-          onEditEntryAt={onEditEntryAt}
+          onOpenWorkout={onOpenWorkout}
         />
       ))}
 
@@ -875,11 +994,13 @@ function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onLogSoreness,
                   {formatDate(e.date)}
                 </span>
                 <span style={{ flex: 1, fontSize: 12, color: colors.text.tertiary }}>
-                  {e.muscles.map((m) => `${m.muscle || m.group} ${m.level}`).join(' · ')}
+                  {entryLevel(e) ? `Intensity ${entryLevel(e)}` : 'Intensity not recorded'}
+                  {' · '}
+                  {e.muscles.length ? e.muscles.map((m) => m.muscle || m.group).join(' · ') : 'No muscles specified'}
                 </span>
                 {isAdmin && (
                   <button onClick={() => onEditEntry(e)} style={styles.editIconBtn} title="Edit entry">
-                    <Wrench size={13} />
+                    <Wrench size={13} /> Edit
                   </button>
                 )}
               </div>
@@ -891,7 +1012,7 @@ function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onLogSoreness,
   );
 }
 
-function WorkoutRecoveryCard({ workout, curve, isAdmin, isMobile, onLogSoreness, onEditEntryAt }) {
+function WorkoutRecoveryCard({ workout, curve, isMobile, onOpenWorkout }) {
   const color = dayColor(workout.daySlug);
   const span = curve ? Math.max(1, ...curve.muscles.map((m) => m.spanDays)) : 0;
   const columns = span + 1; // day 0 (the workout) through the last log
@@ -921,11 +1042,9 @@ function WorkoutRecoveryCard({ workout, curve, isAdmin, isMobile, onLogSoreness,
           ) : (
             <span style={{ fontSize: 11, color: colors.text.disabled, fontStyle: 'italic' }}>no soreness logged</span>
           )}
-          {isAdmin && (
-            <button onClick={() => onLogSoreness(workout)} style={styles.linkBtn}>
-              + Log soreness
-            </button>
-          )}
+          <button onClick={() => onOpenWorkout(workout)} style={styles.linkBtn}>
+            View workout
+          </button>
         </span>
       </div>
 
@@ -977,23 +1096,18 @@ function WorkoutRecoveryCard({ workout, curve, isAdmin, isMobile, onLogSoreness,
                 <div style={{ display: 'flex', gap: 2 }}>
                   {Array.from({ length: columns }, (_, i) => {
                     const point = m.points.find((p) => p.dayOffset === i);
-                    // A filled cell is a real logged entry, so it opens the
-                    // editor for that day rather than only showing a tooltip.
-                    const editable = isAdmin && point && onEditEntryAt;
                     return (
                       <span
                         key={i}
                         title={
                           point
-                            ? `${point.date} — level ${point.level}${isAdmin ? ' · click to edit' : ''}`
+                            ? `${point.date} — level ${point.level}`
                             : undefined
                         }
-                        onClick={() => editable && onEditEntryAt(point.date, workout.id)}
                         style={{
                           ...styles.levelCell,
                           background: point ? sorenessTierColor(point.level) : 'rgba(255,255,255,0.04)',
                           color: point ? '#101010' : 'transparent',
-                          cursor: editable ? 'pointer' : 'default',
                         }}
                       >
                         {point ? point.level : ''}
@@ -1083,17 +1197,22 @@ function MusclePicker({ groups, filtered, sourceLabel, onShowAll, expandedGroup,
                 onClick={() => onSelect(r.group, r.muscle)}
                 onMouseEnter={() => onHoverMuscle({ group: r.group, muscle: r.muscle })}
                 onMouseLeave={() => onHoverMuscle(null)}
-                disabled={r.muscle ? isAlreadyAdded(r.group, r.muscle) : isGroupAdded(r.group)}
+                aria-pressed={r.muscle ? isAlreadyAdded(r.group, r.muscle) : isGroupAdded(r.group)}
                 style={{
                   ...styles.muscleOption,
-                  opacity: (r.muscle ? isAlreadyAdded(r.group, r.muscle) : isGroupAdded(r.group)) ? 0.4 : 1,
+                  ...((r.muscle ? isAlreadyAdded(r.group, r.muscle) : isGroupAdded(r.group)) ? styles.selectedOption : {}),
                 }}
               >
-                <span style={{ color: r.muscle ? colors.text.primary : colors.accent.cyan, fontSize: 13, fontWeight: r.muscle ? 400 : 600 }}>
-                  {r.muscle || `${r.group} (general)`}
+                <span style={styles.optionCheck}>
+                  {(r.muscle ? isAlreadyAdded(r.group, r.muscle) : isGroupAdded(r.group)) ? <Check size={14} /> : null}
                 </span>
-                <span style={{ color: colors.text.disabled, fontSize: 11 }}>
-                  {r.muscle ? `${r.group} · ${r.location}` : 'Whole group'}
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: 'block', color: r.muscle ? colors.text.primary : colors.accent.cyan, fontSize: 13, fontWeight: r.muscle ? 400 : 600 }}>
+                    {r.muscle || `${r.group} (general)`}
+                  </span>
+                  <span style={{ display: 'block', color: colors.text.disabled, fontSize: 11 }}>
+                    {r.muscle ? `${r.group} · ${r.location}` : 'Whole group'}
+                  </span>
                 </span>
               </button>
             ))
@@ -1105,13 +1224,19 @@ function MusclePicker({ groups, filtered, sourceLabel, onShowAll, expandedGroup,
           {groups.map((group) => (
             <div key={group}>
               <button
-                onClick={() => onExpandGroup(expandedGroup === group ? null : group)}
+                onClick={() => onExpandGroup(group)}
+                aria-expanded={expandedGroup === group}
                 style={{
                   ...styles.groupBtn,
-                  backgroundColor: expandedGroup === group ? colors.bg.overlay : 'transparent',
+                  backgroundColor: expandedGroup === group ? 'rgba(34, 211, 238, 0.06)' : 'transparent',
                 }}
               >
-                <span style={{ color: colors.text.primary, fontSize: 13, fontWeight: 600 }}>{group}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={styles.optionCheck}>
+                    {existingMuscles.some(m => m.group === group) ? <Check size={14} /> : null}
+                  </span>
+                  <span style={{ color: colors.text.primary, fontSize: 13, fontWeight: 600 }}>{group}</span>
+                </span>
                 <span style={{ color: colors.text.disabled, fontSize: 11 }}>
                   {MUSCLE_TAXONOMY[group].muscles.length} muscles {expandedGroup === group ? '▾' : '▸'}
                 </span>
@@ -1124,15 +1249,18 @@ function MusclePicker({ groups, filtered, sourceLabel, onShowAll, expandedGroup,
                     onClick={() => onSelect(group, null)}
                     onMouseEnter={() => onHoverMuscle({ group, muscle: null })}
                     onMouseLeave={() => onHoverMuscle(null)}
-                    disabled={isGroupAdded(group)}
+                    aria-pressed={isGroupAdded(group)}
                     style={{
                       ...styles.muscleOption,
-                      opacity: isGroupAdded(group) ? 0.4 : 1,
                       backgroundColor: 'rgba(34, 211, 238, 0.05)',
+                      ...(isGroupAdded(group) ? styles.selectedOption : {}),
                     }}
                   >
-                    <span style={{ color: colors.accent.cyan, fontSize: 13, fontWeight: 600 }}>{group} (general)</span>
-                    <span style={{ color: colors.text.disabled, fontSize: 11 }}>Whole group, not a specific muscle</span>
+                    <span style={styles.optionCheck}>{isGroupAdded(group) ? <Check size={14} /> : null}</span>
+                    <span style={{ flex: 1 }}>
+                      <span style={{ display: 'block', color: colors.accent.cyan, fontSize: 13, fontWeight: 600 }}>{group} (general)</span>
+                      <span style={{ display: 'block', color: colors.text.disabled, fontSize: 11 }}>Whole group, not a specific muscle</span>
+                    </span>
                   </button>
 
                   {/* Muscle list — diagram moved to right panel */}
@@ -1142,14 +1270,17 @@ function MusclePicker({ groups, filtered, sourceLabel, onShowAll, expandedGroup,
                       onClick={() => onSelect(group, m.name)}
                       onMouseEnter={() => onHoverMuscle({ group, muscle: m.name })}
                       onMouseLeave={() => onHoverMuscle(null)}
-                      disabled={isAlreadyAdded(group, m.name)}
+                      aria-pressed={isAlreadyAdded(group, m.name)}
                       style={{
                         ...styles.muscleOption,
-                        opacity: isAlreadyAdded(group, m.name) ? 0.4 : 1,
+                        ...(isAlreadyAdded(group, m.name) ? styles.selectedOption : {}),
                       }}
                     >
-                      <span style={{ color: colors.text.primary, fontSize: 13 }}>{m.name}</span>
-                      <span style={{ color: colors.text.disabled, fontSize: 11 }}>{m.location}</span>
+                      <span style={styles.optionCheck}>{isAlreadyAdded(group, m.name) ? <Check size={14} /> : null}</span>
+                      <span style={{ flex: 1 }}>
+                        <span style={{ display: 'block', color: colors.text.primary, fontSize: 13 }}>{m.name}</span>
+                        <span style={{ display: 'block', color: colors.text.disabled, fontSize: 11 }}>{m.location}</span>
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -1224,6 +1355,21 @@ const styles = {
     cursor: 'pointer',
     textAlign: 'left',
   },
+  sourceAction: {
+    flexShrink: 0,
+    color: colors.accent.cyan,
+    fontSize: 11,
+    fontWeight: 700,
+    textAlign: 'right',
+  },
+  fieldLabel: {
+    marginBottom: 5,
+    color: colors.text.tertiary,
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+  },
   sourceBanner: {
     display: 'flex',
     alignItems: 'center',
@@ -1275,6 +1421,17 @@ const styles = {
     fontFamily: 'monospace',
     colorScheme: 'dark',
   },
+  intensityBtn: {
+    minHeight: 38,
+    padding: 0,
+    background: colors.bg.surface,
+    border: `1px solid ${colors.border.subtle}`,
+    borderRadius: 7,
+    color: colors.text.secondary,
+    cursor: 'pointer',
+    fontSize: 14,
+    fontWeight: 700,
+  },
   entryRow: {
     display: 'flex',
     flexWrap: 'wrap',
@@ -1287,14 +1444,16 @@ const styles = {
   },
   editIconBtn: {
     background: 'none',
-    border: 'none',
-    color: colors.text.disabled,
+    border: `1px solid ${colors.border.subtle}`,
+    color: colors.accent.cyan,
     cursor: 'pointer',
-    padding: 4,
+    padding: '4px 8px',
     borderRadius: 4,
     display: 'flex',
     alignItems: 'center',
-    opacity: 0.6,
+    gap: 4,
+    fontSize: 11,
+    fontWeight: 600,
   },
   muscleEntry: {
     display: 'flex',
@@ -1332,6 +1491,24 @@ const styles = {
     cursor: 'pointer',
     fontSize: 13,
     fontWeight: 'bold',
+  },
+  disabledBtn: {
+    opacity: 0.38,
+    cursor: 'not-allowed',
+  },
+  saveBar: {
+    position: 'sticky',
+    bottom: 0,
+    zIndex: 20,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    flexWrap: 'wrap',
+    marginTop: 24,
+    padding: '12px 0 max(12px, env(safe-area-inset-bottom))',
+    background: `linear-gradient(to bottom, ${colors.bg.base}ee, ${colors.bg.base})`,
+    borderTop: `1px solid ${colors.border.strong}`,
+    boxShadow: `0 -12px 24px ${colors.bg.base}`,
   },
   cancelBtn: {
     background: 'none',
@@ -1383,7 +1560,8 @@ const styles = {
   },
   muscleOption: {
     display: 'flex',
-    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 8,
     width: '100%',
     padding: '6px 12px',
     background: 'none',
@@ -1391,6 +1569,19 @@ const styles = {
     borderBottom: `1px solid ${colors.border.subtle}`,
     cursor: 'pointer',
     textAlign: 'left',
-    gap: 2,
+  },
+  selectedOption: {
+    backgroundColor: 'rgba(34, 211, 238, 0.12)',
+    boxShadow: `inset 3px 0 0 ${colors.accent.cyan}`,
+  },
+  optionCheck: {
+    width: 18,
+    height: 18,
+    flexShrink: 0,
+    display: 'grid',
+    placeItems: 'center',
+    color: colors.accent.cyan,
+    border: `1px solid ${colors.border.strong}`,
+    borderRadius: 4,
   },
 };

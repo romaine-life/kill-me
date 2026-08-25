@@ -75,7 +75,7 @@ function shiftDays(date, delta) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness, onEditEntry }) {
+export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
   const [group, setGroup] = useState('workout');   // 'workout' | 'muscle'
   const [gaps, setGaps] = useState('bridge');     // 'bridge' | 'break'
   const [order, setOrder] = useState('oldest');    // 'oldest' | 'newest'
@@ -313,7 +313,6 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness, onEdi
               const x = laneX0 + t.lane * LANE_PITCH;
               const color = dayColor(t.sourceWorkoutDaySlug);
               const dim = hover && hover.workoutId !== t.sourceWorkoutId;
-              const editable = isAdmin && !!onEditEntry;
 
               // Consecutive days of like kind collapse into one segment. An
               // unlogged day therefore ends the solid run whether it is bridged
@@ -394,10 +393,8 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness, onEdi
                     );
                   })}
 
-                  {/* A logged day is the entry itself, so clicking it opens that
-                      entry in the editor — the same place the journal wrench
-                      goes. Without this the only way to fix a mislogged day was
-                      to leave the view you spotted it in. */}
+                  {/* Invisible per-day hit targets preserve precise hover details.
+                      Editing remains an explicit action on a record card. */}
                   {segments
                     .filter((seg) => seg.logged)
                     .flatMap((seg) => seg.days)
@@ -410,10 +407,6 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness, onEdi
                         height={ROW_H}
                         fill="transparent"
                         pointerEvents="all"
-                        style={{ cursor: editable ? 'pointer' : 'default' }}
-                        onClick={() =>
-                          editable && onEditEntry({ date: d, sourceWorkoutId: t.sourceWorkoutId })
-                        }
                         onMouseEnter={() =>
                           setHover({
                             workoutId: t.sourceWorkoutId,
@@ -463,8 +456,8 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness, onEdi
                     <g
                       key={w.id}
                       opacity={dim ? 0.3 : 1}
-                      style={{ cursor: isAdmin ? 'pointer' : 'default' }}
-                      onClick={() => isAdmin && onLogSoreness?.(w)}
+                      style={{ cursor: onOpenWorkout ? 'pointer' : 'default' }}
+                      onClick={() => onOpenWorkout?.(w)}
                     >
                       <rect
                         x={WO_X + i * 5}

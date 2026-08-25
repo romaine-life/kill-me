@@ -110,27 +110,34 @@ export function getLoggedWorkouts(db) {
 }
 
 // Get all soreness entries, sorted by date descending.
-// Several entries can share a date — one per originating workout — so `id` is
-// the identity, not `date`. Entries predating workout attribution have a null
-// source_workout_id and read as unattributed.
+// Several entries can share both a date and originating workout, so `id` is the
+// identity. Entries predating workout attribution have a null source_workout_id.
 export function getSorenessEntries(db) {
+  // Older bundled snapshots stored intensity only on individual muscles.
+  const columns = db.exec('PRAGMA table_info(soreness_entries)');
+  const hasLevel = columns[0]?.values.some((row) => row[1] === 'level');
+  const levelColumn = hasLevel ? 'level' : 'NULL AS level';
   const result = db.exec(
-    'SELECT id, date, muscles, source_workout_id, source_workout_day_slug, source_workout_day, source_workout_date FROM soreness_entries ORDER BY date DESC'
+    `SELECT id, date, ${levelColumn}, muscles, source_workout_id, source_workout_day_slug, source_workout_day, source_workout_date FROM soreness_entries ORDER BY date DESC`
   );
 
   if (result.length === 0) {
     return { entries: [] };
   }
 
-  const entries = result[0].values.map(([id, date, muscles, sourceWorkoutId, sourceWorkoutDaySlug, sourceWorkoutDay, sourceWorkoutDate]) => ({
-    id,
-    date,
-    muscles: JSON.parse(muscles),
-    sourceWorkoutId,
-    sourceWorkoutDaySlug,
-    sourceWorkoutDay,
-    sourceWorkoutDate,
-  }));
+  const entries = result[0].values.map(([id, date, level, muscles, sourceWorkoutId, sourceWorkoutDaySlug, sourceWorkoutDay, sourceWorkoutDate]) => {
+    const parsedMuscles = JSON.parse(muscles);
+    return {
+      id,
+      date,
+      level: level ?? (parsedMuscles.length ? Math.max(...parsedMuscles.map((m) => m.level)) : null),
+      muscles: parsedMuscles,
+      sourceWorkoutId,
+      sourceWorkoutDaySlug,
+      sourceWorkoutDay,
+      sourceWorkoutDate,
+    };
+  });
 
   return { entries };
 }

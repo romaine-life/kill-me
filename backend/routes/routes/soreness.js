@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 
 /**
  * Soreness journal routes.
@@ -9,26 +10,67 @@ import { Router } from 'express';
  * 22nd), and a single date can hold several entries when two workouts'
  * soreness overlap.
  *
- * The document id encodes that pair, so an upsert naturally means "the
- * soreness from workout W recorded on date D":
+ * Historical document ids encoded the date/source pair:
  *
  *   attributed   → soreness-<date>-<sourceWorkoutId>
  *   unattributed → soreness-<date>
  *
- * The unattributed form is byte-identical to the pre-workout-link id scheme,
- * so historical entries keep working as-is with no migration.
+ * New records use unique ids so several records may share a date and source,
+ * and create can never silently become update. Historical ids remain editable.
  *
  * Public:
  *   GET    /api/soreness
  *
  * Admin:
  *   POST   /api/soreness
+ *   PUT    /api/soreness/:id
  *   DELETE /api/soreness/:id
  */
 
-// Build the deterministic document id for a (date, sourceWorkoutId) pair.
+// Historical deterministic id helper retained for compatibility and tests.
 export function sorenessDocId(date, sourceWorkoutId) {
   return sourceWorkoutId ? `soreness-${date}-${sourceWorkoutId}` : `soreness-${date}`;
+}
+
+function parseSorenessBody(body) {
+  const {
+    date,
+    level,
+    muscles,
+    sourceWorkoutId = null,
+    sourceWorkoutDaySlug = null,
+    sourceWorkoutDay = null,
+    sourceWorkoutDate = null,
+  } = body;
+
+  if (!date) return { error: 'Missing required field: date' };
+  if (!Number.isInteger(level) || level < 1 || level > 10) {
+    return { error: 'Overall soreness intensity must be between 1 and 10' };
+  }
+  if (!Array.isArray(muscles)) {
+    return { error: 'Missing required field: muscles (array)' };
+  }
+  for (const muscle of muscles) {
+    if (!muscle.group) return { error: 'Each muscle entry requires a group' };
+  }
+  if (sourceWorkoutId && !sourceWorkoutDate) {
+    return { error: 'sourceWorkoutDate is required when sourceWorkoutId is set' };
+  }
+  if (sourceWorkoutDate && sourceWorkoutDate > date) {
+    return { error: 'Soreness cannot predate the workout that caused it' };
+  }
+
+  return {
+    value: {
+      date,
+      level,
+      muscles: muscles.map(({ group, muscle = null }) => ({ group, muscle, level })),
+      sourceWorkoutId,
+      sourceWorkoutDaySlug,
+      sourceWorkoutDay,
+      sourceWorkoutDate,
+    },
+  };
 }
 
 export function createSorenessRoutes({ container, requireAuth, requireAdmin }) {
@@ -52,68 +94,60 @@ export function createSorenessRoutes({ container, requireAuth, requireAdmin }) {
     }
   });
 
-  // Create or update a soreness entry (admin only).
-  //
-  // Identified by (date, sourceWorkoutId). Pass sourceWorkoutId to attribute the
-  // entry to a logged workout; omit it for a free-floating entry. The workout's
-  // day and date are denormalised onto the entry so the timeline view can render
-  // without joining against the workout list — the slug is what identifies the
-  // day, and the number rides along as the label it carried at the time.
+  // Create a new soreness entry. Creation always gets a unique identity; it can
+  // never silently overwrite or switch into editing another record.
   router.post('/api/soreness', requireAuth, requireAdmin, async (req, res) => {
     try {
       const userId = req.user.sub;
-      const {
-        date,
-        muscles,
-        sourceWorkoutId = null,
-        sourceWorkoutDaySlug = null,
-        sourceWorkoutDay = null,
-        sourceWorkoutDate = null,
-      } = req.body;
-
-      if (!date) {
-        return res.status(400).json({ error: 'Missing required field: date' });
-      }
-      if (!muscles || !Array.isArray(muscles)) {
-        return res.status(400).json({ error: 'Missing required field: muscles (array)' });
-      }
-
-      for (const m of muscles) {
-        if (!m.group || !m.level) {
-          return res.status(400).json({ error: 'Each muscle entry requires group and level' });
-        }
-        if (m.level < 1 || m.level > 10) {
-          return res.status(400).json({ error: 'Soreness level must be between 1 and 10' });
-        }
-      }
-
-      if (sourceWorkoutId) {
-        if (!sourceWorkoutDate) {
-          return res.status(400).json({ error: 'sourceWorkoutDate is required when sourceWorkoutId is set' });
-        }
-        if (sourceWorkoutDate > date) {
-          return res.status(400).json({ error: 'Soreness cannot predate the workout that caused it' });
-        }
-      }
+      const parsed = parseSorenessBody(req.body);
+      if (parsed.error) return res.status(400).json({ error: parsed.error });
 
       const doc = {
-        id: sorenessDocId(date, sourceWorkoutId),
+        id: `soreness-${parsed.value.date}-${randomUUID()}`,
         type: 'soreness-entry',
         userId,
-        date,
-        muscles,
-        sourceWorkoutId,
-        sourceWorkoutDaySlug,
-        sourceWorkoutDay,
-        sourceWorkoutDate,
+        ...parsed.value,
         updatedAt: new Date().toISOString()
       };
 
-      const { resource } = await container.items.upsert(doc);
+      const { resource } = await container.items.create(doc);
       res.status(201).json({ entry: resource });
     } catch (error) {
-      console.error('Error saving soreness entry:', error);
-      res.status(500).json({ error: 'Failed to save soreness entry', message: error.message });
+      console.error('Error creating soreness entry:', error);
+      res.status(500).json({ error: 'Failed to create soreness entry', message: error.message });
+    }
+  });
+
+  // Update one explicitly selected record. The id remains stable when its date
+  // or originating workout changes.
+  router.put('/api/soreness/:id', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const userId = req.user.sub;
+      const { id } = req.params;
+      const parsed = parseSorenessBody(req.body);
+      if (parsed.error) return res.status(400).json({ error: parsed.error });
+
+      const { resource: existing } = await container.item(id, userId).read();
+      if (!existing || existing.type !== 'soreness-entry') {
+        return res.status(404).json({ error: 'Soreness entry not found' });
+      }
+
+      const doc = {
+        ...existing,
+        ...parsed.value,
+        id,
+        type: 'soreness-entry',
+        userId,
+        updatedAt: new Date().toISOString(),
+      };
+      const { resource } = await container.item(id, userId).replace(doc);
+      res.json({ entry: resource });
+    } catch (error) {
+      if (error.code === 404) {
+        return res.status(404).json({ error: 'Soreness entry not found' });
+      }
+      console.error('Error updating soreness entry:', error);
+      res.status(500).json({ error: 'Failed to update soreness entry', message: error.message });
     }
   });
 
