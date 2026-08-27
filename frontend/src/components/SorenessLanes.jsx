@@ -171,9 +171,9 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
   const { layout, yByDate, bottom, tracks, laneCount, workoutsByDate, cardioByDate } = model;
   const y = (date) => yByDate.get(date);
 
-  // A stripe's label sits at whichever end is visually on top, which flips with
-  // the sort order — otherwise in newest-first the label floats at the bottom of
-  // the stripe it names.
+  // A muscle stripe's label sits at whichever end is visually on top, which
+  // flips with the sort order — otherwise in newest-first the label floats at
+  // the bottom of the stripe it names.
   const anchorDate = (t) => (order === 'newest' ? t.endDate : t.startDate);
 
   // Several stripes can share an anchor row — after a leg session you might log
@@ -203,8 +203,11 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
     ? cardioX + ACTIVITY_W + CARDIO_GAP
     : cardioX;
   const laneX0 = workoutX + ACTIVITY_W + GUTTER;
-  const labelX = laneX0 + Math.max(laneCount, 1) * LANE_PITCH + LABEL_GAP;
-  const width = labelX + labelSlots.widest * LABEL_COL + 16;
+  const laneRight = laneX0 + Math.max(laneCount, 1) * LANE_PITCH;
+  const labelX = laneRight + LABEL_GAP;
+  const width = group === 'muscle'
+    ? labelX + labelSlots.widest * LABEL_COL + 16
+    : laneRight + 16;
   const height = bottom + 16;
   const visibleCardioActivities = [...new Set(
     [...cardioByDate.values()].flat().map((session) => session.activity),
@@ -479,8 +482,8 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
               );
             })}
 
-            {/* One label per stripe, at its first day */}
-            {tracks.map((t) => {
+            {/* Muscle mode names each stripe; workout mode needs no side label. */}
+            {group === 'muscle' && tracks.map((t) => {
               const rowY = y(anchorDate(t));
               if (rowY == null) return null;
               const dim = hover?.kind === 'soreness' && hover.workoutId !== t.sourceWorkoutId;
@@ -492,9 +495,7 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
                   style={{ fontSize: 10, fontFamily: 'monospace', fill: colors.text.tertiary }}
                   opacity={dim ? 0.25 : 1}
                 >
-                  {group === 'muscle'
-                    ? t.group
-                    : `${t.spanDays}d${t.peak == null ? '' : ` · peak ${t.peak}`}`}
+                  {t.group}
                 </text>
               );
             })}
