@@ -9,22 +9,14 @@ import { describeLoggedDay, getDayInfo } from '../utils/dayConfig';
 import { useDataSource } from '../api/snapshotContext.jsx';
 import { formatTime12h, todayLocal } from '../utils/dateUtils';
 import { formatIntervalSummary } from '../utils/cardioTemplates.js';
-import {
-  dayWarns,
-  dayColor,
-  dayMuscle,
-  anatomyUrl,
-  pad2,
-  sorenessTierColor,
-} from '../utils/dayDesign';
+import { cardioColor, cardioName } from '../utils/cardioConfig.js';
+import { dayColor, pad2, sorenessTierColor } from '../utils/dayDesign';
 import { daysBetween } from '../utils/sorenessLink';
 import {
-  Plus,
-  Check,
   Bike,
   Activity,
+  Dumbbell,
   ChevronRight,
-  AlertTriangle,
 } from 'lucide-react';
 
 const fmtDate = (iso) => {
@@ -38,23 +30,7 @@ const daysSince = (iso) => {
   return Math.round((b - a) / (1000 * 60 * 60 * 24));
 };
 
-const loggedWeights = (exercise) => {
-  if (Array.isArray(exercise.weights)) return exercise.weights;
-  return Object.entries(exercise.weights || {}).map(([key, value]) => ({
-    key,
-    label: key.charAt(0).toUpperCase() + key.slice(1),
-    value,
-  }));
-};
-
-const chartWeight = (exercise) => {
-  const values = [exercise.weight, ...loggedWeights(exercise).map((entry) => entry.value)]
-    .map(Number)
-    .filter(Number.isFinite);
-  return values.length > 0 ? Math.max(...values) : 0;
-};
-
-export function ListTab({ onWorkoutClick, onCardioClick, onLogSoreness, viewToggle }) {
+export function ListTab({ onWorkoutClick, onCardioClick, onSorenessClick, viewToggle }) {
   const [workouts, setWorkouts] = useState([]);
   const [cardioSessions, setCardioSessions] = useState([]);
   const [sorenessEntries, setSorenessEntries] = useState([]);
@@ -192,7 +168,7 @@ export function ListTab({ onWorkoutClick, onCardioClick, onLogSoreness, viewTogg
           </div>
         ) : (
           groups.map(([date, dayItems]) => (
-            <DateGroup key={date} date={date} items={dayItems} onWorkoutClick={onWorkoutClick} onCardioClick={onCardioClick} onLogSoreness={onLogSoreness} />
+            <DateGroup key={date} date={date} items={dayItems} onWorkoutClick={onWorkoutClick} onCardioClick={onCardioClick} onSorenessClick={onSorenessClick} />
           ))
         )}
       </div>
@@ -234,7 +210,7 @@ function StatsStrip({ workouts, cardio, cycles, activeDays }) {
 }
 
 // ── Date group ─────────────────────────────────────────────────────────
-function DateGroup({ date, items, onWorkoutClick, onCardioClick, onLogSoreness }) {
+function DateGroup({ date, items, onWorkoutClick, onCardioClick, onSorenessClick }) {
   const ds = daysSince(date);
   const rel = ds === 0 ? 'today' : ds === 1 ? 'yesterday' : `${ds} days ago`;
   return (
@@ -245,9 +221,9 @@ function DateGroup({ date, items, onWorkoutClick, onCardioClick, onLogSoreness }
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
         {items.map((it) => {
-          if (it._kind === 'workout') return <WorkoutCard key={it.id} w={it} onClick={onWorkoutClick} onLogSoreness={onLogSoreness} />;
+          if (it._kind === 'workout') return <WorkoutCard key={it.id} w={it} onClick={onWorkoutClick} />;
           if (it._kind === 'cardio') return <CardioCard key={it.id} c={it} onClick={onCardioClick} />;
-          if (it._kind === 'soreness') return <SorenessCard key={it.id || `s-${it.date}`} s={it} />;
+          if (it._kind === 'soreness') return <SorenessCard key={it.id || `s-${it.date}`} s={it} onClick={onSorenessClick} />;
           return null;
         })}
       </div>
@@ -285,54 +261,22 @@ function DayChip({ daySlug, number, size = 'md' }) {
 }
 
 // ── Workout card ───────────────────────────────────────────────────────
-function WorkoutCard({ w, onClick, onLogSoreness }) {
-  const [open, setOpen] = useState(false);
-  const muscle = dayMuscle(w.daySlug);
-  const sets = (w.exercises || []).reduce((s, e) => s + (e.sets || 0), 0);
-  const handleHeader = (e) => {
-    e.stopPropagation();
-    setOpen((o) => !o);
-  };
+function WorkoutCard({ w, onClick }) {
+  const sets = (w.exercises || []).reduce((sum, exercise) => sum + (exercise.sets || 0), 0);
   return (
-    <div
+    <button
+      onClick={() => onClick?.(w)}
+      aria-label={`View ${w.dayName || describeLoggedDay(w)} workout details`}
       style={{
-        borderRadius: 12,
-        border: '1px solid var(--border-subtle)',
-        background: 'var(--bg-raised)',
-        overflow: 'hidden',
+        width: '100%', padding: 0, textAlign: 'left', color: 'inherit', borderRadius: 12,
+        border: '1px solid var(--border-subtle)', background: 'var(--bg-raised)',
+        overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
       }}
     >
       <div style={{ height: 2, background: dayColor(w.daySlug) }} />
-      <button
-        onClick={handleHeader}
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'auto minmax(0, 1fr) auto auto',
-          alignItems: 'center',
-          gap: 14,
-          padding: '14px 16px',
-          width: '100%',
-          textAlign: 'left',
-          background: 'transparent',
-          border: 'none',
-          color: 'inherit',
-          cursor: 'pointer',
-        }}
-      >
-        <div
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 8,
-            background: 'var(--bg-app)',
-            border: '1px solid var(--border-subtle)',
-            display: 'grid',
-            placeItems: 'center',
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}
-        >
-          <img className="anatomy" src={anatomyUrl(muscle)} alt="" style={{ height: 62, width: 'auto' }} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', alignItems: 'center', gap: 14, padding: '14px 16px' }}>
+        <div style={{ width: 40, height: 40, borderRadius: 8, background: `${dayColor(w.daySlug)}18`, color: dayColor(w.daySlug), display: 'grid', placeItems: 'center' }}>
+          <Dumbbell size={16} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -341,129 +285,27 @@ function WorkoutCard({ w, onClick, onLogSoreness }) {
               {w.dayName || describeLoggedDay(w)}
             </span>
             {w.mode === 'quick' && (
-              <span
-                style={{
-                  fontSize: 10,
-                  fontFamily: 'var(--font-mono)',
-                  color: 'var(--fg-muted)',
-                  padding: '2px 6px',
-                  borderRadius: 4,
-                  background: 'rgba(255,255,255,0.04)',
-                  textTransform: 'lowercase',
-                }}
-              >
+              <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)', padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.04)' }}>
                 quick log
               </span>
             )}
-            {dayWarns(w.daySlug) && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--status-warn)', fontFamily: 'var(--font-mono)' }}>
-                <AlertTriangle size={12} /> shoulder-safe
-              </span>
-            )}
           </div>
-          <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
-            {w.time && <span>{formatTime12h(w.time)}</span>}
-            {w.time && <span>·</span>}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+            {w.time && <span>{formatTime12h(w.time)} ·</span>}
             <span>{(w.exercises || []).length} exercises</span>
-            <span>·</span>
-            <span className="tnum">{sets} sets</span>
+            <span>· {sets} sets</span>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 28 }}>
-          {(w.exercises || []).map((e, i) => {
-            const h = Math.max(6, Math.min(28, (chartWeight(e) / 4) + 6));
-            return <div key={i} style={{ width: 4, height: h, background: dayColor(w.daySlug), opacity: 0.6, borderRadius: 1 }} />;
-          })}
-        </div>
-        <div
-          style={{
-            color: 'var(--fg-muted)',
-            display: 'flex',
-            alignItems: 'center',
-            transform: open ? 'rotate(90deg)' : 'none',
-            transition: 'transform var(--t-fast) var(--ease)',
-          }}
-        >
-          <ChevronRight size={14} />
-        </div>
-      </button>
-      {open && (
-        <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 4, marginLeft: 70 }}>
-          {(w.exercises || []).map((e, i) => (
-            <div
-              key={i}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr auto',
-                padding: '8px 12px',
-                background: 'rgba(255,255,255,0.02)',
-                borderRadius: 6,
-                alignItems: 'center',
-                fontSize: 12,
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
-              <div>
-                <span style={{ color: 'var(--fg-body)', fontWeight: 600 }}>{e.name}</span>
-                {e.variation && e.variation !== 'Standard' && (
-                  <span style={{ color: 'var(--fg-faint)', marginLeft: 8 }}>{e.variation}</span>
-                )}
-              </div>
-              <div className="tnum" style={{ color: 'var(--fg-secondary)', display: 'flex', gap: 10 }}>
-                {e.weight != null && e.weight !== '' && <span>{e.weight} lb</span>}
-                {loggedWeights(e).map((entry) => (
-                  entry.value != null && entry.value !== ''
-                    ? <span key={entry.key}>{entry.label} {entry.value} lb</span>
-                    : null
-                ))}
-                {e.inclineDegrees != null && e.inclineDegrees !== '' && <span>{e.inclineDegrees}° incline</span>}
-                {e.reps != null && <span>×{e.reps}</span>}
-                {e.sets != null && <span style={{ color: dayColor(w.daySlug) }}>×{e.sets} sets</span>}
-              </div>
-            </div>
-          ))}
-          {(onClick || onLogSoreness) && (
-            <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-              {onClick && (
-                <button onClick={() => onClick(w)} style={cardActionStyle()}>
-                  Open in editor →
-                </button>
-              )}
-              {onLogSoreness && (
-                <button
-                  onClick={() => onLogSoreness(w)}
-                  style={cardActionStyle('#f59e6f')}
-                  title="Record the soreness this workout caused"
-                >
-                  Log soreness →
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+        <ChevronRight size={15} color="var(--fg-muted)" />
+      </div>
+    </button>
   );
-}
-
-// Pill button used for the actions revealed inside an expanded workout card.
-function cardActionStyle(color) {
-  return {
-    padding: '6px 10px',
-    fontSize: 11,
-    fontFamily: 'var(--font-primary)',
-    fontWeight: 600,
-    color: color || 'var(--fg-muted)',
-    background: 'transparent',
-    border: `1px solid ${color ? 'rgba(245,158,111,0.35)' : 'var(--border-subtle)'}`,
-    borderRadius: 9999,
-    cursor: 'pointer',
-  };
 }
 
 // ── Cardio card ────────────────────────────────────────────────────────
 function CardioCard({ c, onClick }) {
   const isBike = c.activity === 'bike';
+  const activityColor = cardioColor(c.activity);
   const intervalSummary = Array.isArray(c.treadmill?.intervals)
     ? formatIntervalSummary(c.treadmill.intervals)
     : c.treadmill?.intervals;
@@ -471,6 +313,14 @@ function CardioCard({ c, onClick }) {
   return (
     <div
       onClick={() => onClick?.(c)}
+      onKeyDown={(event) => {
+        if (onClick && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          onClick(c);
+        }
+      }}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
       style={{
         borderRadius: 12,
         border: '1px solid var(--border-subtle)',
@@ -483,7 +333,7 @@ function CardioCard({ c, onClick }) {
         cursor: onClick ? 'pointer' : 'default',
       }}
     >
-      <div style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(103,232,249,0.10)', color: '#67e8f9', display: 'grid', placeItems: 'center' }}>
+      <div style={{ width: 40, height: 40, borderRadius: 8, background: `${activityColor}1a`, color: activityColor, display: 'grid', placeItems: 'center' }}>
         {isBike ? <Bike size={16} /> : <Activity size={16} />}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
@@ -497,14 +347,14 @@ function CardioCard({ c, onClick }) {
               textTransform: 'uppercase',
               padding: '3px 8px',
               borderRadius: 9999,
-              background: 'rgba(103,232,249,0.14)',
-              color: '#a5f3fc',
+              background: `${activityColor}24`,
+              color: activityColor,
             }}
           >
             Cardio
           </span>
-          <span style={{ fontFamily: 'var(--font-primary)', fontWeight: 600, fontSize: 15, color: 'var(--fg-primary)', textTransform: 'capitalize' }}>
-            {c.activity}
+          <span style={{ fontFamily: 'var(--font-primary)', fontWeight: 600, fontSize: 15, color: 'var(--fg-primary)' }}>
+            {cardioName(c.activity)}
           </span>
         </div>
         <div style={{ fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
@@ -533,9 +383,18 @@ function MetricStat({ val, unit }) {
 }
 
 // ── Soreness card ──────────────────────────────────────────────────────
-function SorenessCard({ s }) {
+function SorenessCard({ s, onClick }) {
   return (
     <div
+      onClick={() => onClick?.(s)}
+      onKeyDown={(event) => {
+        if (onClick && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          onClick(s);
+        }
+      }}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
       style={{
         borderRadius: 12,
         border: '1px solid var(--border-subtle)',
@@ -544,6 +403,7 @@ function SorenessCard({ s }) {
         display: 'flex',
         flexDirection: 'column',
         gap: 10,
+        cursor: onClick ? 'pointer' : 'default',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -586,6 +446,9 @@ function SorenessCard({ s }) {
             flexWrap: 'wrap',
             padding: '5px 10px',
             borderRadius: 8,
+            width: '100%',
+            maxWidth: '100%',
+            boxSizing: 'border-box',
             background: 'rgba(255,255,255,0.03)',
             borderLeft: `3px solid ${dayColor(s.sourceWorkoutDaySlug)}`,
           }}

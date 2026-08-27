@@ -1,16 +1,13 @@
 // Root application component. Left sidebar tab navigation (matches bender-world /
 // eight-queens pattern). Tabs:
-//   - History (default): calendar/list view of past workouts with color-coded days
-//   - Workout: detailed view of any day in the cycle (defaults to current day)
+//   - Activity (default): overview, recovery, journal, list, and calendar views
+//   - Exercises: exercise library organized by cycle day
 //   - Cycle: Synergy cycle overview — philosophy, day breakdown, recovery notes
-//   - Soreness: daily muscle soreness journal with structured muscle picker
 //   - Log (admin only): log a workout with quick or detailed mode
 //   - Admin (localhost only + admin role): day override, database init and data migration
 //
-// Auth model: anyone can view (History/Today tabs load publicly). Only the
+// Auth model: anyone can view Activity, Exercises, and Cycle. Only the
 // admin user (whitelisted Microsoft email) sees the Log tab and the Admin tab.
-/* global __BUILD_NUMBER__ */
-
 import { useState, useEffect, useCallback } from 'react';
 import { useWorkouts } from './hooks/useWorkouts';
 import { useAuth } from './auth/AuthContext.jsx';
@@ -24,23 +21,25 @@ import { SorenessTab } from './components/SorenessTab';
 import { ExercisesTab } from './components/ExercisesTab';
 import { ListTab } from './components/ListTab';
 import { CycleDial } from './components/CycleDial';
+import { ActivityRecordDetail } from './components/ActivityRecordDetail';
 import { isAdminMode } from './utils/adminMode';
 import { getTotalDays } from './utils/dayConfig';
-import { CalendarDays, RefreshCw, Activity, PenLine, Wrench, ListChecks, List, Menu } from 'lucide-react';
+import { RefreshCw, Activity, PenLine, Wrench, ListChecks, Menu } from 'lucide-react';
 
 // Brand string tracks the cycle length, which now comes from the active workout
 // model. It has to be read at render rather than at import: the model loads
 // asynchronously, and at module-evaluation time there is no cycle yet.
 const brand = () => `synergy-${getTotalDays()}`;
 
-// Map URL path to tab id. Unknown paths fall back to 'list' (the landing page).
+// Map URL path to tab id. The bare root and unknown paths land on Activity.
 const tabFromPath = (path) => {
   const slug = path.replace(/^\//, '').toLowerCase();
-  const valid = ['list', 'exercises', 'cycle', 'soreness', 'log', 'admin'];
-  return valid.includes(slug) ? slug : 'list';
+  if (slug === 'list' || slug === 'history') return 'soreness';
+  const valid = ['exercises', 'cycle', 'soreness', 'log', 'admin'];
+  return valid.includes(slug) ? slug : 'soreness';
 };
 
-const pathFromTab = (tab) => (tab === 'list' ? '/' : `/${tab}`);
+const pathFromTab = (tab) => (tab === 'soreness' ? '/' : `/${tab}`);
 
 function App() {
   const [activeTab, setActiveTab] = useState(() => tabFromPath(window.location.pathname));
@@ -51,12 +50,14 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [logViewWorkout, setLogViewWorkout] = useState(null);
   const [logViewCardio, setLogViewCardio] = useState(null);
+  const [detailStack, setDetailStack] = useState([]);
   // Workout handed to the Soreness tab by a "Log soreness" action elsewhere,
   // so the editor opens already attributed to it. Cleared once consumed.
   const [sorenessSource, setSorenessSource] = useState(null);
+  const [sorenessEditEntry, setSorenessEditEntry] = useState(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 760);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [activityView, setActivityView] = useState('list'); // History tab: 'list' | 'calendar'
+  const [activityView, setActivityView] = useState('lanes');
 
   // Push URL when tab changes (but not on initial mount)
   const navigateTab = useCallback((tab) => {
@@ -69,7 +70,10 @@ function App() {
 
   // Handle browser back/forward buttons
   useEffect(() => {
-    const onPopState = () => setActiveTab(tabFromPath(window.location.pathname));
+    const onPopState = () => {
+      setDetailStack([]);
+      setActiveTab(tabFromPath(window.location.pathname));
+    };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -80,11 +84,20 @@ function App() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // History is now a view within Activity, not a separate destination. Keep
+  // old bookmarks working while normalizing them to the single Activity URL.
+  useEffect(() => {
+    if (/^\/(list|history)\/?$/i.test(window.location.pathname)) {
+      window.history.replaceState(null, '', '/');
+    }
+  }, []);
+
   // Admin tab requires both localhost dev mode AND admin role
   const showAdminTab = isAdminMode() && isAdmin;
 
   // Navigate to Log tab, optionally pre-filling day/date (e.g. from empty calendar click)
   const handleOpenLog = (dayNumber = null, date = null) => {
+    setDetailStack([]);
     setLogViewWorkout(null);
     setLogViewCardio(null);
     setLogInitialDay(dayNumber);
@@ -92,12 +105,22 @@ function App() {
     navigateTab('log');
   };
 
-  // Navigate to Log tab showing an existing workout's details
-  const handleViewWorkout = (workout) => {
+  const handleOpenRecord = (kind, record) => {
+    if (!record) return;
+    setDetailStack((current) => [...current, { kind, record }]);
+  };
+
+  const handleCloseRecord = () => {
+    setDetailStack((current) => current.slice(0, -1));
+  };
+
+  // Editors are explicit destinations reached from the shared record detail.
+  const handleEditWorkout = (workout) => {
     if (workout === null) {
       setLogViewWorkout(null);
       return;
     }
+    setDetailStack([]);
     setLogViewWorkout(workout);
     setLogViewCardio(null);
     setLogInitialDay(null);
@@ -107,21 +130,36 @@ function App() {
 
   // Navigate to the Soreness tab with the editor pre-attributed to a workout
   const handleLogSoreness = (workout) => {
+    setDetailStack([]);
     setSorenessSource(workout);
+    setActivityView('journal');
     navigateTab('soreness');
   };
 
-  // Navigate to Log tab showing an existing cardio session
-  const handleViewCardio = (session) => {
+  const handleEditCardio = (session) => {
     if (session === null) {
       setLogViewCardio(null);
       return;
     }
+    setDetailStack([]);
     setLogViewCardio(session);
     setLogViewWorkout(null);
     setLogInitialDay(null);
     setLogInitialDate(null);
     navigateTab('log');
+  };
+
+  const handleEditSoreness = (entry) => {
+    setDetailStack([]);
+    setSorenessEditEntry(entry);
+    setActivityView('journal');
+    navigateTab('soreness');
+  };
+
+  const handleEditRecord = (kind, record) => {
+    if (kind === 'workout') handleEditWorkout(record);
+    if (kind === 'cardio') handleEditCardio(record);
+    if (kind === 'soreness') handleEditSoreness(record);
   };
 
   const handleWorkoutSuccess = (advancedTo) => {
@@ -133,22 +171,26 @@ function App() {
     setLogInitialDate(null);
     setLogViewWorkout(null);
     setLogViewCardio(null);
-    navigateTab('list');
+    setDetailStack([]);
+    setActivityView('list');
+    navigateTab('soreness');
   };
 
   const handleNav = (tab) => {
+    setDetailStack([]);
     navigateTab(tab);
     setMobileNavOpen(false);
   };
 
   const tabs = [
-    { id: 'list', label: 'History', icon: CalendarDays },
+    { id: 'soreness', label: 'Activity', icon: Activity },
     { id: 'exercises', label: 'Exercises', icon: ListChecks },
     { id: 'cycle', label: 'Cycle', icon: RefreshCw },
-    { id: 'soreness', label: 'Soreness', icon: Activity },
     ...(isAdmin ? [{ id: 'log', label: 'Log', icon: PenLine }] : []),
     ...(showAdminTab ? [{ id: 'admin', label: 'Admin', icon: Wrench }] : [])
   ];
+
+  const activeDetail = detailStack[detailStack.length - 1] || null;
 
   if (loading) {
     return (
@@ -176,7 +218,6 @@ function App() {
             onTabChange={handleNav}
             currentDay={currentDay}
             onDay={isAdmin ? setDay : undefined}
-            isAdmin={isAdmin}
           />
         )}
 
@@ -188,7 +229,6 @@ function App() {
               onTabChange={handleNav}
               currentDay={currentDay}
               onDay={isAdmin ? setDay : undefined}
-              isAdmin={isAdmin}
               compact
             />
           </div>
@@ -204,6 +244,18 @@ function App() {
             ...(isMobile ? { paddingBottom: 'calc(76px + env(safe-area-inset-bottom))' } : {}),
           }}
         >
+          {activeDetail ? (
+            <ActivityRecordDetail
+              kind={activeDetail.kind}
+              record={activeDetail.record}
+              isAdmin={isAdmin}
+              onBack={handleCloseRecord}
+              onEdit={handleEditRecord}
+              onOpenRecord={handleOpenRecord}
+              onAddSoreness={handleLogSoreness}
+            />
+          ) : (
+            <>
           {activeTab === 'exercises' && (
             <ExercisesTab
               currentDay={currentDay}
@@ -211,36 +263,42 @@ function App() {
             />
           )}
 
-          {activeTab === 'list' && (
+          {activeTab === 'soreness' && (
             activityView === 'calendar' ? (
               <HistoryTab
                 key={refreshKey}
                 viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
                 onDayClick={isAdmin ? handleOpenLog : undefined}
-                onWorkoutClick={isAdmin ? handleViewWorkout : undefined}
-                onCardioClick={isAdmin ? handleViewCardio : undefined}
+                onWorkoutClick={(workout) => handleOpenRecord('workout', workout)}
+                onCardioClick={(session) => handleOpenRecord('cardio', session)}
+                onSorenessClick={(entry) => handleOpenRecord('soreness', entry)}
               />
-            ) : (
+            ) : activityView === 'list' ? (
               <ListTab
                 key={refreshKey}
                 viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
-                onWorkoutClick={isAdmin ? handleViewWorkout : undefined}
-                onCardioClick={isAdmin ? handleViewCardio : undefined}
-                onLogSoreness={isAdmin ? handleLogSoreness : undefined}
+                onWorkoutClick={(workout) => handleOpenRecord('workout', workout)}
+                onCardioClick={(session) => handleOpenRecord('cardio', session)}
+                onSorenessClick={(entry) => handleOpenRecord('soreness', entry)}
+              />
+            ) : (
+              <SorenessTab
+                isAdmin={isAdmin}
+                view={activityView}
+                viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
+                initialSource={sorenessSource}
+                onSourceConsumed={() => setSorenessSource(null)}
+                initialEditEntry={sorenessEditEntry}
+                onEditConsumed={() => setSorenessEditEntry(null)}
+                onOpenWorkout={(workout) => handleOpenRecord('workout', workout)}
+                onOpenCardio={(session) => handleOpenRecord('cardio', session)}
+                onOpenSoreness={(entry) => handleOpenRecord('soreness', entry)}
               />
             )
           )}
 
           {activeTab === 'cycle' && (
             <CycleTab currentDay={currentDay} />
-          )}
-
-          {activeTab === 'soreness' && (
-            <SorenessTab
-              isAdmin={isAdmin}
-              initialSource={sorenessSource}
-              onSourceConsumed={() => setSorenessSource(null)}
-            />
           )}
 
           {activeTab === 'log' && isAdmin && (
@@ -250,14 +308,14 @@ function App() {
               currentDay={currentDay}
               onSuccess={handleWorkoutSuccess}
               viewWorkout={logViewWorkout}
-              onViewWorkout={handleViewWorkout}
+              onViewWorkout={handleEditWorkout}
               onLogSoreness={handleLogSoreness}
               onWorkoutChanged={() => {
                 setLogViewWorkout(null);
                 setRefreshKey(prev => prev + 1);
               }}
               viewCardio={logViewCardio}
-              onViewCardio={handleViewCardio}
+              onViewCardio={handleEditCardio}
               onCardioChanged={() => {
                 setLogViewCardio(null);
                 setRefreshKey(prev => prev + 1);
@@ -267,6 +325,8 @@ function App() {
 
           {activeTab === 'admin' && showAdminTab && (
             <DayOverride currentDay={currentDay} onDayChange={setDay} />
+          )}
+            </>
           )}
         </div>
       </div>
@@ -282,17 +342,24 @@ function App() {
 export default App;
 
 function ActivityToggle({ view, onChange }) {
-  const opts = [{ id: 'list', label: 'List' }, { id: 'calendar', label: 'Calendar' }];
+  const opts = [
+    { id: 'lanes', label: 'Overview' },
+    { id: 'timeline', label: 'Recovery' },
+    { id: 'journal', label: 'Journal' },
+    { id: 'list', label: 'List' },
+    { id: 'calendar', label: 'Calendar' },
+  ];
   return (
-    <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, width: 'fit-content' }}>
+    <div className="activity-view-toggle" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: 4, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, width: 'fit-content', maxWidth: '100%', boxSizing: 'border-box' }}>
       {opts.map((o) => {
         const active = o.id === view;
         return (
           <button
             key={o.id}
             onClick={() => onChange(o.id)}
+            aria-pressed={active}
             style={{
-              padding: '9px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600,
+              padding: '9px 12px', borderRadius: 7, fontSize: 13, fontWeight: 600,
               fontFamily: 'var(--font-primary)', border: 'none', cursor: 'pointer',
               color: active ? 'var(--fg-primary)' : 'var(--fg-muted)',
               background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
@@ -307,7 +374,9 @@ function ActivityToggle({ view, onChange }) {
 }
 
 function TopBar({ activeTab, isMobile, showAdminTab, mobileNavOpen, onToggleMobileNav }) {
-  const title = activeTab === 'list' ? 'History' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
+  const title = activeTab === 'soreness'
+      ? 'Activity'
+      : activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
 
   return (
     <header style={{ ...styles.topBar, ...(isMobile ? styles.topBarMobile : {}) }}>
@@ -335,7 +404,7 @@ function TopBar({ activeTab, isMobile, showAdminTab, mobileNavOpen, onToggleMobi
   );
 }
 
-function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, isAdmin, compact = false }) {
+function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, compact = false }) {
   return (
     <aside style={{ ...styles.sidebar, ...(compact ? styles.sidebarCompact : {}) }}>
       <div style={styles.brand}>
@@ -356,9 +425,9 @@ function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, isAdmin, 
 }
 
 function BottomNav({ tabs, activeTab, onTabChange }) {
-  // Log is the primary daily action for admins — surface it centered in the bar
-  // (it's only in `tabs` when signed in as admin, so public visitors still see 4).
-  const order = ['list', 'log', 'cycle', 'soreness'];
+  // Activity is home; Log stays prominent for admins, and the remaining public
+  // destinations fill out the compact mobile navigation.
+  const order = ['soreness', 'log', 'cycle', 'exercises'];
   const visibleTabs = order
     .map((id) => tabs.find((tab) => tab.id === id))
     .filter(Boolean);
@@ -397,6 +466,9 @@ function BrandMark() {
 const styles = {
   app: {
     height: '100vh',
+    width: '100vw',
+    maxWidth: '100vw',
+    boxSizing: 'border-box',
     background: 'var(--bg-app)',
     color: 'var(--fg-body)',
     fontFamily: 'var(--font-primary)',
@@ -480,6 +552,8 @@ const styles = {
     flex: 1,
     minHeight: 0,
     width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
     position: 'relative',
   },
   sidebar: {

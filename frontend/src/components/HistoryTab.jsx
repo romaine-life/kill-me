@@ -1,8 +1,7 @@
 // Calendar view of workout history with week/month/year views. Each day cell is
 // color-coded by the day's accent color, looked up by slug so a workout logged
-// under a day that has since been renamed or retired keeps its own color. Clicking
-// a day opens the
-// WorkoutDrawer pre-filled with that day's workout type and date.
+// under a day that has since been renamed or retired keeps its own color. Each
+// record stripe opens the app's shared record detail; empty days can start a log.
 //
 // Filter bar lets you toggle visibility of specific workout types —
 // useful for seeing patterns like "how often do I do compound days?"
@@ -16,13 +15,13 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { getDays } from '../utils/dayConfig';
 import { dayColor } from '../utils/dayDesign';
-import { CARDIO_CONFIG } from '../utils/cardioConfig';
+import { CARDIO_CONFIG, cardioColor } from '../utils/cardioConfig';
 import { useDataSource } from '../api/snapshotContext.jsx';
 import { dateToLocal } from '../utils/dateUtils';
 
 const SORENESS_COLOR = '#f97316'; // orange-500
 
-export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewToggle }) {
+export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, onSorenessClick, viewToggle }) {
   const [calendarPeriod, setCalendarPeriod] = useState('month'); // 'week', 'month', or 'year'
   const [workouts, setWorkouts] = useState([]);
   const [cardioSessions, setCardioSessions] = useState([]);
@@ -168,7 +167,7 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
   // class names on DAY_CONFIG; they live in dayDesign.js keyed by slug, as hex.
   const getItemColorStyle = (item) => {
     if (item._kind === 'cardio') {
-      return { backgroundColor: CARDIO_CONFIG[item.activity]?.color || '#10b981' };
+      return { backgroundColor: cardioColor(item.activity) };
     }
     if (item._kind === 'soreness') {
       return { backgroundColor: SORENESS_COLOR };
@@ -201,7 +200,7 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
     if (item._kind === 'cardio') {
       onCardioClick?.(item);
     } else if (item._kind === 'soreness') {
-      // No click action for soreness in calendar
+      onSorenessClick?.(item);
     } else {
       onWorkoutClick?.(item);
     }
@@ -385,10 +384,9 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
                     days.push(
                       <div
                         key={i}
-                        onClick={() => dayItems.length > 0
-                          ? handleItemClick(dayItems[0])
-                          : onDayClick?.(null, dateToLocal(date))
-                        }
+                        onClick={() => {
+                          if (dayItems.length === 0) onDayClick?.(null, dateToLocal(date));
+                        }}
                         className={`min-h-[80px] sm:min-h-[120px] rounded-lg sm:rounded-xl border transition-all overflow-hidden cursor-pointer hover:scale-105 ${
                           isToday
                             ? 'border-cyan-500 shadow-lg shadow-cyan-500/20'
@@ -407,6 +405,19 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
                                 } ${hoveredWorkoutType && hoveredWorkoutType !== getItemFilterKey(item) ? 'opacity-30' : 'opacity-100'}`}
                                 style={getItemColorStyle(item)}
                                 title={getItemTitle(item)}
+                                role="button"
+                                tabIndex={0}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleItemClick(item);
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    handleItemClick(item);
+                                  }
+                                }}
                                 onMouseEnter={() => setHoveredWorkoutType(getItemFilterKey(item))}
                                 onMouseLeave={() => setHoveredWorkoutType(null)}
                               />
@@ -471,10 +482,9 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
                   days.push(
                     <div
                       key={day}
-                      onClick={() => dayItems.length > 0
-                        ? handleItemClick(dayItems[0])
-                        : onDayClick?.(null, dateToLocal(date))
-                      }
+                      onClick={() => {
+                        if (dayItems.length === 0) onDayClick?.(null, dateToLocal(date));
+                      }}
                       className={`h-14 sm:h-20 rounded-md sm:rounded-lg border transition-all overflow-hidden cursor-pointer hover:scale-105 ${
                         isToday
                           ? 'border-cyan-500 shadow-lg shadow-cyan-500/20'
@@ -491,6 +501,19 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
                               } ${hoveredWorkoutType && hoveredWorkoutType !== getItemFilterKey(item) ? 'opacity-30' : 'opacity-100'}`}
                               style={getItemColorStyle(item)}
                               title={getItemTitle(item)}
+                              role="button"
+                              tabIndex={0}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleItemClick(item);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  handleItemClick(item);
+                                }
+                              }}
                               onMouseEnter={() => setHoveredWorkoutType(getItemFilterKey(item))}
                               onMouseLeave={() => setHoveredWorkoutType(null)}
                             />
@@ -576,9 +599,12 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
                             key={day}
                             onClick={(e) => {
                               e.stopPropagation();
-                              dayItems.length > 0
-                                ? handleItemClick(dayItems[0])
-                                : onDayClick?.(null, dateToLocal(date));
+                              if (dayItems.length > 0) {
+                                setSelectedMonth(date);
+                                setCalendarPeriod('month');
+                              } else {
+                                onDayClick?.(null, dateToLocal(date));
+                              }
                             }}
                             className={`aspect-square rounded-sm flex items-center justify-center text-[9px] font-bold transition-all cursor-pointer hover:scale-110 hover:ring-1 hover:ring-white/30 ${
                               isToday
@@ -588,7 +614,7 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
                             style={!isToday ? yearCellStyle : {}}
                             title={
                               dayItems.length > 0
-                                ? dayItems.map(getItemTitle).join(', ')
+                                ? `${dayItems.length} record${dayItems.length === 1 ? '' : 's'} — open month`
                                 : 'Click to log'
                             }
                           >

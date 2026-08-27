@@ -16,7 +16,7 @@ import { apiFetch } from '../api/client.js';
 import { todayLocal, nowLocalTime } from '../utils/dateUtils';
 import { useDataSource } from '../api/snapshotContext.jsx';
 import { getTotalDuration } from '../utils/cardioTemplates.js';
-import { CARDIO_CONFIG } from '../utils/cardioConfig.js';
+import { CARDIO_CONFIG, cardioColor } from '../utils/cardioConfig.js';
 
 const buildWeightEntries = (variation = {}, savedWeights = []) => {
   const savedByKey = new Map(
@@ -1025,7 +1025,7 @@ export function LogTab({
       {logStep === 'form' && logType === 'cardio' && (<>
         {/* Cardio Header */}
         <div className="mb-6">
-          <h2 className="text-4xl font-black uppercase tracking-wide mb-2" style={{ color: CARDIO_CONFIG[cardioActivity]?.color || '#10b981' }}>
+          <h2 className="text-4xl font-black uppercase tracking-wide mb-2" style={{ color: cardioColor(cardioActivity) }}>
             {isCardioEditMode ? 'Edit Cardio' : 'Log Cardio'}
           </h2>
           {isCardioEditMode ? (
