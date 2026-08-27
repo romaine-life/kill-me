@@ -37,6 +37,7 @@ export const DAY_MUSCLE_GROUPS = {
   'compound-push':  ['Pecs', 'Deltoids', 'Triceps'],
   triceps:          ['Triceps', 'Deltoids'],
   deltoid:          ['Deltoids', 'Lats & Back'],
+  'shoulder-press': ['Deltoids', 'Triceps', 'Pecs', 'Lats & Back'],
   grip:             ['Forearms & Grip', 'Biceps'],
   hips:             ['Hip & Adductors', 'Glutes'],
 

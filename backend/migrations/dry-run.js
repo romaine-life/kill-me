@@ -7,11 +7,12 @@
 // Run this before merging anything that adds a migration. It reads production, so it
 // needs the same Cosmos access the pod has (locally: `az login`).
 //
-// It also re-runs every migration a second time against the already-migrated result,
-// because the runner has no transaction to fall back on: a migration that dies partway
-// gets retried from the top, and one that isn't safe to repeat will corrupt data when
-// that happens. The second pass must report no creates and no deletes.
+// It also re-runs every migration that was pending at the start against the
+// already-migrated result. That mirrors a partial production failure: receipts for
+// older migrations remain, while the interrupted migration has no receipt and is
+// retried from the top. The second pass must report no creates and no deletes.
 
+import 'dotenv/config';
 import { CosmosClient } from '@azure/cosmos';
 import { DefaultAzureCredential } from '@azure/identity';
 import { fetchConfig } from '../config.js';
@@ -36,7 +37,7 @@ async function main() {
   const { runMigrations } = await import('./runner.js');
   const { container, store, operations } = memoryContainer(documents);
 
-  await runMigrations({ container });
+  const { applied: previewedVersions } = await runMigrations({ container });
 
   const tally = operations.reduce((acc, [kind]) => ({ ...acc, [kind]: (acc[kind] ?? 0) + 1 }), {});
   console.log('\nWould perform:', tally);
@@ -55,11 +56,15 @@ async function main() {
     if (stranded.length) console.log(`\n  Exercises left on days the model no longer has: ${stranded.join(', ')}`);
   }
 
-  // Second pass: prove the migrations survive being retried.
+  // Second pass: prove the migrations just previewed survive being retried. Keep
+  // historical receipts because a failure in a new migration does not erase them.
   const beforeReplay = stable(store);
   operations.length = 0;
-  const applied = [...store.values()].filter((doc) => doc.type === 'schema-migration');
-  for (const record of applied) store.delete(record.id);
+  const previewed = new Set(previewedVersions);
+  const receipts = [...store.values()].filter(
+    (doc) => doc.type === 'schema-migration' && previewed.has(doc.version),
+  );
+  for (const record of receipts) store.delete(record.id);
 
   await runMigrations({ container, log: { info: () => {} } });
 

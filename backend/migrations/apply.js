@@ -10,6 +10,7 @@
 // live one. Run `npm run migrate:dry-run` first; it reads the same data and prints
 // exactly what this will change.
 
+import 'dotenv/config';
 import { CosmosClient } from '@azure/cosmos';
 import { DefaultAzureCredential } from '@azure/identity';
 import { fetchConfig } from '../config.js';

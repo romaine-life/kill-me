@@ -2,14 +2,14 @@
 // recovery sequencing rationale, and CNS-aware compound day highlighting.
 //
 // The day list and cycle length come from the active workout model; only the
-// compound-day set and the recovery notes are curated here.
+// systemic-day set and the recovery notes are curated here.
 //
 // Both are keyed by day slug rather than number, so reordering the cycle moves the
 // notes with their days instead of leaving them pointing at whoever moved in.
 
 import { getDays, getDayInfo, getTotalDays } from '../utils/dayConfig';
 
-const COMPOUND_DAYS = new Set(['compound-legs', 'compound-pulls', 'compound-push']);
+const SYSTEMIC_DAYS = new Set(['compound-legs', 'compound-pulls', 'compound-push']);
 
 const RECOVERY_NOTES = {
   'compound-legs': 'Starts the cycle — systemic leg strength sets the recovery baseline',
@@ -17,7 +17,9 @@ const RECOVERY_NOTES = {
   back: 'The only loaded spinal extension, placed 8 days clear of Day 1 to spare the lower back for squats',
   'pecs-mobility': 'Primes the shoulder capsule for heavy pressing the next day — light work only',
   'compound-push': 'Dips and heavy pressing belong here, never on the mobility day before it',
-  grip: 'Sits 8 days clear of Pulls and Bicep so forearm loading never stacks',
+  deltoid: 'A low-fatigue primer for the dedicated vertical press the next day — preparation, not a hard delt session',
+  'shoulder-press': 'One focused vertical-push movement, performed with fresh attention but without 1RM testing or grinding',
+  grip: 'Sits well clear of Pulls and Bicep so forearm loading never stacks',
   hips: 'Primes the hips the day before Day 1 squats, mirroring how Pecs Mobility primes Push',
 };
 
@@ -61,7 +63,7 @@ export function CycleTab({ currentDay }) {
           <Principle
             number={3}
             title="CNS-aware sequencing"
-            text="Only three days (1, 6, 12) are systemically taxing compound lifts. They are evenly spaced with isolation and recovery work between them to avoid stacking central nervous system fatigue."
+            text="Only three days (1, 6, 12) are designed as systemically taxing compound sessions. Day 15 is deliberately a short, one-exercise vertical press rather than a fourth systemic session."
           />
           <Principle
             number={4}
@@ -78,7 +80,7 @@ export function CycleTab({ currentDay }) {
         </h3>
         <div className="space-y-2">
           {days.map((day) => {
-            const isCompound = COMPOUND_DAYS.has(day.slug);
+            const isSystemic = SYSTEMIC_DAYS.has(day.slug);
             const isCurrent = day.slug === currentDay;
             const recoveryNote = RECOVERY_NOTES[day.slug];
 
@@ -88,7 +90,7 @@ export function CycleTab({ currentDay }) {
                 className={`rounded-xl border p-4 transition-all ${
                   isCurrent
                     ? 'bg-green-500/10 border-green-500/50 ring-1 ring-green-500/30'
-                    : isCompound
+                    : isSystemic
                       ? 'bg-cyan-500/10 border-cyan-500/40'
                       : 'bg-slate-800/30 border-slate-700/50'
                 }`}
@@ -99,7 +101,7 @@ export function CycleTab({ currentDay }) {
                     className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center font-black text-lg ${
                       isCurrent
                         ? 'bg-green-500/30 text-green-300'
-                        : isCompound
+                        : isSystemic
                           ? 'bg-cyan-500/30 text-cyan-300'
                           : 'bg-slate-700/60 text-slate-400'
                     }`}
@@ -115,9 +117,9 @@ export function CycleTab({ currentDay }) {
                           Next
                         </span>
                       )}
-                      {isCompound && (
+                      {isSystemic && (
                         <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">
-                          Compound
+                          Systemic
                         </span>
                       )}
                     </div>
