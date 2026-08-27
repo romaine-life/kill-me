@@ -26,6 +26,7 @@ export const DAY_DESIGN = {
   'compound-push': { color: '#f59e6f', muscle: 'pectoralis-major-anterior' },
   triceps:         { color: '#67e8f9', muscle: 'biceps-brachii-anterior' },
   deltoid:         { color: '#a06ff5', muscle: 'deltoid-lateral' },
+  'shoulder-press': { color: '#d078f0', muscle: 'deltoid-lateral' },
   grip:            { color: '#c8e85e', muscle: 'biceps-brachii-anterior' },
   hips:            { color: '#e08fd0', muscle: 'gluteus-maximus' },
 

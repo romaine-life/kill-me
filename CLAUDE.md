@@ -1,6 +1,6 @@
 # kill-me — Workout Tracker
 
-Personal workout tracker built around a custom 16-day training cycle called **Synergy 16**.
+Personal workout tracker built around a custom 17-day training cycle called **Synergy 17**.
 
 The repo name comes from a Tom Platz video where he screams "KILL ME" during an
 agonizing set of leg extensions under hypnotherapy coaching.
@@ -15,7 +15,7 @@ content-fingerprint tag (`romainecr.azurecr.io/kill-me:app-<sha256>`); fork PRs
 stay build-only with `push: false`. Release/deploy workflows publish or reuse
 that same fingerprint tag and bump `k8s/values.yaml` to it.
 
-## The 16-Day Synergy System
+## The 17-Day Synergy System
 
 The cycle is Nelson's own design, optimized for **consistent daily activity** rather
 than traditional rest-heavy programming. Four guiding principles:
@@ -27,8 +27,8 @@ than traditional rest-heavy programming. Four guiding principles:
    not progressive overload. Nelson's muscles grow readily; the priority is controlled
    movement and avoiding excessive bulk.
 3. **CNS-aware sequencing** — only three days (1, 6, 12) are systemically taxing compound
-   lifts. They are evenly spaced (5, 6, 5 apart including the wrap) with isolation and
-   recovery work between them to avoid stacking central nervous system fatigue.
+   lifts. Day 15 is a short, one-exercise vertical press rather than a fourth systemic
+   session. Isolation and recovery work keep the major compound days from stacking.
 4. **Coverage over optimization** — the cycle exists to prevent atrophy, not to optimize
    any one adaptation. Its job is making sure nothing gets left out. Traditional splits
    drop the peripheral work (ankles, neck, hip rotation, grip) because a four-day week
@@ -37,7 +37,7 @@ than traditional rest-heavy programming. Four guiding principles:
 ### Short days are the design, not an oversight
 
 Nelson works ~12-hour days. Logged sessions run 1-3 exercises regardless of how many the
-day lists, so **every day is a fixed, fully specified list of 2-4 exercises requiring zero
+day lists, so **every day is a fixed, fully specified list of 1-4 exercises requiring zero
 decisions** — open the app, do what today says. Two consequences worth preserving:
 
 - **More days means shorter days, not more work.** The same coverage distributed into
@@ -60,9 +60,13 @@ The day ordering is not arbitrary — each placement accounts for what came befo
 - **Day 11 (Pecs Mobility)** primes the shoulder capsule for Day 12's heavy pressing —
   light flys, holds, and stretches only
 - **Day 12 (Compound Push)** is where dips and heavy pressing belong — never on Day 11
-- **Day 15 (Grip)** sits 8 days clear of Day 6 (Pulls) and Day 7 (Bicep) so forearm
+- **Day 14 (Deltoid + Shoulder Prep)** primes the shoulder for Day 15 — light rear/side
+  delt and rotator-cuff work only, always well short of failure
+- **Day 15 (Shoulder Press)** is one focused vertical-push exercise. It uses challenging
+  working sets, not 1RM tests or grinding, and still requires same-session ramp-up sets
+- **Day 16 (Grip)** sits well clear of Day 6 (Pulls) and Day 7 (Bicep) so forearm
   loading never stacks on consecutive days
-- **Day 16 (Hips)** primes the hips the day before Day 1 squats, mirroring how Day 11
+- **Day 17 (Hips)** primes the hips the day before Day 1 squats, mirroring how Day 11
   primes Day 12
 
 ### Day 11 shoulder safety
@@ -71,6 +75,21 @@ Nelson has historical shoulder injuries (both shoulders, 15-20 years ago). They 
 well but have underlying limitations. Day 11's strict "no heavy pressing" rule protects
 the shoulder joint by keeping pec work light and mobility-focused before compound push
 day. Dips are fine on Day 12 (assisted machine at -90 lbs), but never on Day 11.
+
+### Day 14-15 shoulder sequencing
+
+Day 14 is preparation, not a second hard shoulder workout. Its reverse fly, lateral
+raise, and rotator-cuff movements stay light and controlled so they improve readiness
+for Day 15 rather than creating fatigue. Day 15 contains only the Dumbbell + Cable
+Shoulder Press. Dumbbell and cable loads are logged separately, and working sets stop
+before the press path or torso position breaks down. The complete rationale and rejected
+alternatives are recorded in `docs/decisions/0002-add-dedicated-vertical-press-day.md`.
+
+## Decision records
+
+Consequential program and architecture decisions live in `docs/decisions/`. They are
+append-only historical records: `CLAUDE.md` describes the current state, migrations
+implement it, and decision records preserve why it exists and when it should be revisited.
 
 ### Known gap: no hip hinge
 
