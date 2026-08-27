@@ -2,21 +2,19 @@
 // as a day slug — the day's permanent identity, not its position.
 //
 // It is persisted server-side as a `settings` document in Cosmos DB so it survives
-// across devices and sessions. For anonymous visitors it comes from the SQLite
-// snapshot via useDataSource().
+// across devices and sessions. Public reads use the same AKS API as signed-in reads.
 
 import { useState, useEffect } from 'react';
 import { apiFetch } from '../api/client.js';
-import { useDataSource } from '../api/snapshotContext.jsx';
+import { useApi } from '../api/useApi.js';
 import { getDays } from '../utils/dayConfig';
 
 export const useWorkouts = () => {
   const [currentDay, setCurrentDay] = useState(() => getDays()[0]?.slug ?? null);
-  const { fetchCurrentDay, isReady } = useDataSource();
+  const { fetchCurrentDay } = useApi();
 
-  // Fetch current day from snapshot or API
+  // Fetch current day from the public API.
   useEffect(() => {
-    if (!isReady) return;
     const load = async () => {
       try {
         const data = await fetchCurrentDay();
@@ -26,7 +24,7 @@ export const useWorkouts = () => {
       }
     };
     load();
-  }, [isReady]);
+  }, [fetchCurrentDay]);
 
   // setDay always uses live API (admin-only write operation)
   const setDay = async (daySlug) => {

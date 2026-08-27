@@ -5,6 +5,22 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>synergy-16</title>
+    <script>
+      // A suspended tab can retain an old HTML document across a deployment.
+      // If one of its hashed assets has been retired, fetch a fresh document
+      // once; main.jsx clears the guard only after the current module executes.
+      window.addEventListener('error', (event) => {
+        const target = event.target;
+        const assetUrl = target?.src || target?.href || '';
+        if (!assetUrl.includes('/assets/')) return;
+        if (sessionStorage.getItem('synergy-asset-reload')) return;
+
+        sessionStorage.setItem('synergy-asset-reload', '1');
+        const url = new URL(window.location.href);
+        url.searchParams.set('_asset_retry', Date.now().toString());
+        window.location.replace(url);
+      }, true);
+    </script>
   </head>
   <body>
     <div id="root"></div>

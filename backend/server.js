@@ -25,6 +25,7 @@ import { runMigrations, pendingMigrations } from './migrations/runner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.join(__dirname, '..', 'frontend', 'dist');
+const FRONTEND_ASSETS_DIR = path.join(FRONTEND_DIR, 'assets');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -89,8 +90,36 @@ async function start() {
   app.use(createSorenessRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
   app.use(createCardioRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
 
-  app.use(express.static(FRONTEND_DIR));
+  // Hashed Vite assets are immutable. Keep their routing separate so a stale
+  // document requesting a removed hash receives a real 404 instead of the SPA
+  // HTML shell (which browsers reject as the wrong JS/CSS MIME type).
+  app.use('/assets', express.static(FRONTEND_ASSETS_DIR, {
+    immutable: true,
+    maxAge: '1y',
+  }));
+  app.use('/assets', (req, res) => {
+    res.status(404).type('text/plain').send('Asset not found');
+  });
+
+  app.use(express.static(FRONTEND_DIR, {
+    setHeaders(res, filePath) {
+      if (path.basename(filePath) === 'index.html') {
+        res.setHeader('Cache-Control', 'no-store');
+      }
+    },
+  }));
+
+  app.use('/api', (req, res) => {
+    res.status(404).json({ error: 'API route not found' });
+  });
+
+  // Missing static files must stay missing. Only extensionless browser routes
+  // are eligible for the History API fallback.
+  app.get(/.*\.[^/]+$/, (req, res) => {
+    res.status(404).type('text/plain').send('File not found');
+  });
   app.get(/.*/, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
     res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
   });
 

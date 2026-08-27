@@ -17,11 +17,12 @@ spec:
   selector:
     matchLabels:
       app: {{ include "kill-me.resourceName" . }}
+  # The frontend and API share one image and production intentionally has one
+  # serving pod. Recreate avoids an old and new pod serving incompatible HTML
+  # and hashed assets during a rollout. Data refreshes no longer deploy the app,
+  # so this brief interruption happens only for real application releases.
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+    type: Recreate
   template:
     metadata:
       labels:

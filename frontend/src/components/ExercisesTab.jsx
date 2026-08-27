@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Plus, Copy, X, Search } from 'lucide-react';
 import { apiFetch } from '../api/client.js';
-import { useDataSource } from '../api/snapshotContext.jsx';
+import { useApi } from '../api/useApi.js';
 import { getDays, getDaySlugs, getDayInfo } from '../utils/dayConfig.js';
 import { AnatomyDiagram } from './AnatomyDiagrams.jsx';
 import { ExercisePose } from './ExercisePoses.jsx';
@@ -85,7 +85,7 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0);
-  const { fetchAllExercises, isReady } = useDataSource();
+  const { fetchAllExercises } = useApi();
 
   // Filters
   const [searchText, setSearchText] = useState('');
@@ -117,7 +117,6 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
 
   // Fetch all exercises on mount
   useEffect(() => {
-    if (!isReady) return;
     const load = async () => {
       setLoading(true);
       try {
@@ -130,15 +129,7 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
       }
     };
     load();
-  }, [isReady]);
-
-  // When navigated from another tab with a specific exercise, find it after load
-  useEffect(() => {
-    if (!loading && initialExercise && allExercises.length > 0) {
-      const idx = filteredExercises.findIndex(e => e.name === initialExercise);
-      if (idx >= 0) setCurrentIndex(idx);
-    }
-  }, [loading, initialExercise, allExercises]);
+  }, [fetchAllExercises]);
 
   const allTags = useMemo(() => collectAllTags(allExercises), [allExercises]);
 
@@ -173,12 +164,20 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise 
     return result;
   }, [allExercises, enabledDays, activeTags, searchText]);
 
+  // When navigated from another tab with a specific exercise, find it after load.
+  useEffect(() => {
+    if (!loading && initialExercise && filteredExercises.length > 0) {
+      const idx = filteredExercises.findIndex(e => e.name === initialExercise);
+      if (idx >= 0) setCurrentIndex(idx);
+    }
+  }, [loading, initialExercise, filteredExercises]);
+
   // Clamp index when filter changes
   useEffect(() => {
     if (currentIndex >= filteredExercises.length) {
       setCurrentIndex(Math.max(0, filteredExercises.length - 1));
     }
-  }, [filteredExercises.length]);
+  }, [currentIndex, filteredExercises.length]);
 
   // Exercises available for "add existing" (not already on target day)
   const addableExercises = useMemo(() => {

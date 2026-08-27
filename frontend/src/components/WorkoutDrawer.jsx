@@ -8,13 +8,13 @@
 // The form looks and feels identical either way — you're always "editing a workout",
 // it just happens to be new or existing. Backing out discards changes.
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { getDayInfo, getDays } from '../utils/dayConfig';
 import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { apiFetch } from '../api/client.js';
 import { todayLocal, nowLocalTime } from '../utils/dateUtils';
-import { useDataSource } from '../api/snapshotContext.jsx';
+import { useApi } from '../api/useApi.js';
 import { getTotalDuration } from '../utils/cardioTemplates.js';
 import { CARDIO_CONFIG, cardioColor } from '../utils/cardioConfig.js';
 
@@ -33,6 +33,20 @@ const buildWeightEntries = (variation = {}, savedWeights = []) => {
       value: saved?.value ?? field.targetWeight ?? '',
     };
   });
+};
+
+// Get the default variation for an exercise (handles pre-migration flat fields).
+const getDefaultVariation = (exercise) => {
+  const variations = exercise.variations;
+  if (!variations || !Array.isArray(variations) || variations.length === 0) {
+    return {
+      name: 'Standard',
+      targetWeight: exercise.targetWeight,
+      targetReps: exercise.targetReps,
+      targetSets: exercise.targetSets,
+    };
+  }
+  return variations.find((variation) => variation.default) || variations[0];
 };
 
 export function LogTab({
@@ -77,8 +91,8 @@ export function LogTab({
   const [cardioActivity, setCardioActivity] = useState('treadmill');
   const [cardioDate, setCardioDate] = useState(todayLocal());
   const [cardioTime, setCardioTime] = useState(nowLocalTime());
-  // Treadmill templates come entirely from the data source (Cosmos via the live
-  // API, or the SQLite snapshot for anonymous visitors) — no hardcoded list.
+  // Treadmill templates come entirely from Cosmos through the public API — no
+  // hardcoded list.
   const [templates, setTemplates] = useState([]);
   const [cardioTemplateId, setCardioTemplateId] = useState('');
   const [cardioNotes, setCardioNotes] = useState('');
@@ -100,7 +114,7 @@ export function LogTab({
 
   const dateInputRef = useRef(null);
   const cardioDateRef = useRef(null);
-  const { fetchCardioTemplates, isReady } = useDataSource();
+  const { fetchCardioTemplates } = useApi();
 
   const dayInfo = getDayInfo(selectedDay);
 
@@ -137,16 +151,8 @@ export function LogTab({
     }
   }, [viewWorkout, initialDay, initialDate, currentDay]);
 
-  // Fetch exercise definitions when day changes, then overlay saved data if editing
+  // Load treadmill templates from the API.
   useEffect(() => {
-    if (selectedDay) {
-      fetchExercises();
-    }
-  }, [selectedDay, viewWorkout]);
-
-  // Load treadmill templates from the data source (live API or snapshot).
-  useEffect(() => {
-    if (!isReady) return;
     fetchCardioTemplates()
       .then((data) => {
         const list = data?.templates || [];
@@ -163,7 +169,7 @@ export function LogTab({
         console.warn('Cardio template load failed:', err);
         setTemplates([]);
       });
-  }, [isReady, viewCardio]);
+  }, [fetchCardioTemplates, viewCardio]);
 
   // Switch logType/step when viewCardio/viewWorkout changes. Edit mode jumps
   // straight to the form; create mode starts on the type picker.
@@ -217,21 +223,7 @@ export function LogTab({
   // Data fetching
   // ─────────────────────────────────────────────
 
-  // Get the default variation for an exercise (handles pre-migration flat fields)
-  const getDefaultVariation = (ex) => {
-    const vars = ex.variations;
-    if (!vars || !Array.isArray(vars) || vars.length === 0) {
-      return {
-        name: 'Standard',
-        targetWeight: ex.targetWeight,
-        targetReps: ex.targetReps,
-        targetSets: ex.targetSets,
-      };
-    }
-    return vars.find(v => v.default) || vars[0];
-  };
-
-  const fetchExercises = async () => {
+  const fetchExercises = useCallback(async () => {
     setLoading(true);
     try {
       const data = await apiFetch(`/api/exercises/day/${selectedDay}`);
@@ -299,7 +291,14 @@ export function LogTab({
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedDay, viewWorkout]);
+
+  // Fetch exercise definitions when day changes, then overlay saved data if editing.
+  useEffect(() => {
+    if (selectedDay) {
+      fetchExercises();
+    }
+  }, [selectedDay, fetchExercises]);
 
   // ─────────────────────────────────────────────
   // Submit (create or update)
