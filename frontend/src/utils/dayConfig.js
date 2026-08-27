@@ -1,9 +1,9 @@
 // Access to the active workout model — the cycle's days, their order, names, focus
 // text and safety notes.
 //
-// None of that lives here any more. The model is data: it comes from the database
-// (or the SQLite snapshot for anonymous visitors) and is installed once at boot by
-// WorkoutModelProvider before anything renders. This module is the read side of it.
+// None of that lives here any more. The model is data: it comes from the public API
+// and is installed once at boot by WorkoutModelProvider before anything renders.
+// This module is the read side of it.
 //
 // A day is identified by its `slug`, which is permanent. `number` is only that day's
 // position in this version of the model, so it may change when the cycle is

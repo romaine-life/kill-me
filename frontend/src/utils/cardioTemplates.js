@@ -1,11 +1,10 @@
 // Treadmill interval helpers.
 //
 // Templates themselves are DATA — they live in Cosmos DB as `cardio-template`
-// documents and are loaded at runtime via useDataSource().fetchCardioTemplates()
-// (live API when signed in, SQLite snapshot for anonymous visitors). There is no
-// hardcoded template list in the frontend. These are the only things that stay
-// in code: pure functions that summarize an interval array (which each logged
-// cardio-session stores inline, so history is self-contained).
+// documents and are loaded at runtime through the public API. There is no hardcoded
+// template list in the frontend. These are the only things that stay in code: pure
+// functions that summarize an interval array (which each logged cardio-session
+// stores inline, so history is self-contained).
 
 // Total duration of all intervals in a template (minutes)
 export function getTotalDuration(intervals) {

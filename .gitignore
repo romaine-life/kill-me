@@ -138,9 +138,6 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Snapshot build artifacts
-frontend/public/sql-wasm.wasm
-
 # Terraform
 *.tfstate
 *.tfstate.*

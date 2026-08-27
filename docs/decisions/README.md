@@ -14,6 +14,7 @@ what would cause the choice to be revisited.
 | --- | --- | --- |
 | [0001](0001-synergy-16-program-architecture.md) | Accepted | Adopt the Synergy 16 coverage-first program architecture |
 | [0002](0002-add-dedicated-vertical-press-day.md) | Accepted | Add a dedicated vertical-press day and advance to Synergy 17 |
+| [0003](0003-remove-browser-snapshot-data-path.md) | Accepted | Remove the browser SQLite snapshot and use the AKS API for every read |
 
 ## Process
 

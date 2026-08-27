@@ -15,9 +15,9 @@
 //               sourceWorkoutId, sourceWorkoutDaySlug, sourceWorkoutDay,
 //               sourceWorkoutDate }.
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { apiFetch } from '../api/client';
-import { useDataSource } from '../api/snapshotContext.jsx';
+import { useApi } from '../api/useApi.js';
 import { MUSCLE_TAXONOMY, MUSCLE_GROUPS, searchMuscles } from '../utils/muscleTaxonomy';
 import { todayLocal } from '../utils/dateUtils';
 import { getDayInfo, describeLoggedDay } from '../utils/dayConfig';
@@ -117,7 +117,7 @@ export function SorenessTab({
   const [cardioSessions, setCardioSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { fetchSoreness, fetchWorkouts, fetchCardioSessions, isReady } = useDataSource();
+  const { fetchSoreness, fetchWorkouts, fetchCardioSessions } = useApi();
   const isMobile = useIsMobile();
 
   // Editor state
@@ -145,14 +145,7 @@ export function SorenessTab({
   const [pinnedMuscle, setPinnedMuscle] = useState(null); // { group, muscle }
   const [listHover, setListHover] = useState(null); // { group, muscle }
 
-  // Fetch the recovery records and the strength/cardio activity that gives
-  // them context on the shared date rail.
-  useEffect(() => {
-    if (!isReady) return;
-    loadData();
-  }, [isReady]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [sorenessData, workoutData, cardioData] = await Promise.all([
@@ -168,7 +161,13 @@ export function SorenessTab({
     } finally {
       setLoading(false);
     }
-  }
+  }, [fetchSoreness, fetchWorkouts, fetchCardioSessions]);
+
+  // Fetch the recovery records and the strength/cardio activity that gives
+  // them context on the shared date rail.
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Workouts, newest first — the order both the source picker and timeline want.
   const workoutsByDate = useMemo(

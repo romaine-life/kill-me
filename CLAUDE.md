@@ -108,16 +108,12 @@ frontend/          React 19 SPA (Vite + Tailwind CSS 4)
   ├── Centralized color palette (src/colors.js)
   ├── Sign-in delegated to auth.romaine.life (no MSAL in-app)
   ├── Public viewing, admin-only editing
-  ├── In-browser SQLite via sql.js/WASM for anonymous visitors (instant loads)
-  ├── Deployed to Azure Static Web App
-  └── Calls backend API with Bearer tokens
-
-snapshot/          SQLite snapshot generator (Node 20)
-  ├── Queries Cosmos DB for all public document types (7 tables)
-  ├── Writes a SQLite .db file consumed by the frontend
-  └── Runs every 4 hours via GitHub Actions cron
+  ├── All reads use the same-origin public API
+  └── Built into the application image and served by Express on AKS
 
 backend/routes/    Express router factories (workouts, soreness, cardio)
+  ├── Public GET routes read Cosmos DB for every visitor
+  ├── Authenticated admin routes perform writes
   └── Imported locally by backend/server.js — no longer published to GitHub Packages
 
 backend/migrations/  Forward-only database migrations
@@ -131,26 +127,32 @@ tofu/              OpenTofu infrastructure-as-code
 
 ### Auth model
 
-"Everyone can view, only admins can edit." Anonymous visitors get instant page
-loads from an in-browser SQLite snapshot (sql.js/WASM) — no backend cold start.
-Authenticated users switch to the live API. Logging workouts, changing the
-current day, and admin actions require signing in via auth.romaine.life — the
+"Everyone can view, only admins can edit." Public reads go directly through the
+same-origin Express API on the always-running AKS pod. Logging workouts, changing
+the current day, and admin actions require signing in via auth.romaine.life — the
 central identity service that owns the user table and the role claim
 (`admin`/`user`/`pending`). Admins are promoted manually via
 https://auth.romaine.life/admin.
 
 ### Data flow
 
-1. Anonymous visitors load `snapshot.db` via sql.js/WASM — reads served entirely in-browser
-2. On sign-in, snapshot is discarded and all reads switch to the live backend API
-
-**Critical `useDataSource()` contract:** Every consumer of `useDataSource()` MUST check `isReady` before calling any fetch function. The snapshot loads asynchronously (WASM init + network fetch). Until it's ready, `db` is null, `isLive` evaluates to true, and fetches silently hit the live API — which doesn't exist for anonymous visitors, causing a permanent loading spinner. Pattern: `const { fetchFoo, isReady } = useDataSource(); useEffect(() => { if (!isReady) return; fetchFoo()... }, [isReady]);`
-3. To edit, user clicks Sign in → redirects to `auth.romaine.life/sign-in/microsoft?callbackURL=...`
-4. After Microsoft completes, auth.romaine.life sets a `.romaine.life` session cookie and bounces back here. Browser auto-attaches that cookie on every request to `workout.romaine.life` because it's scoped to the parent `.romaine.life` domain.
-5. Frontend's `bootstrapAuth()` ([frontend/src/auth/index.js](frontend/src/auth/index.js)) asks the backend `GET /api/auth/me` — the backend forwards the cookie to `auth.romaine.life/api/auth/get-session` and returns the user record (or null). No tokens stored anywhere in the SPA.
-6. On every request to a protected route, `requireAuth` ([backend/auth.js](backend/auth.js)) does the same cookie-forward to `auth.romaine.life/api/auth/get-session` (60s in-process cache to amortize), and gates on `role ∈ {admin, user}` — `pending` returns 403.
+1. Every visitor reads public workout data from `/api/*` on the same AKS pod that
+   serves the frontend. Cosmos DB is the only application data source.
+2. Authentication bootstraps in parallel and never blocks public rendering.
+3. To edit, the user clicks Sign in → redirects to
+   `auth.romaine.life/sign-in/microsoft?callbackURL=...`.
+4. After Microsoft completes, auth.romaine.life sets a `.romaine.life` session
+   cookie and bounces back here. The browser attaches that cookie to
+   `workout.romaine.life` because it is scoped to the parent domain.
+5. Frontend's `bootstrapAuth()` ([frontend/src/auth/index.js](frontend/src/auth/index.js))
+   asks the backend `GET /api/auth/me`; the backend forwards the cookie to
+   `auth.romaine.life/api/auth/get-session` and returns the user record (or null).
+   Both sides bound this probe with a timeout, and the SPA stores no token.
+6. On every protected request, `requireAuth` ([backend/auth.js](backend/auth.js))
+   performs the same cookie-forward (with a 60s in-process cache) and gates on
+   `role ∈ {admin, user}`; `pending` returns 403.
 7. `requireAdmin` gates admin-only routes on `role === 'admin'`.
-8. Backend queries/writes Cosmos DB, partitioned by userId (= `req.user.sub`, i.e. the auth.romaine.life user id).
+8. Backend queries/writes Cosmos DB, partitioned by userId (`req.user.sub`).
 
 No per-app HS256 signing, no Key Vault read, no Bearer-token handling on the frontend. auth.romaine.life is the single source of truth for sessions; this app just consults it.
 
@@ -158,7 +160,8 @@ No per-app HS256 signing, no Key Vault read, no Bearer-token handling on the fro
 
 This repo builds on shared resources provisioned by **infra-bootstrap**:
 
-- Cosmos DB account (`infra-cosmos-serverless`) — pay-per-request, no throughput floor
+- Cosmos DB account (`infra-cosmos-serverless`) — pay-per-request, no throughput floor,
+  continuous backup enabled at the shared account level
 - AKS cluster (`infra-aks`) — hosts the `kill-me` namespace pod
 - Azure Container Registry (`romainecr`) — AcrPush granted per-app
 - Azure App Configuration (`infra-appconfig`)
@@ -237,29 +240,17 @@ Migrations auto-apply only in the cluster, gated on `RUN_MIGRATIONS_ON_BOOT=true
 `npm run dev` deliberately reports what is pending instead of applying it — otherwise
 starting a dev server on a branch would push a half-written migration to production.
 
-`frontend/public/snapshot.db` is committed and baked into the image, so it has to be
-regenerated in the same commit as any migration that changes its schema. Otherwise
-anonymous visitors read a snapshot the new frontend cannot parse until the 4-hourly
-cron catches up:
-
-```bash
-cd snapshot && node generate-snapshot.js --preview-migrations --output ../frontend/public/snapshot.db
-```
-
 ## CI/CD
 
-All workflows delegate to **nelsong6/pipeline-templates** reusable templates:
+Application images are rebuilt only when application or infrastructure source changes.
+Database writes and backups never trigger an application deployment.
 
 | Workflow | Trigger | What it does |
 | -------- | ------- | ------------ |
-| `container-app-build.yml` | Push/PR to main | Builds Docker image, pushes to GHCR |
-| `full-stack-deploy.yml` | After CI Build succeeds / manual | Deploys backend (Container App image update + custom domain cert), deploys frontend (SWA) |
+| `build-and-deploy.yaml` | App source push to main / manual | Builds the fingerprinted image and bumps the Helm values tag |
+| `docker-build-check.yaml` | PR / manual | Verifies the container build and publishes the canonical fingerprint tag when permitted |
 | `tofu.yml` | Push/PR touching `tofu/` | Plan on PR, apply on main merge |
-| `lint.yml` | PR to main | Trailing newlines, YAML, spelling, markdown, tofu fmt |
-| `tofu-lockfile-check.yml` | PR touching `tofu/` | Validates lockfile is current |
-| `tofu-lockfile-update.yml` | Manual dispatch | Regenerates lockfile across platforms |
-| `generate-local-env.yml` | Manual dispatch | Generates `frontend/.env` and `backend/.env` from infra outputs |
-| `snapshot.yml` | Every 4 hours / manual | Generates SQLite snapshot from Cosmos DB and commits it to the repo (`frontend/public/snapshot.db`) |
+| `lint.yaml` | PR to main | Repository lint checks |
 
 ## Development
 
@@ -268,7 +259,6 @@ All workflows delegate to **nelsong6/pipeline-templates** reusable templates:
 - Node 20+
 - Azure CLI (`az login` for local Cosmos DB access)
 - Backend `.env` with `AZURE_APP_CONFIG_ENDPOINT`
-- Frontend `.env` with `VITE_API_URL` (Microsoft sign-in is delegated upstream to auth.romaine.life)
 
 ### Running locally
 
@@ -278,7 +268,8 @@ cd backend && npm run dev   # Backend only (Express :3000)
 cd frontend && npm run dev  # Frontend only (Vite :5173)
 ```
 
-The frontend reads `VITE_API_URL`. The auth service URL is fetched at runtime from the backend's `/api/config` endpoint.
+The frontend uses same-origin `/api/*` routes. Microsoft sign-in is delegated to
+auth.romaine.life; no frontend environment file is required.
 
 Admin mode is available only on localhost in dev mode when signed in as admin. It
 holds the day-override control; database initialization and the hand-run data
@@ -304,7 +295,7 @@ Working method (dev server started via `devctl`, see the dev-servers skill —
 chrome --headless=new --disable-gpu --hide-scrollbars \
   --user-data-dir="<temp>/chrome-prof" \
   --window-size=390,844 \          # 390w = mobile; app's isMobile triggers <760px
-  --virtual-time-budget=9000 \     # let async load (sql.js WASM + snapshot.db) settle
+  --virtual-time-budget=9000 \     # let async API data settle
   --screenshot="<temp>/shot.png" \
   "http://127.0.0.1:<vite-port>/<route>"
 ```

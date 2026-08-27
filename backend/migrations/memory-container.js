@@ -2,9 +2,8 @@
 // shapes the migrations actually use.
 //
 // It exists so migrations can be run against a copy of real data without writing
-// anything: the dry run uses it to show what would change, and the snapshot
-// generator uses it to preview what the anonymous snapshot will look like once
-// pending migrations have been applied.
+// anything: the dry run uses it to show what would change and to prove that pending
+// migrations are safe to retry.
 //
 // It deliberately throws 404 on a missing delete, exactly as Cosmos does, so a
 // migration that assumes a document is still there fails here instead of in
@@ -17,8 +16,8 @@ export function memoryContainer(documents) {
   const matches = (doc, sql, parameters) => {
     const p = Object.fromEntries(parameters.map(({ name, value }) => [name, value]));
 
-    // The migrations parameterise the type; the snapshot generator writes it as a
-    // literal. Both shapes have to filter, or a preview silently returns everything.
+    // Migration queries normally parameterise the type, but the in-memory adapter
+    // also accepts literals so it faithfully handles every migration query shape.
     const literalType = sql.match(/c\.type = "([^"]+)"/);
     if (literalType && doc.type !== literalType[1]) return false;
 

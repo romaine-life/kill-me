@@ -5,18 +5,26 @@
 // auth.romaine.life/api/auth/get-session and gates on role).
 
 const AUTH_URL = 'https://auth.romaine.life';
+const AUTH_TIMEOUT_MS = 5_000;
 
 /**
  * Boot-time "who am I?" probe. Returns the user record from auth.romaine.life
  * (via this app's /api/auth/me) if there's a valid session, or null.
  */
 export async function bootstrapAuth() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AUTH_TIMEOUT_MS);
   try {
-    const res = await fetch('/api/auth/me', { credentials: 'include' });
+    const res = await fetch('/api/auth/me', {
+      credentials: 'include',
+      signal: controller.signal,
+    });
     if (!res.ok) return null;
     return await res.json();
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

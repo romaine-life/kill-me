@@ -43,7 +43,7 @@ const pathFromTab = (tab) => (tab === 'soreness' ? '/' : `/${tab}`);
 
 function App() {
   const [activeTab, setActiveTab] = useState(() => tabFromPath(window.location.pathname));
-  const { isAdmin, loading } = useAuth();
+  const { isAdmin } = useAuth();
   const { currentDay, setDay, setCurrentDay } = useWorkouts();
   const [logInitialDay, setLogInitialDay] = useState(null);
   const [logInitialDate, setLogInitialDate] = useState(null);
@@ -191,14 +191,6 @@ function App() {
   ];
 
   const activeDetail = detailStack[detailStack.length - 1] || null;
-
-  if (loading) {
-    return (
-      <div style={{ ...styles.app, alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: 'var(--fg-muted)', fontSize: 16 }}>Loading...</div>
-      </div>
-    );
-  }
 
   return (
     <div style={styles.app}>

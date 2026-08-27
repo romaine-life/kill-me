@@ -13,6 +13,7 @@
 
 const AUTH_URL = 'https://auth.romaine.life';
 const SESSION_CACHE_TTL_MS = 60_000;
+const AUTH_REQUEST_TIMEOUT_MS = 5_000;
 const ALLOWED_ROLES = new Set(['admin', 'user']);
 
 // LOCAL DEV ONLY. When DEV_AUTH is set (e.g. DEV_AUTH=admin), skip the
@@ -37,6 +38,7 @@ async function fetchSessionFromAuth(cookie) {
   try {
     const res = await fetch(`${AUTH_URL}/api/auth/get-session`, {
       headers: { Cookie: cookie },
+      signal: AbortSignal.timeout(AUTH_REQUEST_TIMEOUT_MS),
     });
     if (!res.ok) return null;
     const body = await res.json();

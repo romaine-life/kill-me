@@ -2,10 +2,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { createServer as createNetServer } from 'node:net'
 import { spawn, execSync } from 'node:child_process'
-import { readFileSync, writeFileSync, existsSync, unlinkSync, copyFileSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { createHash } from 'node:crypto'
-import { resolve, dirname, join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -19,22 +19,6 @@ const getGitCommit = () => {
   } catch (error) {
     console.warn('Could not get git commit hash:', error.message)
     return 'dev'
-  }
-}
-
-// Copy sql.js WASM into public/ so it's served as a static asset (the in-browser
-// SQLite engine anonymous visitors read snapshot.db with).
-function copySqlJsWasm() {
-  return {
-    name: 'copy-sql-js-wasm',
-    buildStart() {
-      const src = resolve(__dirname, 'node_modules/sql.js/dist/sql-wasm.wasm')
-      const dest = resolve(__dirname, 'public/sql-wasm.wasm')
-      if (existsSync(src)) {
-        mkdirSync(dirname(dest), { recursive: true })
-        copyFileSync(src, dest)
-      }
-    },
   }
 }
 
@@ -59,8 +43,7 @@ function getFreePort() {
 // proxy every /api call to it. The child is tied to vite's lifecycle — starts with
 // the dev server, relaunches if it crashes, and is killed when vite exits — so
 // `vite` ALONE is "full prod from dev". `apply:'serve'` means this NEVER touches a
-// production build. Opt out with DEV_NO_BACKEND=1 to run the frontend alone against
-// the committed sql.js snapshot (anonymous, no backend, no DB).
+// production build.
 // The endpoint + identity are not secrets (the endpoint is a hostname; the sub is a
 // user id); override any via the env.
 function devBackend(port) {
@@ -102,8 +85,7 @@ function devBackend(port) {
       // The backend is a HARD dependency of the dev server: the frontend needs it
       // for auth, workouts, cardio — everything under /api. If it can't come up we
       // take the WHOLE dev server DOWN with a loud message instead of serving a
-      // frontend that silently fails every /api call. The only sanctioned way to run
-      // without it is the explicit DEV_NO_BACKEND=1 opt-in, which never reaches here.
+      // frontend that silently fails every /api call.
       const stop = () => { stopping = true; if (child) { child.kill(); child = null } try { unlinkSync(pidFile) } catch { /* */ } }
       const fatal = (why) => {
         const bar = '━'.repeat(74)
@@ -114,7 +96,6 @@ function devBackend(port) {
         log.error('')
         log.error('     The backend is NOT optional — the frontend talks to it for auth,')
         log.error('     workouts, cardio, everything under /api. Fix it, then re-run `npm run dev`.')
-        log.error('     (Want the frontend-only sql.js snapshot instead? Opt in: DEV_NO_BACKEND=1.)')
         log.error(`${bar}\n`)
         stop()
         process.exit(1)
@@ -229,15 +210,13 @@ function devctlHealth() {
   }
 }
 
-const noBackend = process.env.DEV_NO_BACKEND === '1'
-
 // https://vite.dev/config/
 export default defineConfig(async ({ command }) => {
   // Only a dev server (command 'serve') spawns the backend + proxy; a production
   // build touches none of this. A fresh free port is chosen each start, shared by
   // both the spawned backend and the /api proxy.
   const isVitest = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test'
-  const useBackend = command === 'serve' && !noBackend && !isVitest
+  const useBackend = command === 'serve' && !isVitest
   const backendPort = useBackend ? await getFreePort() : 0
   // devctl owns the port when it is the launcher; honour what it assigned so the
   // health endpoint above reports the port devctl recorded even if the flag is
@@ -248,7 +227,6 @@ export default defineConfig(async ({ command }) => {
   return {
     plugins: [
       react(),
-      copySqlJsWasm(),
       devctlHealth(),
       ...(useBackend ? [devBackend(backendPort)] : []),
     ],

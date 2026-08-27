@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { describeLoggedDay, getDayInfo } from '../utils/dayConfig';
-import { useDataSource } from '../api/snapshotContext.jsx';
+import { useApi } from '../api/useApi.js';
 import { formatTime12h, todayLocal } from '../utils/dateUtils';
 import { formatIntervalSummary } from '../utils/cardioTemplates.js';
 import { cardioColor, cardioName } from '../utils/cardioConfig.js';
@@ -36,10 +36,9 @@ export function ListTab({ onWorkoutClick, onCardioClick, onSorenessClick, viewTo
   const [sorenessEntries, setSorenessEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
-  const { fetchWorkouts, fetchCardioSessions, fetchSoreness, isReady } = useDataSource();
+  const { fetchWorkouts, fetchCardioSessions, fetchSoreness } = useApi();
 
   useEffect(() => {
-    if (!isReady) return;
     let active = true;
     (async () => {
       setLoading(true);
@@ -62,7 +61,7 @@ export function ListTab({ onWorkoutClick, onCardioClick, onSorenessClick, viewTo
     return () => {
       active = false;
     };
-  }, [isReady]);
+  }, [fetchWorkouts, fetchCardioSessions, fetchSoreness]);
 
   const items = useMemo(() => {
     const merged = [

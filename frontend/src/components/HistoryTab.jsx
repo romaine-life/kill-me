@@ -11,12 +11,12 @@
 //
 // The chronological list view is a separate tab (ListTab.jsx).
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { getDays } from '../utils/dayConfig';
 import { dayColor } from '../utils/dayDesign';
 import { CARDIO_CONFIG, cardioColor } from '../utils/cardioConfig';
-import { useDataSource } from '../api/snapshotContext.jsx';
+import { useApi } from '../api/useApi.js';
 import { dateToLocal } from '../utils/dateUtils';
 
 const SORENESS_COLOR = '#f97316'; // orange-500
@@ -38,14 +38,9 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, onSorene
   });
   // Hover state: tracks which workout type is currently being hovered
   const [hoveredWorkoutType, setHoveredWorkoutType] = useState(null);
-  const { fetchWorkouts: fetchWorkoutsFromSource, fetchCardioSessions, fetchSoreness, isReady } = useDataSource();
+  const { fetchWorkouts: fetchWorkoutsFromSource, fetchCardioSessions, fetchSoreness } = useApi();
 
-  useEffect(() => {
-    if (!isReady) return;
-    loadData();
-  }, [isReady]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [workoutData, cardioData, sorenessData] = await Promise.all([
@@ -61,7 +56,11 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, onSorene
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchWorkoutsFromSource, fetchCardioSessions, fetchSoreness]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Calendar helpers
   const getDaysInMonth = (date) => {

@@ -18,7 +18,7 @@ async function gravatarUrl(email, size = 64) {
 }
 
 export function UserProfile() {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, loading, isAdmin, logout } = useAuth();
   const [avatarSrc, setAvatarSrc] = useState(null);
   const [imgFailed, setImgFailed] = useState(false);
   const [open, setOpen] = useState(false);
@@ -47,6 +47,10 @@ export function UserProfile() {
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);
+
+  if (loading) {
+    return <span style={styles.checking}>Checking sign-in…</span>;
+  }
 
   if (!user) {
     return (
@@ -125,6 +129,11 @@ export function UserProfile() {
 }
 
 const styles = {
+  checking: {
+    color: colors.text.tertiary,
+    fontSize: 11,
+    fontFamily: 'monospace',
+  },
   signInButton: {
     display: 'inline-flex',
     alignItems: 'center',

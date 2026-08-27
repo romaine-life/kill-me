@@ -1,6 +1,6 @@
 import { createElement, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Bike, ChevronLeft, Dumbbell, Wrench } from 'lucide-react';
-import { useDataSource } from '../api/snapshotContext.jsx';
+import { useApi } from '../api/useApi.js';
 import { colors } from '../colors';
 import { cardioColor, cardioName } from '../utils/cardioConfig';
 import { formatTime12h } from '../utils/dateUtils';
@@ -63,7 +63,7 @@ export function ActivityRecordDetail({
   onOpenRecord,
   onAddSoreness,
 }) {
-  const { fetchWorkouts, fetchCardioSessions, fetchSoreness, isReady } = useDataSource();
+  const { fetchWorkouts, fetchCardioSessions, fetchSoreness } = useApi();
   const fetchers = useRef({ fetchWorkouts, fetchCardioSessions, fetchSoreness });
   useEffect(() => {
     fetchers.current = { fetchWorkouts, fetchCardioSessions, fetchSoreness };
@@ -73,7 +73,6 @@ export function ActivityRecordDetail({
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!isReady) return;
     let active = true;
     setLoading(true);
     setError(null);
@@ -99,7 +98,7 @@ export function ActivityRecordDetail({
     return () => {
       active = false;
     };
-  }, [isReady, kind, record]);
+  }, [kind, record]);
 
   const context = useMemo(() => {
     if (kind === 'workout') {
