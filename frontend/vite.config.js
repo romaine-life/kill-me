@@ -10,17 +10,10 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-// Git short hash for the displayed build number. CI/Docker pass BUILD_NUMBER via
-// env (the container isn't a git repo); local dev falls back to the running git.
-const getGitCommit = () => {
-  if (process.env.BUILD_NUMBER) return process.env.BUILD_NUMBER
-  try {
-    return execSync('git rev-parse --short HEAD').toString().trim()
-  } catch (error) {
-    console.warn('Could not get git commit hash:', error.message)
-    return 'dev'
-  }
-}
+// CI passes the immutable source-content fingerprint used as the image tag.
+// Unlike a PR commit SHA, it remains correct when the exact image is reused
+// after merge. Local development deliberately uses a distinct identity.
+const getBuildId = () => process.env.APP_BUILD_ID || 'dev'
 
 // Ask the OS for a free port instead of hardcoding one, so parallel worktrees /
 // dev servers never fight over a fixed number (several backends pinning one port
@@ -231,7 +224,7 @@ export default defineConfig(async ({ command }) => {
       ...(useBackend ? [devBackend(backendPort)] : []),
     ],
     define: {
-      __BUILD_NUMBER__: JSON.stringify(getGitCommit()),
+      __APP_BUILD_ID__: JSON.stringify(getBuildId()),
     },
     server: {
       // Bind IPv4 loopback explicitly. Vite's default host is 'localhost', which

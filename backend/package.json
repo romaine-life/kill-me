@@ -1,6 +1,6 @@
 {
   "name": "@romaine-life/kill-me-backend",
-  "version": "1.0.0",
+  "version": "0.0.0-private",
   "private": true,
   "type": "module",
   "description": "Per-app backend for workout.romaine.life, running as a single container on AKS",
@@ -8,6 +8,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "test": "node --test",
     "migrate:dry-run": "node migrations/dry-run.js",
     "migrate": "node migrations/apply.js"
   },

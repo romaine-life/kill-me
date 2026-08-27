@@ -7,6 +7,12 @@ image:
   tag: "app-11ce063dcc02ae35560f75b3154e2d601229e6752e2468b6d9e20764a9100f02"
   pullPolicy: IfNotPresent
 
+# The deploy workflow derives semantic versions from immutable Git release
+# tags, then records the version-to-image mapping here for the running pod.
+release:
+  version: "1.0.0"
+  deployedAt: ""
+
 name: kill-me
 namespace: kill-me
 

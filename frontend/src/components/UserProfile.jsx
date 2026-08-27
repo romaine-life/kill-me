@@ -4,8 +4,6 @@ import { useAuth } from '../auth/AuthContext.jsx';
 import { startLogin } from '../auth/index.js';
 import { colors } from '../colors';
 
-/* global __BUILD_NUMBER__ */
-
 // Gravatar for the signed-in email. Uses SHA-256 (Gravatar's modern hash);
 // crypto.subtle needs a secure context, which both localhost and https satisfy.
 // `d=retro` gives a deterministic pixel-art fallback when the email has no
@@ -121,7 +119,6 @@ export function UserProfile() {
           >
             Sign Out
           </button>
-          <div style={styles.buildLine}>build {__BUILD_NUMBER__}</div>
         </div>
       )}
     </div>
@@ -238,13 +235,6 @@ const styles = {
     padding: '8px 10px',
     borderRadius: 6,
     cursor: 'pointer',
-    fontFamily: 'monospace',
-  },
-  buildLine: {
-    marginTop: 4,
-    textAlign: 'center',
-    fontSize: 10,
-    color: colors.text.disabled,
     fontFamily: 'monospace',
   },
 };
