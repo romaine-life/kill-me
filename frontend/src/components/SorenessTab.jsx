@@ -109,6 +109,7 @@ export function SorenessTab({
   onSourceConsumed,
   initialEditEntry = null,
   onEditConsumed,
+  onEditorClosed,
   onOpenWorkout,
   onOpenCardio,
   onOpenSoreness,
@@ -234,10 +235,17 @@ export function SorenessTab({
   }, [initialCreate]);
 
   function showWorkout(workout) {
-    setEditing(false);
+    closeEditor();
     setChangingSource(false);
     resetPicker();
     onOpenWorkout?.(workout);
+  }
+
+  // Parent-launched editors temporarily replace an Activity view. Closing one
+  // reveals that unchanged view again; inline editors remain in this component.
+  function closeEditor() {
+    setEditing(false);
+    onEditorClosed?.();
   }
 
   // Only the explicit Add soreness command on a workout detail page reaches
@@ -349,8 +357,12 @@ export function SorenessTab({
           sourceWorkoutDate: editSource?.date || null,
         }),
       });
-      setEditing(false);
-      await loadData();
+      if (onEditorClosed) {
+        closeEditor();
+      } else {
+        setEditing(false);
+        await loadData();
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -366,8 +378,12 @@ export function SorenessTab({
       setSaving(true);
       setError(null);
       await apiFetch(`/api/soreness/${encodeURIComponent(originalId)}`, { method: 'DELETE' });
-      setEditing(false);
-      await loadData();
+      if (onEditorClosed) {
+        closeEditor();
+      } else {
+        setEditing(false);
+        await loadData();
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -394,7 +410,7 @@ export function SorenessTab({
                 setChangingSource(false);
                 setEditorStep('muscles');
               } else {
-                setEditing(false);
+                closeEditor();
               }
             }}
             style={styles.backBtn}
@@ -471,7 +487,7 @@ export function SorenessTab({
     return (
       <div style={{ maxWidth: 960 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-          <button onClick={() => setEditing(false)} style={styles.backBtn}>
+          <button onClick={closeEditor} style={styles.backBtn}>
             <ChevronLeft size={13} style={{ verticalAlign: -2 }} /> Back
           </button>
           <h2 style={styles.heading}>{isEditingEntry ? 'Edit soreness' : 'Add soreness'}</h2>
@@ -639,7 +655,7 @@ export function SorenessTab({
           >
             {saving ? 'Saving...' : isEditingEntry ? 'Save changes' : 'Create soreness'}
           </button>
-          <button onClick={() => setEditing(false)} style={styles.cancelBtn}>
+          <button onClick={closeEditor} style={styles.cancelBtn}>
             Cancel
           </button>
           {originalId && (

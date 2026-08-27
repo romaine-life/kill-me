@@ -59,6 +59,10 @@ function App() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activityView, setActivityView] = useState('lanes');
   const [sorenessCreateRequested, setSorenessCreateRequested] = useState(false);
+  // The editor temporarily replaces Activity content without changing the
+  // selected view. Preserve enough context to return to its launch point.
+  const [sorenessEditorOpen, setSorenessEditorOpen] = useState(false);
+  const [sorenessReturnContext, setSorenessReturnContext] = useState(null);
 
   // Push URL when tab changes (but not on initial mount)
   const navigateTab = useCallback((tab) => {
@@ -73,6 +77,8 @@ function App() {
   useEffect(() => {
     const onPopState = () => {
       setDetailStack([]);
+      setSorenessEditorOpen(false);
+      setSorenessReturnContext(null);
       setActiveTab(tabFromPath(window.location.pathname));
     };
     window.addEventListener('popstate', onPopState);
@@ -131,10 +137,12 @@ function App() {
 
   // Navigate to the Soreness tab with the editor pre-attributed to a workout
   const handleLogSoreness = (workout) => {
+    setSorenessReturnContext({ tab: activeTab, detailStack });
     setDetailStack([]);
     setSorenessCreateRequested(false);
     setSorenessSource(workout);
-    setActivityView('journal');
+    setSorenessEditEntry(null);
+    setSorenessEditorOpen(true);
     navigateTab('soreness');
   };
 
@@ -152,18 +160,48 @@ function App() {
   };
 
   const handleEditSoreness = (entry) => {
+    // The detail contains the pre-edit record, so return to its originating
+    // Activity view rather than restoring a stale detail page after saving.
+    setSorenessReturnContext({ tab: 'soreness', detailStack: [] });
     setDetailStack([]);
     setSorenessCreateRequested(false);
+    setSorenessSource(null);
     setSorenessEditEntry(entry);
-    setActivityView('journal');
+    setSorenessEditorOpen(true);
     navigateTab('soreness');
   };
 
   const handleCreateSoreness = () => {
+    setSorenessReturnContext({ tab: 'soreness', detailStack: [] });
     setSorenessSource(null);
     setSorenessEditEntry(null);
     setSorenessCreateRequested(true);
-    setActivityView('journal');
+    setSorenessEditorOpen(true);
+  };
+
+  const clearSorenessEditor = () => {
+    setSorenessEditorOpen(false);
+    setSorenessCreateRequested(false);
+    setSorenessSource(null);
+    setSorenessEditEntry(null);
+  };
+
+  const handleSorenessEditorClosed = () => {
+    const returnContext = sorenessReturnContext;
+    clearSorenessEditor();
+    setSorenessReturnContext(null);
+    setDetailStack(returnContext?.detailStack || []);
+    if (returnContext?.tab && returnContext.tab !== activeTab) {
+      navigateTab(returnContext.tab);
+    }
+  };
+
+  const handleActivityViewChange = (view) => {
+    // Selecting a view while editing is explicit navigation away from the
+    // draft, so do not later restore the editor's launch point.
+    clearSorenessEditor();
+    setSorenessReturnContext(null);
+    setActivityView(view);
   };
 
   const handleEditRecord = (kind, record) => {
@@ -188,6 +226,8 @@ function App() {
 
   const handleNav = (tab) => {
     setDetailStack([]);
+    clearSorenessEditor();
+    setSorenessReturnContext(null);
     navigateTab(tab);
     setMobileNavOpen(false);
   };
@@ -268,11 +308,28 @@ function App() {
           {activeTab === 'soreness' && (
             <ActivityWorkspace
               view={activityView}
-              onViewChange={setActivityView}
+              onViewChange={handleActivityViewChange}
               isAdmin={isAdmin}
               onCreateSoreness={handleCreateSoreness}
+              editorOpen={sorenessEditorOpen}
             >
-              {activityView === 'calendar' ? (
+              {sorenessEditorOpen ? (
+                <SorenessTab
+                  key="soreness-editor"
+                  isAdmin={isAdmin}
+                  view={activityView}
+                  initialCreate={sorenessCreateRequested}
+                  onCreateConsumed={() => setSorenessCreateRequested(false)}
+                  initialSource={sorenessSource}
+                  onSourceConsumed={() => setSorenessSource(null)}
+                  initialEditEntry={sorenessEditEntry}
+                  onEditConsumed={() => setSorenessEditEntry(null)}
+                  onEditorClosed={handleSorenessEditorClosed}
+                  onOpenWorkout={(workout) => handleOpenRecord('workout', workout)}
+                  onOpenCardio={(session) => handleOpenRecord('cardio', session)}
+                  onOpenSoreness={(entry) => handleOpenRecord('soreness', entry)}
+                />
+              ) : activityView === 'calendar' ? (
                 <HistoryTab
                   key={refreshKey}
                   onDayClick={isAdmin ? handleOpenLog : undefined}
@@ -289,14 +346,9 @@ function App() {
                 />
               ) : (
                 <SorenessTab
+                  key="soreness-view"
                   isAdmin={isAdmin}
                   view={activityView}
-                  initialCreate={sorenessCreateRequested}
-                  onCreateConsumed={() => setSorenessCreateRequested(false)}
-                  initialSource={sorenessSource}
-                  onSourceConsumed={() => setSorenessSource(null)}
-                  initialEditEntry={sorenessEditEntry}
-                  onEditConsumed={() => setSorenessEditEntry(null)}
                   onOpenWorkout={(workout) => handleOpenRecord('workout', workout)}
                   onOpenCardio={(session) => handleOpenRecord('cardio', session)}
                   onOpenSoreness={(entry) => handleOpenRecord('soreness', entry)}
@@ -408,7 +460,7 @@ function ActivityToggle({ view, onChange }) {
   );
 }
 
-function ActivityWorkspace({ view, onViewChange, isAdmin, onCreateSoreness, children }) {
+function ActivityWorkspace({ view, onViewChange, isAdmin, onCreateSoreness, editorOpen, children }) {
   return (
     <div className="activity-workspace">
       <header className="activity-workspace-header">
@@ -418,7 +470,7 @@ function ActivityWorkspace({ view, onViewChange, isAdmin, onCreateSoreness, chil
         </div>
         <div className="activity-workspace-controls">
           <ActivityToggle view={view} onChange={onViewChange} />
-          {isAdmin && (
+          {isAdmin && !editorOpen && (
             <button type="button" className="activity-add-soreness" onClick={onCreateSoreness}>
               <span className="activity-add-label-long">+ Add soreness</span>
               <span className="activity-add-label-short">+ Add</span>
