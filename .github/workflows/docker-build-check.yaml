@@ -57,7 +57,6 @@ jobs:
           git checkout --detach "$full_sha"
           echo "Resolved image source -> ${full_sha}"
           echo "sha=${full_sha}" >> "${GITHUB_OUTPUT}"
-          echo "BUILD_NUMBER=${full_sha}" >> "$GITHUB_ENV"
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
@@ -119,7 +118,7 @@ jobs:
           load: false
           tags: romainecr.azurecr.io/kill-me:${{ steps.fingerprint.outputs.proof_tag }}
           build-args: |
-            BUILD_NUMBER=${{ env.BUILD_NUMBER || github.event.pull_request.head.sha || github.sha }}
+            APP_BUILD_ID=${{ steps.fingerprint.outputs.proof_tag }}
           cache-from: |
             type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app
             type=gha,scope=app
@@ -153,6 +152,6 @@ jobs:
           push: false
           load: false
           build-args: |
-            BUILD_NUMBER=${{ github.event.pull_request.head.sha }}
+            APP_BUILD_ID=${{ steps.fingerprint.outputs.proof_tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

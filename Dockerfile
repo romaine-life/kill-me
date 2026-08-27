@@ -10,11 +10,11 @@ RUN npm ci
 # Copy frontend source, then build.
 COPY frontend/ ./
 
-# Build-time env: Vite inlines VITE_* vars into the bundle. BUILD_NUMBER
-# overrides vite.config.js's `execSync('git rev-parse')` fallback — git isn't
-# available in this stage, and that's fine.
-ARG BUILD_NUMBER=dev
-ENV BUILD_NUMBER=$BUILD_NUMBER
+# The source-content fingerprint is stable when a PR-built image is reused after
+# merge. The frontend compares this identity with /api/version to detect an old
+# browser tab after a new image is deployed.
+ARG APP_BUILD_ID=dev
+ENV APP_BUILD_ID=$APP_BUILD_ID
 
 RUN npm run build
 

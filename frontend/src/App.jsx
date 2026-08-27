@@ -15,6 +15,7 @@ import { HistoryTab } from './components/HistoryTab';
 import { DayOverride } from './components/DayOverride';
 import { LogTab } from './components/WorkoutDrawer';
 import { UserProfile } from './components/UserProfile';
+import { AppVersion } from './components/AppVersion';
 import { TabBar } from './components/TabBar';
 import { CycleTab } from './components/CycleTab';
 import { SorenessTab } from './components/SorenessTab';
@@ -538,6 +539,7 @@ function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, compact =
       <TabBar tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
 
       <div style={{ flex: 1 }} />
+      <AppVersion />
     </aside>
   );
 }

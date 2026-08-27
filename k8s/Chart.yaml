@@ -2,5 +2,6 @@ apiVersion: v2
 name: kill-me
 description: Workout tracker (workout.romaine.life)
 type: application
+# This is the Helm chart packaging version. Application releases use Git tags
+# and .Values.release.version; the chart itself is not published independently.
 version: 0.1.0
-appVersion: "0.1.0"

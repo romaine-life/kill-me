@@ -247,7 +247,7 @@ Database writes and backups never trigger an application deployment.
 
 | Workflow | Trigger | What it does |
 | -------- | ------- | ------------ |
-| `build-and-deploy.yaml` | App source push to main / manual | Builds the fingerprinted image and bumps the Helm values tag |
+| `build-and-deploy.yaml` | App source push to main / manual | Creates the next semantic release when required, builds or reuses the fingerprinted image, and records the deployed version/image/time in Helm values |
 | `docker-build-check.yaml` | PR / manual | Verifies the container build and publishes the canonical fingerprint tag when permitted |
 | `tofu.yml` | Push/PR touching `tofu/` | Plan on PR, apply on main merge |
 | `lint.yaml` | PR to main | Repository lint checks |
@@ -311,7 +311,21 @@ fall back from: you get a silent failure and no PNG at all. Use an isolated
 is typically `C:\Program Files\Google\Chrome\Application\chrome.exe` or Edge's
 `msedge.exe`.
 
-### Build number
+### Application releases and deployed version
 
-The frontend displays a git short hash as the build number, injected at build time
-via Vite's `define` config.
+Application releases use immutable Git tags (`vMAJOR.MINOR.PATCH`) as their source
+of truth. Every PR carries exactly one `release:major`, `release:minor`,
+`release:patch`, or `release:none` label. On merge, `build-and-deploy.yaml` applies
+that bump to the latest tag, creates the GitHub release, and records the version,
+deployment time, and content-fingerprint image tag in `k8s/values.yaml`.
+
+The public `/api/version` endpoint returns that runtime metadata with `no-store`
+caching. The frontend shows the semantic version and deployment time at the bottom
+of the shared sidebar (also used by the mobile drawer). It polls the endpoint and
+compares the running image fingerprint with the build identity compiled into the
+bundle; an old browser tab gets an explicit reload action after a new deployment.
+Git SHAs remain CI/debugging metadata and are not presented as application versions.
+
+The `version` fields in the private frontend/backend npm packages are deliberately
+`0.0.0-private`; the Helm `version` is the chart packaging version. Neither is an
+application release number.

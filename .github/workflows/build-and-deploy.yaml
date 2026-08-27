@@ -21,6 +21,7 @@ on:
 permissions:
   id-token: write
   contents: write
+  pull-requests: read
 
 concurrency:
   group: build-and-deploy
@@ -63,7 +64,70 @@ jobs:
 
           git checkout --detach "$full_sha"
           echo "Resolved ${target_ref} -> ${full_sha}"
-          echo "BUILD_NUMBER=${full_sha::7}" >> "$GITHUB_ENV"
+          echo "SOURCE_SHA=${full_sha}" >> "$GITHUB_ENV"
+
+      - name: Resolve semantic application version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          existing_tag="$(git tag --points-at "${SOURCE_SHA}" --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1)"
+          latest_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1)"
+          release_title="Versioned application release"
+          create_tag=false
+          create_release=false
+
+          if [ -n "${existing_tag}" ]; then
+            app_version="${existing_tag#v}"
+            if ! gh release view "${existing_tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+              create_release=true
+            fi
+          elif [ -z "${latest_tag}" ]; then
+            # The first release establishes a truthful baseline; it does not
+            # pretend the package.json/Helm placeholders were prior releases.
+            app_version="1.0.0"
+            release_title="Initial versioned release"
+            create_tag=true
+            create_release=true
+          else
+            pulls="$(gh api \
+              -H 'Accept: application/vnd.github+json' \
+              "repos/${GITHUB_REPOSITORY}/commits/${SOURCE_SHA}/pulls")"
+            pull_count="$(jq 'length' <<<"${pulls}")"
+            if [ "${pull_count}" -ne 1 ]; then
+              echo "::error::Expected ${SOURCE_SHA} to be associated with exactly one pull request; found ${pull_count}."
+              exit 1
+            fi
+
+            mapfile -t release_labels < <(jq -r \
+              '.[0].labels[].name | select(startswith("release:"))' \
+              <<<"${pulls}")
+            if [ "${#release_labels[@]}" -ne 1 ]; then
+              echo "::error::Expected exactly one release:* label; found ${#release_labels[@]}."
+              exit 1
+            fi
+
+            bump="${release_labels[0]#release:}"
+            release_title="$(jq -r '.[0].title' <<<"${pulls}")"
+            app_version="$(node scripts/next-app-version.mjs "${latest_tag#v}" "${bump}")"
+            if [ "${bump}" != "none" ]; then
+              create_tag=true
+              create_release=true
+            fi
+          fi
+
+          deployed_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          {
+            echo "APP_VERSION=${app_version}"
+            echo "APP_DEPLOYED_AT=${deployed_at}"
+            echo "CREATE_VERSION_TAG=${create_tag}"
+            echo "CREATE_GITHUB_RELEASE=${create_release}"
+            echo "RELEASE_TITLE=${release_title}"
+          } >> "$GITHUB_ENV"
+          echo "Resolved ${SOURCE_SHA} as application v${app_version}"
 
       - name: Azure Login (OIDC)
         uses: azure/login@v3
@@ -118,7 +182,7 @@ jobs:
           push: true
           tags: romainecr.azurecr.io/kill-me:${{ env.ALIAS_TAG }}
           build-args: |
-            BUILD_NUMBER=${{ env.BUILD_NUMBER }}
+            APP_BUILD_ID=${{ env.ALIAS_TAG }}
           cache-from: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app
           cache-to: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app,mode=max
 
@@ -128,6 +192,8 @@ jobs:
           set -euo pipefail
           # Quote the tag so YAML never reinterprets image tags.
           sed -i "s|^  tag: .*|  tag: \"${ALIAS_TAG}\"|" k8s/values.yaml
+          sed -i "s|^  version: .*|  version: \"${APP_VERSION}\"|" k8s/values.yaml
+          sed -i "s|^  deployedAt: .*|  deployedAt: \"${APP_DEPLOYED_AT}\"|" k8s/values.yaml
 
       - name: Commit and push tag bump
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -140,5 +206,25 @@ jobs:
             echo "No values changes to commit"
             exit 0
           fi
-          git commit -m "chore: bump kill-me image to fingerprint ${{ env.ALIAS_TAG }} [skip ci]"
+          git commit -m "chore: deploy kill-me v${APP_VERSION} as ${ALIAS_TAG} [skip ci]"
           git push origin HEAD:main
+
+      - name: Publish semantic release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.CREATE_GITHUB_RELEASE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_tag="v${APP_VERSION}"
+          if [ "${CREATE_VERSION_TAG}" = "true" ]; then
+            git tag -a "${version_tag}" "${SOURCE_SHA}" -m "${version_tag}: ${RELEASE_TITLE}"
+            git push origin "refs/tags/${version_tag}"
+          fi
+          if ! gh release view "${version_tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release create "${version_tag}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --target "${SOURCE_SHA}" \
+              --title "${version_tag} — ${RELEASE_TITLE}" \
+              --generate-notes
+          fi

@@ -3,6 +3,7 @@ name: Lint
 on:
   pull_request:
     branches: [ main ]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 
 concurrency:
@@ -10,6 +11,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  release-label:
+    name: Semantic release label
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require exactly one release label
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const allowed = new Set([
+              'release:major',
+              'release:minor',
+              'release:patch',
+              'release:none',
+            ]);
+            const found = context.payload.pull_request.labels
+              .map(({ name }) => name)
+              .filter((name) => allowed.has(name));
+            if (found.length !== 1) {
+              core.setFailed(
+                `Expected exactly one semantic release label (${[...allowed].join(', ')}); found ${found.length ? found.join(', ') : 'none'}.`
+              );
+            }
+
+  release-version-tests:
+    name: Semantic version rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Test version calculation
+        run: node --test scripts/next-app-version.test.mjs
+
   code-quality:
     uses: romaine-life/pipeline-templates/.github/workflows/lint-template.yml@main
     with:

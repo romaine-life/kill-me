@@ -22,6 +22,7 @@ import {
 import { createRequireAuth, requireAdmin, currentCaller } from './auth.js';
 import { fetchConfig } from './config.js';
 import { runMigrations, pendingMigrations } from './migrations/runner.js';
+import { getVersionInfo } from './version.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.join(__dirname, '..', 'frontend', 'dist');
@@ -44,6 +45,15 @@ app.use((req, res, next) => {
 app.get('/health', (req, res) => {
   if (!serverReady) return res.status(503).json({ status: 'starting' });
   res.json({ status: 'healthy' });
+});
+
+// Public, non-cached deployment identity. An already-open frontend polls this
+// endpoint and offers a reload when its immutable build no longer matches the
+// image currently serving the API.
+app.get('/api/version', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.json(getVersionInfo());
 });
 
 // Boot-time "am I signed in?" probe used by the frontend. Returns null if

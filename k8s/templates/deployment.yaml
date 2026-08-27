@@ -28,6 +28,9 @@ spec:
       labels:
         app: {{ include "kill-me.resourceName" . }}
         azure.workload.identity/use: "true"
+      annotations:
+        romaine.life/app-version: {{ .Values.release.version | quote }}
+        romaine.life/build-id: {{ .Values.image.tag | quote }}
     spec:
       serviceAccountName: {{ .Values.serviceAccount }}
       containers:
@@ -46,6 +49,12 @@ spec:
           env:
             - name: PORT
               value: "3000"
+            - name: APP_VERSION
+              value: {{ .Values.release.version | quote }}
+            - name: APP_DEPLOYED_AT
+              value: {{ .Values.release.deployedAt | quote }}
+            - name: APP_BUILD_ID
+              value: {{ .Values.image.tag | quote }}
             - name: AZURE_APP_CONFIG_ENDPOINT
               value: https://infra-appconfig.azconfig.io
             # Pending migrations apply here and nowhere else. Local development points at

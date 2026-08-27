@@ -21,6 +21,7 @@ function assertNotIncludes(text, needle, label) {
 assertIncludes(dockerBuildCheck, "scripts/image-fingerprint.sh", "docker-build-check");
 assertIncludes(dockerBuildCheck, "steps.fingerprint.outputs.proof_tag", "docker-build-check");
 assertIncludes(dockerBuildCheck, "romainecr.azurecr.io/kill-me:${{ steps.fingerprint.outputs.proof_tag }}", "docker-build-check");
+assertIncludes(dockerBuildCheck, "APP_BUILD_ID=${{ steps.fingerprint.outputs.proof_tag }}", "docker-build-check");
 assertIncludes(dockerBuildCheck, "sha-${{ steps.source.outputs.sha }}", "docker-build-check");
 assertNotIncludes(dockerBuildCheck, "ci-pr-", "docker-build-check");
 assertNotIncludes(dockerBuildCheck, "ci-ref-", "docker-build-check");
@@ -31,6 +32,7 @@ assertNotIncludes(dockerBuildCheck, "romainecr.azurecr.io/kill-me:${{ env.IMAGE_
 assertIncludes(buildAndDeploy, "scripts/image-fingerprint.sh", "build-and-deploy");
 assertIncludes(buildAndDeploy, "ALIAS_TAG=app-${fingerprint}", "build-and-deploy");
 assertIncludes(buildAndDeploy, "romainecr.azurecr.io/kill-me:${{ env.ALIAS_TAG }}", "build-and-deploy");
+assertIncludes(buildAndDeploy, "APP_BUILD_ID=${{ env.ALIAS_TAG }}", "build-and-deploy");
 assertNotIncludes(buildAndDeploy, "ci-ref-", "build-and-deploy");
 assertNotIncludes(buildAndDeploy, 'TAG="${GITHUB_SHA::7}"', "build-and-deploy");
 assertNotIncludes(buildAndDeploy, '--build-arg BUILD_NUMBER="${TAG}"', "build-and-deploy");
