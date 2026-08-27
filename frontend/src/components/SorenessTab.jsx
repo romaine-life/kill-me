@@ -103,7 +103,8 @@ function useIsMobile(breakpoint = 640) {
 export function SorenessTab({
   isAdmin,
   view = 'lanes',
-  viewToggle,
+  initialCreate = false,
+  onCreateConsumed,
   initialSource = null,
   onSourceConsumed,
   initialEditEntry = null,
@@ -221,6 +222,16 @@ export function SorenessTab({
     setEditing(true);
     resetPicker();
   }
+
+  const createConsumedCallback = useRef(onCreateConsumed);
+  const startNewCallback = useRef(startNew);
+  createConsumedCallback.current = onCreateConsumed;
+  startNewCallback.current = startNew;
+  useEffect(() => {
+    if (!initialCreate) return;
+    startNewCallback.current();
+    createConsumedCallback.current?.();
+  }, [initialCreate]);
 
   function showWorkout(workout) {
     setEditing(false);
@@ -645,36 +656,10 @@ export function SorenessTab({
     );
   }
 
-  const header = (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-      <div>
-        <h2 style={styles.heading}>
-          {view === 'lanes' ? 'Activity & Recovery' : view === 'timeline' ? 'Recovery Timeline' : 'Soreness Journal'}
-        </h2>
-        <p style={{ color: colors.text.tertiary, fontSize: 12, margin: '4px 0 0 0' }}>
-          {view === 'journal'
-            ? 'Soreness logged per workout'
-            : view === 'lanes'
-              ? 'Strength, cardio, and recovery over time'
-              : 'Each workout and the soreness it caused'}
-        </p>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {viewToggle}
-        {isAdmin && (
-          <button onClick={startNew} style={styles.addBtn}>
-            + Add soreness
-          </button>
-        )}
-      </div>
-    </div>
-  );
-
   // ── Lanes view ───────────────────────────────────────────────────────
   if (view === 'lanes') {
     return (
       <div style={{ width: '100%', maxWidth: 1200, minWidth: 0, boxSizing: 'border-box' }}>
-        {header}
         {error && <p style={{ color: colors.accent.red, fontSize: 12, marginBottom: 12 }}>{error}</p>}
         <SorenessLanes
           entries={entries}
@@ -691,7 +676,6 @@ export function SorenessTab({
   if (view === 'timeline') {
     return (
       <div style={{ width: '100%', maxWidth: 1000, minWidth: 0, boxSizing: 'border-box' }}>
-        {header}
         {error && <p style={{ color: colors.accent.red, fontSize: 12, marginBottom: 12 }}>{error}</p>}
         <RecoveryTimeline
           workouts={workoutsByDate}
@@ -713,7 +697,6 @@ export function SorenessTab({
   // ── Journal (list) view ──────────────────────────────────────────────
   return (
     <div style={{ maxWidth: isMobile ? undefined : 1000 }}>
-      {header}
       {error && <p style={{ color: colors.accent.red, fontSize: 12, marginBottom: 12 }}>{error}</p>}
 
       <div style={{ display: 'flex', gap: isMobile ? 16 : 24, alignItems: 'flex-start', overflowX: 'auto' }}>

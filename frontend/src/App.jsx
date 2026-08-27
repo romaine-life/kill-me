@@ -58,6 +58,7 @@ function App() {
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 760);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activityView, setActivityView] = useState('lanes');
+  const [sorenessCreateRequested, setSorenessCreateRequested] = useState(false);
 
   // Push URL when tab changes (but not on initial mount)
   const navigateTab = useCallback((tab) => {
@@ -131,6 +132,7 @@ function App() {
   // Navigate to the Soreness tab with the editor pre-attributed to a workout
   const handleLogSoreness = (workout) => {
     setDetailStack([]);
+    setSorenessCreateRequested(false);
     setSorenessSource(workout);
     setActivityView('journal');
     navigateTab('soreness');
@@ -151,9 +153,17 @@ function App() {
 
   const handleEditSoreness = (entry) => {
     setDetailStack([]);
+    setSorenessCreateRequested(false);
     setSorenessEditEntry(entry);
     setActivityView('journal');
     navigateTab('soreness');
+  };
+
+  const handleCreateSoreness = () => {
+    setSorenessSource(null);
+    setSorenessEditEntry(null);
+    setSorenessCreateRequested(true);
+    setActivityView('journal');
   };
 
   const handleEditRecord = (kind, record) => {
@@ -256,37 +266,43 @@ function App() {
           )}
 
           {activeTab === 'soreness' && (
-            activityView === 'calendar' ? (
-              <HistoryTab
-                key={refreshKey}
-                viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
-                onDayClick={isAdmin ? handleOpenLog : undefined}
-                onWorkoutClick={(workout) => handleOpenRecord('workout', workout)}
-                onCardioClick={(session) => handleOpenRecord('cardio', session)}
-                onSorenessClick={(entry) => handleOpenRecord('soreness', entry)}
-              />
-            ) : activityView === 'list' ? (
-              <ListTab
-                key={refreshKey}
-                viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
-                onWorkoutClick={(workout) => handleOpenRecord('workout', workout)}
-                onCardioClick={(session) => handleOpenRecord('cardio', session)}
-                onSorenessClick={(entry) => handleOpenRecord('soreness', entry)}
-              />
-            ) : (
-              <SorenessTab
-                isAdmin={isAdmin}
-                view={activityView}
-                viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
-                initialSource={sorenessSource}
-                onSourceConsumed={() => setSorenessSource(null)}
-                initialEditEntry={sorenessEditEntry}
-                onEditConsumed={() => setSorenessEditEntry(null)}
-                onOpenWorkout={(workout) => handleOpenRecord('workout', workout)}
-                onOpenCardio={(session) => handleOpenRecord('cardio', session)}
-                onOpenSoreness={(entry) => handleOpenRecord('soreness', entry)}
-              />
-            )
+            <ActivityWorkspace
+              view={activityView}
+              onViewChange={setActivityView}
+              isAdmin={isAdmin}
+              onCreateSoreness={handleCreateSoreness}
+            >
+              {activityView === 'calendar' ? (
+                <HistoryTab
+                  key={refreshKey}
+                  onDayClick={isAdmin ? handleOpenLog : undefined}
+                  onWorkoutClick={(workout) => handleOpenRecord('workout', workout)}
+                  onCardioClick={(session) => handleOpenRecord('cardio', session)}
+                  onSorenessClick={(entry) => handleOpenRecord('soreness', entry)}
+                />
+              ) : activityView === 'list' ? (
+                <ListTab
+                  key={refreshKey}
+                  onWorkoutClick={(workout) => handleOpenRecord('workout', workout)}
+                  onCardioClick={(session) => handleOpenRecord('cardio', session)}
+                  onSorenessClick={(entry) => handleOpenRecord('soreness', entry)}
+                />
+              ) : (
+                <SorenessTab
+                  isAdmin={isAdmin}
+                  view={activityView}
+                  initialCreate={sorenessCreateRequested}
+                  onCreateConsumed={() => setSorenessCreateRequested(false)}
+                  initialSource={sorenessSource}
+                  onSourceConsumed={() => setSorenessSource(null)}
+                  initialEditEntry={sorenessEditEntry}
+                  onEditConsumed={() => setSorenessEditEntry(null)}
+                  onOpenWorkout={(workout) => handleOpenRecord('workout', workout)}
+                  onOpenCardio={(session) => handleOpenRecord('cardio', session)}
+                  onOpenSoreness={(entry) => handleOpenRecord('soreness', entry)}
+                />
+              )}
+            </ActivityWorkspace>
           )}
 
           {activeTab === 'cycle' && (
@@ -341,26 +357,84 @@ function ActivityToggle({ view, onChange }) {
     { id: 'list', label: 'List' },
     { id: 'calendar', label: 'Calendar' },
   ];
+
+  const handleKeyDown = (event, index) => {
+    let nextIndex;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % opts.length;
+    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + opts.length) % opts.length;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = opts.length - 1;
+    if (nextIndex === undefined) return;
+
+    event.preventDefault();
+    const next = opts[nextIndex];
+    onChange(next.id);
+    window.requestAnimationFrame(() => document.getElementById(`activity-tab-${next.id}`)?.focus());
+  };
+
   return (
-    <div className="activity-view-toggle" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: 4, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, width: 'fit-content', maxWidth: '100%', boxSizing: 'border-box' }}>
-      {opts.map((o) => {
+    <div
+      className="activity-view-toggle"
+      role="tablist"
+      aria-label="Activity views"
+      style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, width: 'fit-content', maxWidth: '100%', boxSizing: 'border-box' }}
+    >
+      {opts.map((o, index) => {
         const active = o.id === view;
         return (
           <button
             key={o.id}
+            id={`activity-tab-${o.id}`}
+            type="button"
+            role="tab"
             onClick={() => onChange(o.id)}
-            aria-pressed={active}
+            onKeyDown={(event) => handleKeyDown(event, index)}
+            aria-selected={active}
+            aria-controls="activity-view-panel"
+            tabIndex={active ? 0 : -1}
             style={{
               padding: '9px 12px', borderRadius: 7, fontSize: 13, fontWeight: 600,
               fontFamily: 'var(--font-primary)', border: 'none', cursor: 'pointer',
               color: active ? 'var(--fg-primary)' : 'var(--fg-muted)',
               background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
+              whiteSpace: 'nowrap', flexShrink: 0,
             }}
           >
             {o.label}
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function ActivityWorkspace({ view, onViewChange, isAdmin, onCreateSoreness, children }) {
+  return (
+    <div className="activity-workspace">
+      <header className="activity-workspace-header">
+        <div className="activity-workspace-heading">
+          <h2>Activity &amp; Recovery</h2>
+          <p>Strength, cardio, and recovery over time</p>
+        </div>
+        <div className="activity-workspace-controls">
+          <ActivityToggle view={view} onChange={onViewChange} />
+          {isAdmin && (
+            <button type="button" className="activity-add-soreness" onClick={onCreateSoreness}>
+              <span className="activity-add-label-long">+ Add soreness</span>
+              <span className="activity-add-label-short">+ Add</span>
+            </button>
+          )}
+        </div>
+      </header>
+      <div
+        id="activity-view-panel"
+        className="activity-view-panel"
+        role="tabpanel"
+        aria-labelledby={`activity-tab-${view}`}
+        tabIndex={0}
+      >
+        {children}
+      </div>
     </div>
   );
 }
