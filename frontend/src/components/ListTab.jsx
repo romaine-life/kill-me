@@ -30,7 +30,7 @@ const daysSince = (iso) => {
   return Math.round((b - a) / (1000 * 60 * 60 * 24));
 };
 
-export function ListTab({ onWorkoutClick, onCardioClick, onSorenessClick, viewToggle }) {
+export function ListTab({ onWorkoutClick, onCardioClick, onSorenessClick }) {
   const [workouts, setWorkouts] = useState([]);
   const [cardioSessions, setCardioSessions] = useState([]);
   const [sorenessEntries, setSorenessEntries] = useState([]);
@@ -122,8 +122,7 @@ export function ListTab({ onWorkoutClick, onCardioClick, onSorenessClick, viewTo
   ];
 
   return (
-    <div className="list-tab-page" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 80px', display: 'flex', flexDirection: 'column', gap: 28, fontFamily: 'var(--font-primary)' }}>
-      {viewToggle}
+    <div className="list-tab-page" style={{ width: '100%', maxWidth: 1100, margin: 0, padding: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 28, fontFamily: 'var(--font-primary)' }}>
       <StatsStrip workouts={workouts} cardio={cardioSessions} cycles={cyclesCompleted} activeDays={new Set(allDates).size} />
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
