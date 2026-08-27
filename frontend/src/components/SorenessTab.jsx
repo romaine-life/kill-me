@@ -177,19 +177,20 @@ export function SorenessTab({
     [workouts],
   );
 
-  // Arriving from "Log soreness" on a workout elsewhere in the app: open the
-  // editor straight onto that workout, skipping the source picker.
+  // Arriving from "Log soreness" on a workout elsewhere in the app: wait for
+  // the existing soreness records, then open the editor straight onto that
+  // workout. The records are needed to seed a follow-up log from its last one.
   const consumedSource = useRef(null);
   const sourceConsumedCallback = useRef(onSourceConsumed);
   const beginCreateCallback = useRef(beginCreateForWorkout);
   sourceConsumedCallback.current = onSourceConsumed;
   beginCreateCallback.current = beginCreateForWorkout;
   useEffect(() => {
-    if (!initialSource || consumedSource.current === initialSource) return;
+    if (loading || !initialSource || consumedSource.current === initialSource) return;
     consumedSource.current = initialSource;
     beginCreateCallback.current(initialSource);
     sourceConsumedCallback.current?.();
-  }, [initialSource]);
+  }, [initialSource, loading]);
 
   const consumedEdit = useRef(null);
   const editConsumedCallback = useRef(onEditConsumed);
@@ -248,15 +249,31 @@ export function SorenessTab({
     onEditorClosed?.();
   }
 
+  // Most recent felt-date wins. New records also have updatedAt, which makes
+  // repeated logs on the same date deterministic while legacy records continue
+  // to work without it.
+  function lastEntryForWorkout(workoutId) {
+    return entries
+      .filter((entry) => entry.sourceWorkoutId === workoutId)
+      .sort((a, b) => (
+        (b.date || '').localeCompare(a.date || '')
+        || (b.updatedAt || '').localeCompare(a.updatedAt || '')
+        || (b._ts || 0) - (a._ts || 0)
+        || (b.id || '').localeCompare(a.id || '')
+      ))[0] || null;
+  }
+
   // Only the explicit Add soreness command on a workout detail page reaches
-  // this function. It always starts a clean record.
+  // this function. It creates a distinct record for today, seeded with the
+  // latest muscles and intensity logged against that same workout.
   function beginCreateForWorkout(workout = null) {
     const source = workout ? toSource(workout) : null;
+    const previous = source ? lastEntryForWorkout(source.id) : null;
     setEditDate(todayStr());
     setEditSource(source);
     setOriginalId(null);
-    setEditLevel(null);
-    setEditMuscles([]);
+    setEditLevel(entryLevel(previous));
+    setEditMuscles((previous?.muscles || []).map((muscle) => ({ ...muscle })));
     setShowAllGroups(!source);
     setChangingSource(false);
     setEditorStep('muscles');
