@@ -100,16 +100,25 @@ function useIsMobile(breakpoint = 640) {
   return mobile;
 }
 
-export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed }) {
+export function SorenessTab({
+  isAdmin,
+  view = 'lanes',
+  viewToggle,
+  initialSource = null,
+  onSourceConsumed,
+  initialEditEntry = null,
+  onEditConsumed,
+  onOpenWorkout,
+  onOpenCardio,
+  onOpenSoreness,
+}) {
   const [entries, setEntries] = useState([]);
   const [workouts, setWorkouts] = useState([]);
+  const [cardioSessions, setCardioSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { fetchSoreness, fetchWorkouts, isReady } = useDataSource();
+  const { fetchSoreness, fetchWorkouts, fetchCardioSessions, isReady } = useDataSource();
   const isMobile = useIsMobile();
-
-  const [view, setView] = useState('lanes'); // 'lanes' | 'journal' | 'timeline'
-  const [workoutDetail, setWorkoutDetail] = useState(null);
 
   // Editor state
   const [editing, setEditing] = useState(false);
@@ -136,7 +145,8 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   const [pinnedMuscle, setPinnedMuscle] = useState(null); // { group, muscle }
   const [listHover, setListHover] = useState(null); // { group, muscle }
 
-  // Fetch entries and workouts (workouts drive the source picker and timeline)
+  // Fetch the recovery records and the strength/cardio activity that gives
+  // them context on the shared date rail.
   useEffect(() => {
     if (!isReady) return;
     loadData();
@@ -145,9 +155,14 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   async function loadData() {
     try {
       setLoading(true);
-      const [sorenessData, workoutData] = await Promise.all([fetchSoreness(), fetchWorkouts()]);
+      const [sorenessData, workoutData, cardioData] = await Promise.all([
+        fetchSoreness(),
+        fetchWorkouts(),
+        fetchCardioSessions(),
+      ]);
       setEntries(sorenessData.entries || []);
       setWorkouts(workoutData.workouts || []);
+      setCardioSessions(cardioData.sessions || []);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -164,13 +179,28 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   // Arriving from "Log soreness" on a workout elsewhere in the app: open the
   // editor straight onto that workout, skipping the source picker.
   const consumedSource = useRef(null);
+  const sourceConsumedCallback = useRef(onSourceConsumed);
+  const beginCreateCallback = useRef(beginCreateForWorkout);
+  sourceConsumedCallback.current = onSourceConsumed;
+  beginCreateCallback.current = beginCreateForWorkout;
   useEffect(() => {
     if (!initialSource || consumedSource.current === initialSource) return;
     consumedSource.current = initialSource;
-    setWorkoutDetail(initialSource);
-    beginCreateForWorkout(initialSource);
-    onSourceConsumed?.();
-  }, [initialSource, entries]);
+    beginCreateCallback.current(initialSource);
+    sourceConsumedCallback.current?.();
+  }, [initialSource]);
+
+  const consumedEdit = useRef(null);
+  const editConsumedCallback = useRef(onEditConsumed);
+  const startEditCallback = useRef(startEdit);
+  editConsumedCallback.current = onEditConsumed;
+  startEditCallback.current = startEdit;
+  useEffect(() => {
+    if (!initialEditEntry || consumedEdit.current === initialEditEntry) return;
+    consumedEdit.current = initialEditEntry;
+    startEditCallback.current(initialEditEntry);
+    editConsumedCallback.current?.();
+  }, [initialEditEntry]);
 
   // Search results, restricted to the source day's groups unless overridden
   const visibleGroups = useMemo(() => {
@@ -187,7 +217,6 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   // The global Add action opens the workout browser. Choosing a workout is
   // navigation to its detail page, never an implicit create or edit command.
   function startNew() {
-    setWorkoutDetail(null);
     setChangingSource(false);
     setEditorStep('source');
     setEditing(true);
@@ -195,10 +224,10 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   }
 
   function showWorkout(workout) {
-    setWorkoutDetail(workout);
     setEditing(false);
     setChangingSource(false);
     resetPicker();
+    onOpenWorkout?.(workout);
   }
 
   // Only the explicit Add soreness command on a workout detail page reaches
@@ -343,20 +372,6 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   // The group to show in the diagram panel — either the expanded picker group or
   // the hovered muscle's group (hovered takes priority for search results).
   const diagramGroup = hoveredMuscle?.group || expandedGroup;
-
-  // ── Workout detail (read-only until an explicit Add/Edit command) ─────
-  if (workoutDetail && !editing) {
-    return (
-      <SorenessWorkoutDetail
-        workout={workoutDetail}
-        entries={entries.filter((entry) => entry.sourceWorkoutId === workoutDetail.id)}
-        isAdmin={isAdmin}
-        onBack={() => setWorkoutDetail(null)}
-        onAdd={() => beginCreateForWorkout(workoutDetail)}
-        onEdit={startEdit}
-      />
-    );
-  }
 
   // ── Source picker step ───────────────────────────────────────────────
   if (editing && isAdmin && editorStep === 'source') {
@@ -634,17 +649,19 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   const header = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
       <div>
-        <h2 style={styles.heading}>Soreness Journal</h2>
+        <h2 style={styles.heading}>
+          {view === 'lanes' ? 'Activity & Recovery' : view === 'timeline' ? 'Recovery Timeline' : 'Soreness Journal'}
+        </h2>
         <p style={{ color: colors.text.tertiary, fontSize: 12, margin: '4px 0 0 0' }}>
           {view === 'journal'
             ? 'Soreness logged per workout'
             : view === 'lanes'
-              ? 'Each workout and how long its soreness ran'
+              ? 'Strength, cardio, and recovery over time'
               : 'Each workout and the soreness it caused'}
         </p>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <ViewToggle view={view} onChange={setView} />
+        {viewToggle}
         {isAdmin && (
           <button onClick={startNew} style={styles.addBtn}>
             + Add soreness
@@ -657,13 +674,15 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   // ── Lanes view ───────────────────────────────────────────────────────
   if (view === 'lanes') {
     return (
-      <div style={{ maxWidth: 1200 }}>
+      <div style={{ width: '100%', maxWidth: 1200, minWidth: 0, boxSizing: 'border-box' }}>
         {header}
         {error && <p style={{ color: colors.accent.red, fontSize: 12, marginBottom: 12 }}>{error}</p>}
         <SorenessLanes
           entries={entries}
           workouts={workoutsByDate}
+          cardioSessions={cardioSessions}
           onOpenWorkout={showWorkout}
+          onOpenCardio={onOpenCardio}
         />
       </div>
     );
@@ -672,7 +691,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
   // ── Timeline view ────────────────────────────────────────────────────
   if (view === 'timeline') {
     return (
-      <div style={{ maxWidth: 1000 }}>
+      <div style={{ width: '100%', maxWidth: 1000, minWidth: 0, boxSizing: 'border-box' }}>
         {header}
         {error && <p style={{ color: colors.accent.red, fontSize: 12, marginBottom: 12 }}>{error}</p>}
         <RecoveryTimeline
@@ -681,6 +700,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
           isAdmin={isAdmin}
           isMobile={isMobile}
           onOpenWorkout={showWorkout}
+          onOpenSoreness={onOpenSoreness}
           onEditEntry={startEdit}
         />
       </div>
@@ -710,8 +730,18 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
                 return (
                   <div
                     key={entry.id || sorenessDocId(entry.date, entry.sourceWorkoutId)}
+                    role={onOpenSoreness ? 'button' : undefined}
+                    tabIndex={onOpenSoreness ? 0 : undefined}
+                    onClick={() => onOpenSoreness?.(entry)}
+                    onKeyDown={(event) => {
+                      if (onOpenSoreness && (event.key === 'Enter' || event.key === ' ')) {
+                        event.preventDefault();
+                        onOpenSoreness(entry);
+                      }
+                    }}
                     style={{
                       ...styles.entryRow,
+                      cursor: onOpenSoreness ? 'pointer' : 'default',
                       ...(isMobile ? { flexDirection: 'column', alignItems: 'flex-start', gap: 8, padding: '10px 12px' } : {}),
                     }}
                   >
@@ -724,7 +754,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
                       </div>
                       {isAdmin && (
                         <button
-                          onClick={() => startEdit(entry)}
+                          onClick={(event) => { event.stopPropagation(); startEdit(entry); }}
                           style={styles.editIconBtn}
                           title="Edit soreness"
                         >
@@ -763,7 +793,10 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
                         return (
                           <div
                             key={`${m.group}-${m.muscle || 'group'}`}
-                            onClick={() => setPinnedMuscle(isPinned ? null : { group: m.group, muscle: m.muscle })}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setPinnedMuscle(isPinned ? null : { group: m.group, muscle: m.muscle });
+                            }}
                             onMouseEnter={() => setListHover({ group: m.group, muscle: m.muscle })}
                             onMouseLeave={() => setListHover(null)}
                             style={{
@@ -836,129 +869,10 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
 // ---------------------------------------------------------------------------
 // Timeline — workout history and the soreness each workout caused, side by side
 // ---------------------------------------------------------------------------
-
-function SorenessWorkoutDetail({ workout, entries, isAdmin, onBack, onAdd, onEdit }) {
-  const color = dayColor(workout.daySlug);
-  const sortedEntries = [...entries].sort((a, b) => b.date.localeCompare(a.date));
-
-  return (
-    <div style={{ maxWidth: 900 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <button onClick={onBack} style={styles.backBtn}>
-          <ChevronLeft size={13} style={{ verticalAlign: -2 }} /> Back
-        </button>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ ...styles.dayChip, borderColor: color }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
-              D{pad2(workout.dayNumber)}
-            </span>
-            <h2 style={styles.heading}>{describeLoggedDay(workout)}</h2>
-          </div>
-          <div style={{ marginTop: 4, color: colors.text.tertiary, fontSize: 12 }}>
-            {formatDate(workout.date)}{workout.time ? ` · ${workout.time}` : ''}
-          </div>
-        </div>
-      </div>
-
-      {(workout.exercises || []).length > 0 && (
-        <div style={{ ...styles.timelineCard, marginBottom: 18 }}>
-          <div style={styles.fieldLabel}>Workout</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {workout.exercises.map((exercise, index) => (
-              <div key={`${exercise.name}-${index}`} style={{ color: colors.text.secondary, fontSize: 13 }}>
-                <span style={{ color: colors.text.primary, fontWeight: 600 }}>{exercise.name}</span>
-                {exercise.variation ? ` · ${exercise.variation}` : ''}
-                {exercise.sets && exercise.reps ? ` · ${exercise.sets} × ${exercise.reps}` : ''}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
-        <div>
-          <h3 style={{ ...styles.heading, fontSize: 16 }}>Soreness records</h3>
-          <div style={{ marginTop: 3, color: colors.text.tertiary, fontSize: 11 }}>
-            {sortedEntries.length} record{sortedEntries.length === 1 ? '' : 's'} associated with this workout
-          </div>
-        </div>
-        {isAdmin && (
-          <button onClick={onAdd} style={styles.addBtn}>+ Add soreness</button>
-        )}
-      </div>
-
-      {sortedEntries.length === 0 ? (
-        <div style={{ ...styles.timelineCard, color: colors.text.tertiary, fontSize: 13 }}>
-          No soreness records for this workout.
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {sortedEntries.map((entry) => {
-            const level = entryLevel(entry);
-            return (
-              <div key={entry.id || `${entry.date}-${entry.updatedAt || ''}`} style={styles.entryRow}>
-                <div style={{ minWidth: 120 }}>
-                  <div style={{ color: colors.text.primary, fontSize: 13, fontWeight: 600 }}>{formatDate(entry.date)}</div>
-                  <div style={{ color: colors.text.disabled, fontSize: 10 }}>{entry.date}</div>
-                </div>
-                <div style={{ flex: 1, minWidth: 180 }}>
-                  <div style={{ color: level ? getLevelColor(level) : colors.accent.amber, fontSize: 13, fontWeight: 700 }}>
-                    {level ? `Intensity ${level} · ${getLevelLabel(level)}` : 'Intensity not recorded'}
-                  </div>
-                  <div style={{ marginTop: 2, color: colors.text.tertiary, fontSize: 11 }}>
-                    {entry.muscles.length
-                      ? entry.muscles.map((m) => m.muscle || m.group).join(' · ')
-                      : 'No muscles specified'}
-                  </div>
-                </div>
-                {isAdmin && (
-                  <button onClick={() => onEdit(entry)} style={styles.editIconBtn}>
-                    <Wrench size={13} /> Edit
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ViewToggle({ view, onChange }) {
-  const opts = [
-    { id: 'journal', label: 'Journal' },
-    { id: 'timeline', label: 'Timeline' },
-    { id: 'lanes', label: 'Lanes' },
-  ];
-  return (
-    <div style={{ display: 'flex', gap: 4, padding: 4, background: colors.bg.raised, border: `1px solid ${colors.border.subtle}`, borderRadius: 8 }}>
-      {opts.map((o) => {
-        const active = o.id === view;
-        return (
-          <button
-            key={o.id}
-            onClick={() => onChange(o.id)}
-            style={{
-              padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-              border: 'none', cursor: 'pointer',
-              color: active ? colors.text.primary : colors.text.tertiary,
-              background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
-            }}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 // Every workout in reverse-chronological order with its recovery curve beneath
 // it. Workouts with nothing logged are still listed — the gaps are part of the
 // picture, and they double as the entry point for logging.
-function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onOpenWorkout, onEditEntry }) {
+function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onOpenWorkout, onOpenSoreness, onEditEntry }) {
   const curves = useMemo(() => buildRecoveryCurves(entries), [entries]);
   const unattributed = useMemo(
     () => entries.filter((e) => !e.sourceWorkoutId),
@@ -989,7 +903,19 @@ function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onOpenWorkout,
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {unattributed.map((e) => (
-              <div key={e.id || e.date} style={{ ...styles.entryRow, gap: 12 }}>
+              <div
+                key={e.id || e.date}
+                role={onOpenSoreness ? 'button' : undefined}
+                tabIndex={onOpenSoreness ? 0 : undefined}
+                onClick={() => onOpenSoreness?.(e)}
+                onKeyDown={(event) => {
+                  if (onOpenSoreness && (event.key === 'Enter' || event.key === ' ')) {
+                    event.preventDefault();
+                    onOpenSoreness(e);
+                  }
+                }}
+                style={{ ...styles.entryRow, gap: 12, cursor: onOpenSoreness ? 'pointer' : 'default' }}
+              >
                 <span style={{ fontSize: 12, color: colors.text.secondary, fontWeight: 600, minWidth: 110 }}>
                   {formatDate(e.date)}
                 </span>
@@ -999,7 +925,7 @@ function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onOpenWorkout,
                   {e.muscles.length ? e.muscles.map((m) => m.muscle || m.group).join(' · ') : 'No muscles specified'}
                 </span>
                 {isAdmin && (
-                  <button onClick={() => onEditEntry(e)} style={styles.editIconBtn} title="Edit entry">
+                  <button onClick={(event) => { event.stopPropagation(); onEditEntry(e); }} style={styles.editIconBtn} title="Edit entry">
                     <Wrench size={13} /> Edit
                   </button>
                 )}

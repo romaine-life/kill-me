@@ -1,5 +1,6 @@
 // Lanes view — a vertical date rail where each workout spawns a stripe that
-// runs for as long as its soreness lasted.
+// runs for as long as its soreness lasted. Cardio sessions share the date rail
+// as peer activity records, but never spawn a soreness stripe.
 //
 // Reads like a git graph: the date axis is the trunk, workouts are commits, and
 // each recovery is a branch that slopes off its workout and runs down the page
@@ -21,23 +22,23 @@
 import { useMemo, useState, useEffect } from 'react';
 import { getDayInfo, describeLoggedDay } from '../utils/dayConfig';
 import { dayColor, pad2 } from '../utils/dayDesign';
+import { cardioColor, cardioLabel, cardioName } from '../utils/cardioConfig';
 import { buildTracks, packLanes, datesBetween, daysBetween } from '../utils/sorenessLink';
 import { todayLocal } from '../utils/dateUtils';
 import { colors } from '../colors';
 
 const ROW_H = 30;
 const GAP_H = 22; // a collapsed run of dates with nothing in them
-const DATE_X = 0;
+const ACTIVITY_W = 146;
+const CARDIO_GAP = 12;
 const DATE_W = 74; // wide enough for "Sat Aug 13" in 10px monospace
-const WO_X = DATE_W + 6;
-const WO_W = 146;
+const ACTIVITY_GAP = 6;
 const GUTTER = 64; // room for the spawn connector to slope
 const LANE_W = 20;
 const LANE_PITCH = 26;
 const LABEL_GAP = 14;
 const LABEL_COL = 100; // per-stripe label column, for stripes sharing a start day
 const TOP = 34;
-
 const shortDate = (d) =>
   new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
@@ -75,12 +76,13 @@ function shiftDays(date, delta) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWorkout, onOpenCardio }) {
   const [group, setGroup] = useState('workout');   // 'workout' | 'muscle'
   const [gaps, setGaps] = useState('bridge');     // 'bridge' | 'break'
   const [order, setOrder] = useState('oldest');    // 'oldest' | 'newest'
   const [quiet, setQuiet] = useState('collapse');  // 'collapse' | 'show'
   const [windowDays, setWindowDays] = useState(30); // 30 | 90 | 0 (all)
+  const [activityContext, setActivityContext] = useState('all'); // 'all' | 'weights'
   const [hover, setHover] = useState(null);
   const narrow = useNarrow();
 
@@ -91,13 +93,20 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
     const built = buildTracks(entries.filter((e) => inWindow(e.date)), group);
     const { tracks, laneCount } = packLanes(built);
     const visibleWorkouts = workouts.filter((w) => inWindow(w.date));
+    const visibleCardio = activityContext === 'all'
+      ? cardioSessions.filter((session) => inWindow(session.date))
+      : [];
 
     const stamps = [
       ...visibleWorkouts.map((w) => w.date),
+      ...visibleCardio.map((session) => session.date),
       ...tracks.flatMap((t) => [t.startDate, t.endDate, t.sourceWorkoutDate].filter(Boolean)),
     ];
     if (stamps.length === 0) {
-      return { layout: [], yByDate: new Map(), bottom: TOP, tracks: [], laneCount: 0, workoutsByDate: new Map() };
+      return {
+        layout: [], yByDate: new Map(), bottom: TOP, tracks: [], laneCount: 0,
+        workoutsByDate: new Map(), cardioByDate: new Map(),
+      };
     }
 
     const min = stamps.reduce((a, b) => (a < b ? a : b));
@@ -110,11 +119,17 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
       if (!workoutsByDate.has(w.date)) workoutsByDate.set(w.date, []);
       workoutsByDate.get(w.date).push(w);
     }
+    const cardioByDate = new Map();
+    for (const session of visibleCardio) {
+      if (!cardioByDate.has(session.date)) cardioByDate.set(session.date, []);
+      cardioByDate.get(session.date).push(session);
+    }
 
     // A date earns a full row if something happens on it, or if a stripe is
     // mid-run through it. A stripe must never be collapsed through, or its
     // length — the one thing this view exists to show — would lie.
     const active = new Set(workoutsByDate.keys());
+    for (const date of cardioByDate.keys()) active.add(date);
     for (const t of tracks) {
       if (t.sourceWorkoutDate) active.add(t.sourceWorkoutDate);
       for (const d of datesBetween(t.startDate, t.endDate)) active.add(d);
@@ -150,10 +165,10 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
     const yByDate = new Map();
     for (const r of layout) if (r.kind === 'date') yByDate.set(r.date, r.y);
 
-    return { layout, yByDate, bottom: yPos, tracks, laneCount, workoutsByDate };
-  }, [entries, workouts, group, order, windowDays, quiet]);
+    return { layout, yByDate, bottom: yPos, tracks, laneCount, workoutsByDate, cardioByDate };
+  }, [entries, workouts, cardioSessions, activityContext, group, order, windowDays, quiet]);
 
-  const { layout, yByDate, bottom, tracks, laneCount, workoutsByDate } = model;
+  const { layout, yByDate, bottom, tracks, laneCount, workoutsByDate, cardioByDate } = model;
   const y = (date) => yByDate.get(date);
 
   // A stripe's label sits at whichever end is visually on top, which flips with
@@ -181,13 +196,25 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
     return { slot, widest };
   }, [tracks, order]);
 
-  const laneX0 = WO_X + WO_W + GUTTER;
+  const showCardioColumn = activityContext === 'all';
+  const dateX = 0;
+  const cardioX = dateX + DATE_W + ACTIVITY_GAP;
+  const workoutX = showCardioColumn
+    ? cardioX + ACTIVITY_W + CARDIO_GAP
+    : cardioX;
+  const laneX0 = workoutX + ACTIVITY_W + GUTTER;
   const labelX = laneX0 + Math.max(laneCount, 1) * LANE_PITCH + LABEL_GAP;
   const width = labelX + labelSlots.widest * LABEL_COL + 16;
   const height = bottom + 16;
+  const visibleCardioActivities = [...new Set(
+    [...cardioByDate.values()].flat().map((session) => session.activity),
+  )];
 
   const controls = (
-    <Controls {...{ group, setGroup, gaps, setGaps, order, setOrder, quiet, setQuiet, windowDays, setWindowDays }} />
+    <Controls {...{
+      group, setGroup, gaps, setGaps, order, setOrder, quiet, setQuiet,
+      windowDays, setWindowDays, activityContext, setActivityContext, narrow,
+    }} />
   );
 
   if (layout.length === 0) {
@@ -195,7 +222,7 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
       <div style={{ maxWidth: '100%', minWidth: 0 }}>
         {controls}
         <p style={{ color: colors.text.tertiary, fontSize: 13, marginTop: 16 }}>
-          No workout-linked soreness in this window.
+          No strength, cardio, or soreness activity in this window.
         </p>
       </div>
     );
@@ -204,6 +231,14 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
   return (
     <div style={{ maxWidth: '100%', minWidth: 0 }}>
       {controls}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginTop: 10, color: colors.text.tertiary, fontSize: 10 }}>
+        <LegendMark color={colors.text.secondary} label="Strength workout" />
+        {visibleCardioActivities.map((activity) => (
+          <LegendMark key={activity} color={cardioColor(activity)} label={cardioLabel(activity)} />
+        ))}
+        <LegendMark color={colors.text.secondary} label="Recovery lane matches strength" />
+      </div>
 
       <div
         style={{
@@ -231,12 +266,30 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
           }}
         >
           <svg width={width} height={height} style={{ display: 'block' }}>
+            {/* Keep the timeline in one reading direction. Date is the stable
+                lookup key, cardio and strength are peer activity records, and
+                strength remains adjacent to the recovery it can originate. */}
+            <text x={dateX} y={12} style={{ fontSize: 8, fontFamily: 'monospace', fill: colors.text.disabled, letterSpacing: '0.08em' }}>
+              DATE
+            </text>
+            {showCardioColumn && (
+              <text x={cardioX} y={12} style={{ fontSize: 8, fontFamily: 'monospace', fill: colors.text.disabled, letterSpacing: '0.08em' }}>
+                CARDIO
+              </text>
+            )}
+            <text x={workoutX} y={12} style={{ fontSize: 8, fontFamily: 'monospace', fill: colors.text.disabled, letterSpacing: '0.08em' }}>
+              STRENGTH
+            </text>
+            <text x={laneX0} y={12} style={{ fontSize: 8, fontFamily: 'monospace', fill: colors.text.disabled, letterSpacing: '0.08em' }}>
+              SORENESS
+            </text>
+
             {/* Date rail */}
             {layout.map((r) =>
               r.kind === 'gap' ? (
                 <g key={`gap-${r.y}`}>
                   <line
-                    x1={DATE_X}
+                    x1={dateX}
                     y1={r.y + GAP_H / 2}
                     x2={width - 8}
                     y2={r.y + GAP_H / 2}
@@ -244,9 +297,9 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
                     strokeWidth={0.5}
                     strokeDasharray="1 5"
                   />
-                  <rect x={DATE_X} y={r.y + GAP_H / 2 - 7} width={DATE_W + 24} height={14} fill={colors.bg.base} />
+                  <rect x={dateX} y={r.y + GAP_H / 2 - 7} width={DATE_W + 24} height={14} fill={colors.bg.base} />
                   <text
-                    x={DATE_X}
+                    x={dateX}
                     y={r.y + GAP_H / 2 + 3}
                     style={{ fontSize: 9, fontFamily: 'monospace', fill: colors.text.disabled }}
                   >
@@ -256,14 +309,14 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
               ) : (
                 <g key={r.date}>
                   <text
-                    x={DATE_X}
+                    x={dateX}
                     y={r.y + 4}
                     style={{ fontSize: 10, fontFamily: 'monospace', fill: colors.text.tertiary }}
                   >
                     {weekday(r.date)} {shortDate(r.date)}
                   </text>
                   <line
-                    x1={DATE_W - 4}
+                    x1={dateX + DATE_W - 4}
                     y1={r.y}
                     x2={width - 8}
                     y2={r.y}
@@ -281,7 +334,7 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
               const y1 = t.sourceWorkoutDate ? y(t.sourceWorkoutDate) : undefined;
               const y2raw = y(t.startDate);
               if (y1 == null || y2raw == null) return null;
-              const x1 = WO_X + WO_W;
+              const x1 = workoutX + ACTIVITY_W;
               const x2 = laneX0 + t.lane * LANE_PITCH;
               // Land on the middle of the first day, not on the edge above it.
               // The edge is where a day boundary is scored, so arriving there
@@ -289,7 +342,7 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
               // the same height — the connector looked like it ran through the
               // stripe it was passing behind.
               const y2 = y2raw;
-              const dim = hover && hover.workoutId !== t.sourceWorkoutId;
+              const dim = hover?.kind === 'soreness' && hover.workoutId !== t.sourceWorkoutId;
               return (
                 <path
                   key={`c-${t.key}`}
@@ -312,7 +365,7 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
             {tracks.map((t) => {
               const x = laneX0 + t.lane * LANE_PITCH;
               const color = dayColor(t.sourceWorkoutDaySlug);
-              const dim = hover && hover.workoutId !== t.sourceWorkoutId;
+              const dim = hover?.kind === 'soreness' && hover.workoutId !== t.sourceWorkoutId;
 
               // Consecutive days of like kind collapse into one segment. An
               // unlogged day therefore ends the solid run whether it is bridged
@@ -409,6 +462,7 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
                         pointerEvents="all"
                         onMouseEnter={() =>
                           setHover({
+                            kind: 'soreness',
                             workoutId: t.sourceWorkoutId,
                             daySlug: t.sourceWorkoutDaySlug,
                             day: t.sourceWorkoutDay,
@@ -429,7 +483,7 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
             {tracks.map((t) => {
               const rowY = y(anchorDate(t));
               if (rowY == null) return null;
-              const dim = hover && hover.workoutId !== t.sourceWorkoutId;
+              const dim = hover?.kind === 'soreness' && hover.workoutId !== t.sourceWorkoutId;
               return (
                 <text
                   key={`l-${t.key}`}
@@ -445,42 +499,121 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
               );
             })}
 
-            {/* Workout nodes */}
-            {layout
+            {/* Cardio and strength are peer records on the shared date rail. */}
+            {showCardioColumn && layout
               .filter((r) => r.kind === 'date')
-              .map((r) =>
-                (workoutsByDate.get(r.date) || []).map((w, i) => {
-                  const dim = hover && hover.workoutId !== w.id;
-                  const c = dayColor(w.daySlug);
+              .map((r) => {
+                const sessions = cardioByDate.get(r.date) || [];
+                const availableHeight = ROW_H - 6;
+                const gap = sessions.length > 1 ? 2 : 0;
+                const nodeHeight = sessions.length
+                  ? Math.max(7, (availableHeight - gap * (sessions.length - 1)) / sessions.length)
+                  : availableHeight;
+
+                return sessions.map((session, i) => {
+                  const nodeY = r.y - ROW_H / 2 + 2 + i * (nodeHeight + gap);
+                  const activityLabel = cardioLabel(session.activity);
+                  const activityColor = cardioColor(session.activity);
+                  const label = `${activityLabel} · ${session.durationMinutes || '—'} min`;
                   return (
                     <g
-                      key={w.id}
-                      opacity={dim ? 0.3 : 1}
-                      style={{ cursor: onOpenWorkout ? 'pointer' : 'default' }}
-                      onClick={() => onOpenWorkout?.(w)}
+                      key={`cardio-${session.id}`}
+                      role={onOpenCardio ? 'button' : undefined}
+                      tabIndex={onOpenCardio ? 0 : undefined}
+                      aria-label={onOpenCardio ? `View ${activityLabel} session from ${session.date}` : undefined}
+                      style={{ cursor: onOpenCardio ? 'pointer' : 'default' }}
+                      onClick={() => onOpenCardio?.(session)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          onOpenCardio?.(session);
+                        }
+                      }}
+                      onMouseEnter={() => setHover({ kind: 'cardio', session })}
+                      onMouseLeave={() => setHover(null)}
+                      onFocus={() => setHover({ kind: 'cardio', session })}
+                      onBlur={() => setHover(null)}
                     >
                       <rect
-                        x={WO_X + i * 5}
-                        y={r.y - ROW_H / 2 + 2}
-                        width={WO_W - i * 5}
-                        height={ROW_H - 6}
+                        x={cardioX}
+                        y={nodeY}
+                        width={ACTIVITY_W}
+                        height={nodeHeight}
+                        rx={4}
+                        fill={colors.bg.surface}
+                        stroke={activityColor}
+                        strokeWidth={0.75}
+                      />
+                      <rect x={cardioX} y={nodeY} width={3} height={nodeHeight} fill={activityColor} />
+                      <text
+                        x={cardioX + 10}
+                        y={nodeY + nodeHeight / 2}
+                        dominantBaseline="middle"
+                        style={{ fontSize: nodeHeight < 14 ? 8 : 11, fill: colors.text.primary, fontWeight: 600 }}
+                      >
+                        {label}
+                      </text>
+                    </g>
+                  );
+                });
+              })}
+
+            {/* Strength stays directly beside its soreness lanes and is the
+                only activity type that can own a spawn connector. */}
+            {layout
+              .filter((r) => r.kind === 'date')
+              .map((r) => {
+                const dayWorkouts = workoutsByDate.get(r.date) || [];
+                const availableHeight = ROW_H - 6;
+                const gap = dayWorkouts.length > 1 ? 2 : 0;
+                const nodeHeight = dayWorkouts.length
+                  ? Math.max(7, (availableHeight - gap * (dayWorkouts.length - 1)) / dayWorkouts.length)
+                  : availableHeight;
+
+                return dayWorkouts.map((workout, i) => {
+                  const dim = hover?.kind === 'soreness' && hover.workoutId !== workout.id;
+                  const c = dayColor(workout.daySlug);
+                  const nodeY = r.y - ROW_H / 2 + 2 + i * (nodeHeight + gap);
+                  const label = `D${pad2(workout.dayNumber)} · ${describeLoggedDay(workout).slice(0, 15)}`;
+                  return (
+                    <g
+                      key={workout.id}
+                      opacity={dim ? 0.3 : 1}
+                      role={onOpenWorkout ? 'button' : undefined}
+                      tabIndex={onOpenWorkout ? 0 : undefined}
+                      aria-label={onOpenWorkout ? `View strength workout ${label} from ${workout.date}` : undefined}
+                      style={{ cursor: onOpenWorkout ? 'pointer' : 'default' }}
+                      onClick={() => onOpenWorkout?.(workout)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          onOpenWorkout?.(workout);
+                        }
+                      }}
+                    >
+                      <rect
+                        x={workoutX}
+                        y={nodeY}
+                        width={ACTIVITY_W}
+                        height={nodeHeight}
                         rx={4}
                         fill={colors.bg.surface}
                         stroke={c}
                         strokeWidth={0.75}
                       />
-                      <rect x={WO_X + i * 5} y={r.y - ROW_H / 2 + 2} width={3} height={ROW_H - 6} fill={c} />
+                      <rect x={workoutX} y={nodeY} width={3} height={nodeHeight} fill={c} />
                       <text
-                        x={WO_X + 10 + i * 5}
-                        y={r.y + 4}
-                        style={{ fontSize: 11, fill: colors.text.primary, fontWeight: 600 }}
+                        x={workoutX + 10}
+                        y={nodeY + nodeHeight / 2}
+                        dominantBaseline="middle"
+                        style={{ fontSize: nodeHeight < 14 ? 8 : 11, fill: colors.text.primary, fontWeight: 600 }}
                       >
-                        D{pad2(w.dayNumber)} · {describeLoggedDay(w).slice(0, 15)}
+                        {label}
                       </text>
                     </g>
                   );
-                }),
-              )}
+                });
+              })}
           </svg>
         </div>
 
@@ -495,6 +628,42 @@ function HoverPanel({ hover, narrow }) {
   // chart, so it can simply go; on desktop it is a fixed column beside the
   // chart, and dropping it outright would reflow the chart on every hover.
   if (!hover) return narrow ? null : <div style={{ width: 200, flexShrink: 0 }} />;
+
+  if (hover.kind === 'cardio') {
+    const session = hover.session;
+    const activityColor = cardioColor(session.activity);
+    return (
+      <div
+        style={{
+          width: narrow ? '100%' : 200,
+          boxSizing: 'border-box',
+          flexShrink: 0,
+          padding: 12,
+          borderRadius: 10,
+          background: colors.bg.raised,
+          border: `1px solid ${activityColor}47`,
+          ...(narrow ? {} : { position: 'sticky', top: 12 }),
+        }}
+      >
+        <div style={{ color: activityColor, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          Cardio session
+        </div>
+        <div style={{ marginTop: 5, color: colors.text.primary, fontSize: 13, fontWeight: 700 }}>
+          {cardioName(session.activity)}
+        </div>
+        <div style={{ marginTop: 3, color: colors.text.tertiary, fontSize: 11 }}>
+          {weekday(session.date)} {shortDate(session.date)}{session.time ? ` · ${session.time}` : ''}
+        </div>
+        <div style={{ marginTop: 9, color: colors.text.secondary, fontFamily: 'monospace', fontSize: 12 }}>
+          {session.durationMinutes || '—'} min
+          {session.activity === 'bike' && session.bike?.distanceMiles ? ` · ${session.bike.distanceMiles} mi` : ''}
+        </div>
+        <div style={{ marginTop: 8, color: colors.text.disabled, fontSize: 10, lineHeight: 1.4 }}>
+          Cardio records do not create recovery lanes.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -534,9 +703,40 @@ function HoverPanel({ hover, narrow }) {
   );
 }
 
-function Controls({ group, setGroup, gaps, setGaps, order, setOrder, quiet, setQuiet, windowDays, setWindowDays }) {
+function LegendMark({ color, label }) {
   return (
-    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', maxWidth: '100%', minWidth: 0 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      <span style={{ width: 10, height: 4, borderRadius: 2, background: color }} />
+      {label}
+    </span>
+  );
+}
+
+function Controls({
+  group, setGroup, gaps, setGaps, order, setOrder, quiet, setQuiet,
+  windowDays, setWindowDays, activityContext, setActivityContext, narrow,
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 12,
+        flexWrap: 'wrap',
+        alignItems: 'flex-end',
+        width: narrow ? 340 : '100%',
+        maxWidth: '100%',
+        minWidth: 0,
+      }}
+    >
+      <Seg
+        label="Activities"
+        value={activityContext}
+        onChange={setActivityContext}
+        opts={[
+          { id: 'all', label: 'Strength + cardio' },
+          { id: 'weights', label: 'Strength only' },
+        ]}
+      />
       <Seg
         label="Stripe per"
         value={group}
@@ -589,7 +789,7 @@ function Controls({ group, setGroup, gaps, setGaps, order, setOrder, quiet, setQ
 
 function Seg({ label, value, onChange, opts }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
       <span style={{ fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.text.disabled }}>
         {label}
       </span>
@@ -609,6 +809,7 @@ function Seg({ label, value, onChange, opts }) {
             <button
               key={o.id}
               onClick={() => onChange(o.id)}
+              aria-pressed={active}
               style={{
                 padding: '4px 9px',
                 borderRadius: 5,

@@ -241,6 +241,8 @@
   max-width: 1100px !important;
   margin: 0 auto;
   padding: 32px 32px 80px;
+  box-sizing: border-box;
+  min-width: 0;
   font-family: var(--font-primary);
 }
 
@@ -281,6 +283,8 @@
 
   .list-tab-page {
     width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
     padding: 16px 16px 104px !important;
     gap: 20px !important;
   }
@@ -312,6 +316,8 @@
   .date-group {
     flex-direction: column;
     gap: 8px !important;
+    width: 100%;
+    min-width: 0;
   }
 
   .date-group > :first-child {
@@ -319,5 +325,28 @@
     flex-direction: row !important;
     align-items: baseline;
     gap: 10px !important;
+  }
+
+  .date-group > :nth-child(2) {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .date-group > :nth-child(2) > * {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .activity-detail-header {
+    align-items: flex-start !important;
+  }
+
+  .activity-detail-actions {
+    flex: 1 0 100%;
+    padding-left: 58px;
+    box-sizing: border-box;
   }
 }

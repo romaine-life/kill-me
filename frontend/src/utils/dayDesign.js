@@ -41,11 +41,21 @@ export const dayWarns = (daySlug) => DAY_DESIGN[daySlug]?.warn === true;
 export const anatomyUrl = (slug) => `/anatomy/deltoids/training/bodyworks/cropped/${slug}.png`;
 export const pad2 = (n) => String(n).padStart(2, '0');
 
+// Soreness colors are exported as a palette so other semantic color systems
+// can verify they do not accidentally reuse one of these meanings.
+export const SORENESS_TIER_COLORS = {
+  mild: '#7fb98a',
+  noticeable: '#67e8f9',
+  moderate: '#f0c560',
+  significant: '#f59e6f',
+  severe: '#ef6f6f',
+};
+
 // Soreness 1-10 → tier color (matches design's sorenessColor scale).
 export const sorenessTierColor = (level) => {
-  if (level <= 2) return '#7fb98a';
-  if (level <= 4) return '#67e8f9';
-  if (level <= 6) return '#f0c560';
-  if (level <= 8) return '#f59e6f';
-  return '#ef6f6f';
+  if (level <= 2) return SORENESS_TIER_COLORS.mild;
+  if (level <= 4) return SORENESS_TIER_COLORS.noticeable;
+  if (level <= 6) return SORENESS_TIER_COLORS.moderate;
+  if (level <= 8) return SORENESS_TIER_COLORS.significant;
+  return SORENESS_TIER_COLORS.severe;
 };
