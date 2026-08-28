@@ -27,7 +27,7 @@ import { buildRecoveryCurves, daysBetween, groupsForDay, sorenessDocId } from '.
 import { AnatomyDiagram } from './AnatomyDiagrams';
 import { SorenessLanes } from './SorenessLanes';
 import { colors } from '../colors';
-import { Check, Wrench, ChevronLeft } from 'lucide-react';
+import { Check, Wrench, ChevronLeft, X } from 'lucide-react';
 
 // Map soreness levels to colors (green → yellow → red gradient)
 function getLevelColor(level) {
@@ -1107,14 +1107,28 @@ function MusclePicker({ groups, filtered, sourceLabel, onShowAll, expandedGroup,
       )}
 
       {/* Search */}
-      <input
-        type="text"
-        placeholder="Search muscles..."
-        value={searchQuery}
-        onChange={(e) => onSearchChange(e.target.value)}
-        style={styles.searchInput}
-        autoFocus
-      />
+      <div style={styles.searchField}>
+        <input
+          type="text"
+          placeholder="Search muscles..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          style={styles.searchInput}
+          autoFocus
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => onSearchChange('')}
+            onMouseDown={(e) => e.preventDefault()}
+            aria-label="Clear muscle search"
+            title="Clear search"
+            style={styles.clearSearchBtn}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        )}
+      </div>
 
       {/* Search results */}
       {searchQuery.length >= 2 ? (
@@ -1483,16 +1497,34 @@ const styles = {
     borderRadius: 10,
     padding: 16,
   },
+  searchField: {
+    position: 'relative',
+  },
   searchInput: {
     width: '100%',
     background: colors.bg.surface,
     border: `1px solid ${colors.border.subtle}`,
     color: colors.text.primary,
-    padding: '8px 12px',
+    padding: '8px 40px 8px 12px',
     borderRadius: 6,
     fontSize: 13,
     outline: 'none',
     boxSizing: 'border-box',
+  },
+  clearSearchBtn: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    height: '100%',
+    width: 36,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 0,
+    background: 'none',
+    border: 'none',
+    color: colors.text.secondary,
+    cursor: 'pointer',
   },
   groupBtn: {
     display: 'flex',
