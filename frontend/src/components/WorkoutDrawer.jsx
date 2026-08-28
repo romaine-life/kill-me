@@ -78,6 +78,7 @@ export function LogTab({
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [useNextWorkout, setUseNextWorkout] = useState(true);
+  const exerciseRequestRef = useRef(0);
   // The picker lists every day in the cycle (see the cycle dial — the list has to
   // line up with it), so it starts on the current day rather than an arbitrary one.
   const [dropdownDay, setDropdownDay] = useState(currentDay);
@@ -224,9 +225,14 @@ export function LogTab({
   // ─────────────────────────────────────────────
 
   const fetchExercises = useCallback(async () => {
+    const requestId = ++exerciseRequestRef.current;
     setLoading(true);
     try {
       const data = await apiFetch(`/api/exercises/day/${selectedDay}`);
+      // The current day arrives asynchronously during app startup. A response for
+      // the former day must not overwrite a newer selection's exercise list.
+      if (requestId !== exerciseRequestRef.current) return;
+
       const defs = data.exercises || [];
       setExercises(defs);
 
@@ -246,6 +252,7 @@ export function LogTab({
           const vars = ex.variations || [];
           const matchedVar = vars.find(v => v.name === savedVarName) || dv;
           return {
+            definitionId: ex.id,
             name: ex.name,
             variation: savedVarName,
             completed: true,
@@ -255,9 +262,11 @@ export function LogTab({
             reps: saved.reps ?? matchedVar.targetReps ?? '',
             sets: saved.sets ?? matchedVar.targetSets ?? '',
             cableSetting: saved.cableSetting ?? matchedVar.cableSetting ?? '',
+            useAsDefault: false,
           };
         }
         return {
+          definitionId: ex.id,
           name: ex.name,
           variation: dv.name,
           completed: false,
@@ -267,6 +276,7 @@ export function LogTab({
           reps: dv.targetReps ?? '',
           sets: dv.targetSets ?? '',
           cableSetting: dv.cableSetting ?? '',
+          useAsDefault: false,
         };
       });
 
@@ -282,14 +292,19 @@ export function LogTab({
           reps: ex.reps ?? '',
           sets: ex.sets ?? '',
           cableSetting: ex.cableSetting ?? '',
+          useAsDefault: false,
         });
       }
 
       setCompletedExercises(checklist);
     } catch (error) {
-      console.error('Error fetching exercises:', error);
+      if (requestId === exerciseRequestRef.current) {
+        console.error('Error fetching exercises:', error);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === exerciseRequestRef.current) {
+        setLoading(false);
+      }
     }
   }, [selectedDay, viewWorkout]);
 
@@ -314,6 +329,40 @@ export function LogTab({
 
     setSubmitting(true);
     try {
+      const defaultUpdates = completed.filter(ex => ex.useAsDefault && ex.definitionId);
+      try {
+        await Promise.all(defaultUpdates.map(ex =>
+          apiFetch(`/api/exercises/${encodeURIComponent(ex.definitionId)}/default`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              variationName: ex.variation,
+              values: {
+                weight: ex.weight,
+                weights: ex.weights,
+                inclineDegrees: ex.inclineDegrees,
+                reps: ex.reps,
+                sets: ex.sets,
+                cableSetting: ex.cableSetting,
+              },
+            }),
+          })
+        ));
+      } catch (error) {
+        console.error('Error updating exercise defaults:', error);
+        alert(
+          'The new defaults could not be updated, so the workout was not saved. Please try again.'
+        );
+        return;
+      }
+
+      // UI-only state controls default promotion and must not become part of the
+      // immutable workout record.
+      const loggedExercises = completed.map(({
+        definitionId: _definitionId,
+        useAsDefault: _useAsDefault,
+        ...exercise
+      }) => exercise);
+
       if (isEditMode) {
         // PUT — update existing
         await apiFetch(`/api/logged-workouts/${viewWorkout.id}`, {
@@ -323,7 +372,7 @@ export function LogTab({
             time: selectedTime || null,
             daySlug: selectedDay,
             mode,
-            exercises: mode === 'detailed' ? completed : [],
+            exercises: mode === 'detailed' ? loggedExercises : [],
           })
         });
         onWorkoutChanged?.();
@@ -336,7 +385,7 @@ export function LogTab({
             mode,
             date: selectedDate,
             time: selectedTime || null,
-            ...(mode === 'detailed' ? { exercises: completed } : {}),
+            ...(mode === 'detailed' ? { exercises: loggedExercises } : {}),
           })
         });
         onSuccess?.(result.advancedTo);
@@ -810,7 +859,7 @@ export function LogTab({
                           </h4>
 
                           {(() => {
-                            const exDef = exercises[idx];
+                            const exDef = exercises.find(definition => definition.id === exercise.definitionId);
                             const vars = exDef?.variations || [];
                             const hasMultipleVars = vars.length > 1;
                             const selectedVar = vars.find(v => v.name === exercise.variation) || getDefaultVariation(exDef || {});
@@ -876,7 +925,7 @@ export function LogTab({
                           })()}
 
                           {exercise.completed && (() => {
-                            const exDef = exercises[idx];
+                            const exDef = exercises.find(definition => definition.id === exercise.definitionId);
                             const vars = exDef?.variations || [];
                             const selectedVar = vars.find(v => v.name === exercise.variation) || getDefaultVariation(exDef || {});
                             return (
@@ -955,6 +1004,24 @@ export function LogTab({
                                   />
                                 </label>
                               </div>
+                              <label className={`flex items-start gap-3 rounded-lg border px-3 py-3 cursor-pointer transition-colors ${
+                                exercise.useAsDefault
+                                  ? 'border-cyan-400/60 bg-cyan-500/10'
+                                  : 'border-slate-600/60 bg-slate-800/40 hover:border-slate-500'
+                              }`}>
+                                <input
+                                  type="checkbox"
+                                  checked={exercise.useAsDefault}
+                                  onChange={(e) => updateExercise(idx, 'useAsDefault', e.target.checked)}
+                                  className="mt-0.5 w-5 h-5 rounded bg-slate-800 border-slate-600 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 cursor-pointer"
+                                />
+                                <span>
+                                  <span className="block text-sm font-bold text-slate-200">This is the new default</span>
+                                  <span className="block mt-0.5 text-xs text-slate-400">
+                                    Prefill this variation and these values next time.
+                                  </span>
+                                </span>
+                              </label>
                             </div>
                             );
                           })()}

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { ExerciseDefaultError, withNewExerciseDefault } from './exercise-defaults.js';
 
 /**
  * The workout model, exercises, logged workouts, and current-day tracking.
@@ -21,6 +22,7 @@ import { Router } from 'express';
  *   DELETE /api/logged-workouts/:id
  *   PUT    /api/current-day
  *   POST   /api/exercises
+ *   PUT    /api/exercises/:id/default
  */
 export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
   const router = Router();
@@ -367,6 +369,44 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
     } catch (error) {
       console.error('Error creating exercise:', error);
       res.status(500).json({ error: 'Failed to create exercise', message: error.message });
+    }
+  });
+
+  // Promote one variation and its just-entered workout values to the defaults
+  // used the next time this exercise is logged. Historical workouts are separate
+  // documents and are deliberately untouched.
+  router.put('/api/exercises/:id/default', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { resources } = await container.items
+        .query({
+          query: 'SELECT * FROM c WHERE c.id = @id AND c.type = @type',
+          parameters: [
+            { name: '@id', value: req.params.id },
+            { name: '@type', value: 'exercise' },
+          ],
+        })
+        .fetchAll();
+
+      if (resources.length === 0) {
+        return res.status(404).json({ error: 'Exercise not found' });
+      }
+
+      const updated = withNewExerciseDefault(
+        resources[0],
+        req.body.variationName,
+        req.body.values,
+      );
+      const { resource } = await container
+        .item(updated.id, updated.userId)
+        .replace(updated);
+
+      res.json({ exercise: resource });
+    } catch (error) {
+      if (error instanceof ExerciseDefaultError) {
+        return res.status(400).json({ error: error.message });
+      }
+      console.error('Error updating exercise default:', error);
+      res.status(500).json({ error: 'Failed to update exercise default', message: error.message });
     }
   });
 
