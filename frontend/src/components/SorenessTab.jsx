@@ -1188,7 +1188,6 @@ function MusclePicker({ groups, filtered, sourceLabel, onShowAll, expandedGroup,
                     <span style={styles.optionCheck}>
                       {groupSelected ? <Check size={14} /> : null}
                     </span>
-                    <span style={{ color: colors.text.primary, fontSize: 13, fontWeight: 600 }}>{group}</span>
                   </button>
                   <button
                     type="button"
@@ -1197,6 +1196,7 @@ function MusclePicker({ groups, filtered, sourceLabel, onShowAll, expandedGroup,
                     aria-label={`${expandedGroup === group ? 'Collapse' : 'Expand'} ${group} muscles`}
                     style={styles.groupExpandBtn}
                   >
+                    <span style={{ color: colors.text.primary, fontSize: 13, fontWeight: 600 }}>{group}</span>
                     <span style={{ color: colors.text.disabled, fontSize: 11 }}>
                       {MUSCLE_TAXONOMY[group].muscles.length} muscles {expandedGroup === group ? '▾' : '▸'}
                     </span>
@@ -1527,32 +1527,35 @@ const styles = {
     cursor: 'pointer',
   },
   groupBtn: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    position: 'relative',
     width: '100%',
     backgroundColor: 'transparent',
     borderBottom: `1px solid ${colors.border.subtle}`,
     textAlign: 'left',
   },
   groupSelectionBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    minWidth: 0,
-    padding: '8px 12px',
+    position: 'absolute',
+    zIndex: 1,
+    left: 12,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    width: 20,
+    height: 20,
+    padding: 0,
     background: 'none',
     border: 'none',
-    color: 'inherit',
     cursor: 'pointer',
-    textAlign: 'left',
   },
   groupExpandBtn: {
-    alignSelf: 'stretch',
-    padding: '8px 12px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    padding: '8px 12px 8px 42px',
     background: 'none',
     border: 'none',
     cursor: 'pointer',
+    textAlign: 'left',
     whiteSpace: 'nowrap',
   },
   muscleOption: {
