@@ -19,6 +19,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { apiFetch } from '../api/client';
 import { useApi } from '../api/useApi.js';
 import { MUSCLE_TAXONOMY, MUSCLE_GROUPS, searchMuscles } from '../utils/muscleTaxonomy';
+import { toggleMuscleGroupSelection, toggleMuscleSelection } from '../utils/muscleSelection';
 import { todayLocal } from '../utils/dateUtils';
 import { getDayInfo, describeLoggedDay } from '../utils/dayConfig';
 import { dayColor, pad2, sorenessTierColor } from '../utils/dayDesign';
@@ -321,30 +322,20 @@ export function SorenessTab({
     setHoveredMuscle(null);
   }
 
-  // Select a muscle in the draft. The picker stays open: Save, not the muscle
+  // Toggle a muscle in the draft. The picker stays open: Save, not the muscle
   // row, is the action that commits the visible selection.
   function selectMuscle(group, muscleName) {
-    setEditMuscles((current) => {
-      if (current.some(m => m.group === group && m.muscle === muscleName)) return current;
-
-      // A whole-group selection and its individual muscles are alternative
-      // levels of specificity, so replace one with the other within a group.
-      const withoutConflicts = muscleName === null
-        ? current.filter(m => m.group !== group)
-        : current.filter(m => !(m.group === group && m.muscle === null));
-      return [...withoutConflicts, { group, muscle: muscleName, level: editLevel || 1 }];
-    });
+    setEditMuscles((current) => toggleMuscleSelection(current, group, muscleName, editLevel || 1));
   }
 
-  // Expanding a previously untouched group visibly primes its general option.
-  // If that group already has draft selections, expanding it only reveals them.
-  function expandAndSelectGroup(group) {
-    if (expandedGroup === group) {
-      setExpandedGroup(null);
-      return;
-    }
-    setExpandedGroup(group);
-    if (!editMuscles.some(m => m.group === group)) selectMuscle(group, null);
+  function toggleGroupSelection(group) {
+    setEditMuscles((current) => toggleMuscleGroupSelection(current, group, editLevel || 1));
+  }
+
+  // Expansion only controls visibility. The adjacent group checkbox owns the
+  // whole-group selection so its checked state can also be cleared directly.
+  function toggleExpandedGroup(group) {
+    setExpandedGroup((current) => current === group ? null : group);
   }
 
   // Remove a muscle from the edit
@@ -621,7 +612,8 @@ export function SorenessTab({
                 sourceLabel={editSource?.dayName}
                 onShowAll={() => setShowAllGroups(true)}
                 expandedGroup={expandedGroup}
-                onExpandGroup={expandAndSelectGroup}
+                onExpandGroup={toggleExpandedGroup}
+                onToggleGroup={toggleGroupSelection}
                 onSelect={selectMuscle}
                 onClose={() => { setPickerOpen(false); setSearchQuery(''); setHoveredMuscle(null); }}
                 searchQuery={searchQuery}
@@ -1090,7 +1082,7 @@ function WorkoutRecoveryCard({ workout, curve, isMobile, onOpenWorkout }) {
 // `groups` is narrowed to the source workout's muscles unless the user opts out.
 // ---------------------------------------------------------------------------
 
-function MusclePicker({ groups, filtered, sourceLabel, onShowAll, expandedGroup, onExpandGroup, onSelect, onClose, searchQuery, onSearchChange, searchResults, existingMuscles, onHoverMuscle }) {
+function MusclePicker({ groups, filtered, sourceLabel, onShowAll, expandedGroup, onExpandGroup, onToggleGroup, onSelect, onClose, searchQuery, onSearchChange, searchResults, existingMuscles, onHoverMuscle }) {
   const isAlreadyAdded = (group, muscle) =>
     existingMuscles.some(m => m.group === group && m.muscle === muscle);
   const isGroupAdded = (group) =>
@@ -1162,72 +1154,87 @@ function MusclePicker({ groups, filtered, sourceLabel, onShowAll, expandedGroup,
       ) : (
         /* Group browse */
         <div style={{ maxHeight: 400, overflowY: 'auto', marginTop: 8 }}>
-          {groups.map((group) => (
-            <div key={group}>
-              <button
-                onClick={() => onExpandGroup(group)}
-                aria-expanded={expandedGroup === group}
-                style={{
-                  ...styles.groupBtn,
-                  backgroundColor: expandedGroup === group ? 'rgba(34, 211, 238, 0.06)' : 'transparent',
-                }}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={styles.optionCheck}>
-                    {existingMuscles.some(m => m.group === group) ? <Check size={14} /> : null}
-                  </span>
-                  <span style={{ color: colors.text.primary, fontSize: 13, fontWeight: 600 }}>{group}</span>
-                </span>
-                <span style={{ color: colors.text.disabled, fontSize: 11 }}>
-                  {MUSCLE_TAXONOMY[group].muscles.length} muscles {expandedGroup === group ? '▾' : '▸'}
-                </span>
-              </button>
-
-              {expandedGroup === group && (
-                <div style={{ paddingLeft: 8 }}>
-                  {/* Group-level option */}
+          {groups.map((group) => {
+            const groupSelected = existingMuscles.some(m => m.group === group);
+            return (
+              <div key={group}>
+                <div
+                  style={{
+                    ...styles.groupBtn,
+                    backgroundColor: expandedGroup === group ? 'rgba(34, 211, 238, 0.06)' : 'transparent',
+                  }}
+                >
                   <button
-                    onClick={() => onSelect(group, null)}
-                    onMouseEnter={() => onHoverMuscle({ group, muscle: null })}
-                    onMouseLeave={() => onHoverMuscle(null)}
-                    aria-pressed={isGroupAdded(group)}
-                    style={{
-                      ...styles.muscleOption,
-                      backgroundColor: 'rgba(34, 211, 238, 0.05)',
-                      ...(isGroupAdded(group) ? styles.selectedOption : {}),
-                    }}
+                    type="button"
+                    onClick={() => onToggleGroup(group)}
+                    aria-pressed={groupSelected}
+                    aria-label={groupSelected ? `Clear ${group} selection` : `Select ${group} generally`}
+                    style={styles.groupSelectionBtn}
                   >
-                    <span style={styles.optionCheck}>{isGroupAdded(group) ? <Check size={14} /> : null}</span>
-                    <span style={{ flex: 1 }}>
-                      <span style={{ display: 'block', color: colors.accent.cyan, fontSize: 13, fontWeight: 600 }}>{group} (general)</span>
-                      <span style={{ display: 'block', color: colors.text.disabled, fontSize: 11 }}>Whole group, not a specific muscle</span>
+                    <span style={styles.optionCheck}>
+                      {groupSelected ? <Check size={14} /> : null}
+                    </span>
+                    <span style={{ color: colors.text.primary, fontSize: 13, fontWeight: 600 }}>{group}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onExpandGroup(group)}
+                    aria-expanded={expandedGroup === group}
+                    aria-label={`${expandedGroup === group ? 'Collapse' : 'Expand'} ${group} muscles`}
+                    style={styles.groupExpandBtn}
+                  >
+                    <span style={{ color: colors.text.disabled, fontSize: 11 }}>
+                      {MUSCLE_TAXONOMY[group].muscles.length} muscles {expandedGroup === group ? '▾' : '▸'}
                     </span>
                   </button>
+                </div>
 
-                  {/* Muscle list — diagram moved to right panel */}
-                  {MUSCLE_TAXONOMY[group].muscles.map((m) => (
+                {expandedGroup === group && (
+                  <div style={{ paddingLeft: 8 }}>
+                    {/* Group-level option */}
                     <button
-                      key={m.name}
-                      onClick={() => onSelect(group, m.name)}
-                      onMouseEnter={() => onHoverMuscle({ group, muscle: m.name })}
+                      onClick={() => onSelect(group, null)}
+                      onMouseEnter={() => onHoverMuscle({ group, muscle: null })}
                       onMouseLeave={() => onHoverMuscle(null)}
-                      aria-pressed={isAlreadyAdded(group, m.name)}
+                      aria-pressed={isGroupAdded(group)}
                       style={{
                         ...styles.muscleOption,
-                        ...(isAlreadyAdded(group, m.name) ? styles.selectedOption : {}),
+                        backgroundColor: 'rgba(34, 211, 238, 0.05)',
+                        ...(isGroupAdded(group) ? styles.selectedOption : {}),
                       }}
                     >
-                      <span style={styles.optionCheck}>{isAlreadyAdded(group, m.name) ? <Check size={14} /> : null}</span>
+                      <span style={styles.optionCheck}>{isGroupAdded(group) ? <Check size={14} /> : null}</span>
                       <span style={{ flex: 1 }}>
-                        <span style={{ display: 'block', color: colors.text.primary, fontSize: 13 }}>{m.name}</span>
-                        <span style={{ display: 'block', color: colors.text.disabled, fontSize: 11 }}>{m.location}</span>
+                        <span style={{ display: 'block', color: colors.accent.cyan, fontSize: 13, fontWeight: 600 }}>{group} (general)</span>
+                        <span style={{ display: 'block', color: colors.text.disabled, fontSize: 11 }}>Whole group, not a specific muscle</span>
                       </span>
                     </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+
+                    {/* Muscle list — diagram moved to right panel */}
+                    {MUSCLE_TAXONOMY[group].muscles.map((m) => (
+                      <button
+                        key={m.name}
+                        onClick={() => onSelect(group, m.name)}
+                        onMouseEnter={() => onHoverMuscle({ group, muscle: m.name })}
+                        onMouseLeave={() => onHoverMuscle(null)}
+                        aria-pressed={isAlreadyAdded(group, m.name)}
+                        style={{
+                          ...styles.muscleOption,
+                          ...(isAlreadyAdded(group, m.name) ? styles.selectedOption : {}),
+                        }}
+                      >
+                        <span style={styles.optionCheck}>{isAlreadyAdded(group, m.name) ? <Check size={14} /> : null}</span>
+                        <span style={{ flex: 1 }}>
+                          <span style={{ display: 'block', color: colors.text.primary, fontSize: 13 }}>{m.name}</span>
+                          <span style={{ display: 'block', color: colors.text.disabled, fontSize: 11 }}>{m.location}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -1492,12 +1499,29 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
+    backgroundColor: 'transparent',
+    borderBottom: `1px solid ${colors.border.subtle}`,
+    textAlign: 'left',
+  },
+  groupSelectionBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 0,
     padding: '8px 12px',
     background: 'none',
     border: 'none',
-    borderBottom: `1px solid ${colors.border.subtle}`,
+    color: 'inherit',
     cursor: 'pointer',
     textAlign: 'left',
+  },
+  groupExpandBtn: {
+    alignSelf: 'stretch',
+    padding: '8px 12px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
   },
   muscleOption: {
     display: 'flex',
@@ -1505,7 +1529,7 @@ const styles = {
     gap: 8,
     width: '100%',
     padding: '6px 12px',
-    background: 'none',
+    backgroundColor: 'transparent',
     border: 'none',
     borderBottom: `1px solid ${colors.border.subtle}`,
     cursor: 'pointer',
