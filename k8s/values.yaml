@@ -4,14 +4,14 @@
 image:
   repository: romainecr.azurecr.io/kill-me
   # Quoted so YAML never reinterprets image tags.
-  tag: "app-9a60d9f82e63b9634f70a779f0d0cd64faf06b03261eac273185212060be99c6"
+  tag: "app-48116e39b2d55dcff905e05a34835b3310a7083341462ab6f2110997d5d16ac4"
   pullPolicy: IfNotPresent
 
 # The deploy workflow derives semantic versions from immutable Git release
 # tags, then records the version-to-image mapping here for the running pod.
 release:
-  version: "1.3.0"
-  deployedAt: "2026-09-15T06:57:31Z"
+  version: "1.4.0"
+  deployedAt: "2026-09-16T06:39:42Z"
 
 name: kill-me
 namespace: kill-me
