@@ -42,6 +42,10 @@ const tabFromPath = (path) => {
 
 const pathFromTab = (tab) => (tab === 'soreness' ? '/' : `/${tab}`);
 
+// The Activity view the app opens to. Mounting and finishing a log both land
+// here, so the landing page is defined once instead of per navigation path.
+const DEFAULT_ACTIVITY_VIEW = 'lanes';
+
 function App() {
   const [activeTab, setActiveTab] = useState(() => tabFromPath(window.location.pathname));
   const { isAdmin } = useAuth();
@@ -58,7 +62,7 @@ function App() {
   const [sorenessEditEntry, setSorenessEditEntry] = useState(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 760);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [activityView, setActivityView] = useState('lanes');
+  const [activityView, setActivityView] = useState(DEFAULT_ACTIVITY_VIEW);
   const [sorenessCreateRequested, setSorenessCreateRequested] = useState(false);
   // The editor temporarily replaces Activity content without changing the
   // selected view. Preserve enough context to return to its launch point.
@@ -221,7 +225,7 @@ function App() {
     setLogViewWorkout(null);
     setLogViewCardio(null);
     setDetailStack([]);
-    setActivityView('list');
+    setActivityView(DEFAULT_ACTIVITY_VIEW);
     navigateTab('soreness');
   };
 
