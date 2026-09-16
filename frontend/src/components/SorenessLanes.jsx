@@ -22,7 +22,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { getDayInfo, describeLoggedDay } from '../utils/dayConfig';
 import { dayColor, pad2 } from '../utils/dayDesign';
-import { cardioColor, cardioLabel, cardioName } from '../utils/cardioConfig';
+import { CARDIO_MOTIONS, cardioColor, cardioMotion, cardioName } from '../utils/cardioConfig';
 import { buildTracks, packLanes, datesBetween, daysBetween } from '../utils/sorenessLink';
 import { todayLocal } from '../utils/dateUtils';
 import { colors } from '../colors';
@@ -30,6 +30,7 @@ import { colors } from '../colors';
 const ROW_H = 30;
 const GAP_H = 22; // a collapsed run of dates with nothing in them
 const ACTIVITY_W = 146;
+const CARDIO_W = 32; // one glyph per session, no label
 const CARDIO_GAP = 12;
 const DATE_W = 74; // wide enough for "Sat Aug 13" in 10px monospace
 const ACTIVITY_GAP = 6;
@@ -200,7 +201,7 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
   const dateX = 0;
   const cardioX = dateX + DATE_W + ACTIVITY_GAP;
   const workoutX = showCardioColumn
-    ? cardioX + ACTIVITY_W + CARDIO_GAP
+    ? cardioX + CARDIO_W + CARDIO_GAP
     : cardioX;
   const laneX0 = workoutX + ACTIVITY_W + GUTTER;
   const laneRight = laneX0 + Math.max(laneCount, 1) * LANE_PITCH;
@@ -209,8 +210,10 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
     ? labelX + labelSlots.widest * LABEL_COL + 16
     : laneRight + 16;
   const height = bottom + 16;
-  const visibleCardioActivities = [...new Set(
-    [...cardioByDate.values()].flat().map((session) => session.activity),
+  // One legend entry per glyph shown, keyed by motion so walk and run each
+  // explain their figure even though they share the treadmill color.
+  const visibleCardioMotions = [...new Map(
+    [...cardioByDate.values()].flat().map((session) => [cardioMotion(session), session.activity]),
   )];
 
   const controls = (
@@ -237,8 +240,8 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginTop: 10, color: colors.text.tertiary, fontSize: 10 }}>
         <LegendMark color={colors.text.secondary} label="Strength workout" />
-        {visibleCardioActivities.map((activity) => (
-          <LegendMark key={activity} color={cardioColor(activity)} label={cardioLabel(activity)} />
+        {visibleCardioMotions.map(([motion, activity]) => (
+          <LegendGlyph key={motion} color={cardioColor(activity)} motion={motion} />
         ))}
         <LegendMark color={colors.text.secondary} label="Recovery lane matches strength" />
       </div>
@@ -510,17 +513,20 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
               .filter((r) => r.kind === 'date')
               .map((r) => {
                 const sessions = cardioByDate.get(r.date) || [];
-                const availableHeight = ROW_H - 6;
+                // Glyphs sit side by side rather than stacked: a row is too short
+                // for two icons on top of each other to stay legible.
+                const nodeHeight = ROW_H - 6;
                 const gap = sessions.length > 1 ? 2 : 0;
-                const nodeHeight = sessions.length
-                  ? Math.max(7, (availableHeight - gap * (sessions.length - 1)) / sessions.length)
-                  : availableHeight;
+                const nodeWidth = (CARDIO_W - gap * (sessions.length - 1)) / sessions.length;
+                const nodeY = r.y - ROW_H / 2 + 2;
 
                 return sessions.map((session, i) => {
-                  const nodeY = r.y - ROW_H / 2 + 2 + i * (nodeHeight + gap);
-                  const activityLabel = cardioLabel(session.activity);
+                  const nodeX = cardioX + i * (nodeWidth + gap);
+                  const motion = cardioMotion(session);
+                  const activityLabel = CARDIO_MOTIONS[motion].label;
                   const activityColor = cardioColor(session.activity);
                   const label = `${activityLabel} · ${session.durationMinutes || '—'} min`;
+                  const iconSize = Math.min(18, nodeHeight - 4, nodeWidth - 4);
                   return (
                     <g
                       key={`cardio-${session.id}`}
@@ -540,25 +546,22 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
                       onFocus={() => setHover({ kind: 'cardio', session })}
                       onBlur={() => setHover(null)}
                     >
+                      <title>{label}</title>
                       <rect
-                        x={cardioX}
+                        x={nodeX}
                         y={nodeY}
-                        width={ACTIVITY_W}
+                        width={nodeWidth}
                         height={nodeHeight}
                         rx={4}
-                        fill={colors.bg.surface}
+                        fill={`${activityColor}2e`}
                         stroke={activityColor}
                         strokeWidth={0.75}
                       />
-                      <rect x={cardioX} y={nodeY} width={3} height={nodeHeight} fill={activityColor} />
-                      <text
-                        x={cardioX + 10}
-                        y={nodeY + nodeHeight / 2}
-                        dominantBaseline="middle"
-                        style={{ fontSize: nodeHeight < 14 ? 8 : 11, fill: colors.text.primary, fontWeight: 600 }}
-                      >
-                        {label}
-                      </text>
+                      <path
+                        d={CARDIO_MOTIONS[motion].path}
+                        fill={activityColor}
+                        transform={`translate(${nodeX + (nodeWidth - iconSize) / 2} ${nodeY + (nodeHeight - iconSize) / 2}) scale(${iconSize / 24})`}
+                      />
                     </g>
                   );
                 });
@@ -706,6 +709,17 @@ function HoverPanel({ hover, narrow }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function LegendGlyph({ color, motion }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+      <svg width={12} height={12} viewBox="0 0 24 24" aria-hidden="true">
+        <path d={CARDIO_MOTIONS[motion].path} fill={color} />
+      </svg>
+      {CARDIO_MOTIONS[motion].label}
+    </span>
   );
 }
 
