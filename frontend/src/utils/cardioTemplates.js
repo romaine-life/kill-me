@@ -13,7 +13,23 @@ export function getTotalDuration(intervals) {
 
 // Human-readable summary of a template's intervals
 export function formatIntervalSummary(intervals) {
+  // A steady walk is a treadmill session with one interval — summarize it by
+  // pace, since "0 jog intervals" says nothing about it.
+  if (intervals.length === 1) {
+    return `${intervals[0].speedMph} mph`;
+  }
   const jogCount = intervals.filter(i => i.type === 'jog').length;
   const totalMin = getTotalDuration(intervals);
   return `${jogCount} jog intervals, ${totalMin} min`;
 }
+
+// A steady walk is logged as a treadmill session rather than its own activity:
+// same machine, same color, same history lane. It differs from an interval
+// template only in that its single `walk` interval is entered per session, so a
+// logged session with one interval is a steady one.
+export const buildWalkIntervals = (speedMph, durationMinutes) => [
+  { type: 'walk', speedMph, durationMinutes },
+];
+
+export const isSteadySession = (treadmill) =>
+  (treadmill?.intervals || []).length === 1;

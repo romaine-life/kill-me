@@ -3,6 +3,7 @@ import { Activity, Bike, ChevronLeft, Dumbbell, Wrench } from 'lucide-react';
 import { useApi } from '../api/useApi.js';
 import { colors } from '../colors';
 import { cardioColor, cardioName } from '../utils/cardioConfig';
+import { isSteadySession } from '../utils/cardioTemplates.js';
 import { formatTime12h } from '../utils/dateUtils';
 import { describeLoggedDay, getDayInfo } from '../utils/dayConfig';
 import { dayColor, pad2 } from '../utils/dayDesign';
@@ -281,10 +282,14 @@ function ExerciseRow({ exercise, number, accent }) {
 function CardioDetail({ session, isAdmin, onEdit }) {
   const accent = cardioColor(session.activity);
   const isBike = session.activity === 'bike';
-  const intervals = Array.isArray(session.treadmill?.intervals) ? session.treadmill.intervals : [];
+  const allIntervals = Array.isArray(session.treadmill?.intervals) ? session.treadmill.intervals : [];
+  // A steady walk is one interval — it reads as a pace, not as an interval list.
+  const walk = isSteadySession(session.treadmill) ? allIntervals[0] : null;
+  const intervals = walk ? [] : allIntervals;
   const metrics = [
     ['Duration', session.durationMinutes != null ? `${session.durationMinutes} min` : 'Not recorded'],
     session.treadmill?.templateName ? ['Workout', session.treadmill.templateName] : null,
+    walk?.speedMph != null ? ['Speed', `${walk.speedMph} mph`] : null,
     session.bike?.distanceMiles != null ? ['Distance', `${session.bike.distanceMiles} mi`] : null,
     session.bike?.avgSpeedMph != null ? ['Average speed', `${session.bike.avgSpeedMph} mph`] : null,
     session.bike?.avgHeartRate != null ? ['Average heart rate', `${session.bike.avgHeartRate} bpm`] : null,

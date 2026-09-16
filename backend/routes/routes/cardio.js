@@ -26,6 +26,10 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
     activity: doc.activity || 'treadmill',
     name: doc.name,
     description: doc.description || '',
+    // A steady template (the walk) carries one interval whose pace and duration
+    // are entered per session; logging one can write the entered values back as
+    // the new default.
+    steady: !!doc.steady,
     intervals: Array.isArray(doc.intervals) ? doc.intervals : [],
     sortOrder: doc.sortOrder ?? 0,
   });
@@ -174,7 +178,7 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
   // documents (userId: 'shared'), like the exercise library.
   router.post('/api/cardio-templates', requireAuth, requireAdmin, async (req, res) => {
     try {
-      const { templateId, name, description, intervals, activity, sortOrder } = req.body;
+      const { templateId, name, description, intervals, activity, sortOrder, steady } = req.body;
 
       if (!templateId || !name) {
         return res.status(400).json({ error: 'Missing required fields: templateId and name' });
@@ -191,6 +195,7 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
         activity: activity || 'treadmill',
         name,
         description: description || '',
+        steady: !!steady,
         intervals,
         sortOrder: sortOrder ?? 0,
         updatedAt: new Date().toISOString(),
