@@ -1,16 +1,19 @@
-// Meal log form — creates or edits one meal entry.
+// Meal logging — saved meals and the meal log, kept visibly separate.
 //
-// Most meals are repeats, so the form leads with the saved defaults: tap one,
-// adjust the portion if needed, log. Anything else is typed in by hand and can be
-// saved as a new default on the way through.
+// The flow has three screens, and each does one thing:
 //
-// The calorie and protein fields always hold the numbers for ONE portion, which
-// is what a default stores. The entry is saved with those numbers multiplied by
-// the portion, so the log keeps what was actually eaten even if the default is
-// later changed or deleted.
+//   choose      — the saved meals list, "+ New saved meal", and "Log a meal
+//                 without saving it"
+//   saved-meal  — create, edit or delete a saved meal. Logs nothing.
+//   log         — log one meal: a saved meal picked from the list, or a one-off
+//                 typed in. Never creates or changes a saved meal.
+//
+// A saved meal holds numbers for ONE portion. A logged meal is stored with its
+// numbers multiplied by the portion, so the log keeps what was actually eaten even
+// if the saved meal is later changed or deleted.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronLeft, Pencil } from 'lucide-react';
 import { apiFetch } from '../api/client.js';
 import { useApi } from '../api/useApi.js';
 import { todayLocal, nowLocalTime } from '../utils/dateUtils';
@@ -18,174 +21,318 @@ import {
   MEAL_COLOR, PORTIONS, scaleMeal, unscaleMeal, formatMealNumbers,
 } from '../utils/mealConfig.js';
 
-const OTHER = '';
-
 const inputClass = 'w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-200/70';
 const labelClass = 'block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide';
+const primaryButtonClass = 'w-full text-slate-900 px-8 py-4 rounded-xl font-black text-xl uppercase tracking-wider shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed';
+const secondaryButtonClass = 'w-full bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-3 rounded-xl font-bold uppercase tracking-wide border border-slate-700 transition-all';
 
-export function MealLogForm({ viewMeal = null, initialDate = null, onSaved }) {
+const validNumber = (value) => value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0;
+
+export function MealLogForm({ viewMeal = null, initialDate = null, onSaved, onBack }) {
   const { fetchMealTemplates } = useApi();
-  const isEditMode = !!viewMeal;
+  const [savedMeals, setSavedMeals] = useState([]);
+  const [savedMealsLoaded, setSavedMealsLoaded] = useState(false);
+  const [screen, setScreen] = useState(viewMeal ? 'log' : 'choose');
+  const [loadError, setLoadError] = useState(null);
 
-  const [templates, setTemplates] = useState([]);
-  const [templatesLoaded, setTemplatesLoaded] = useState(false);
-  const [selectedId, setSelectedId] = useState(OTHER);
-  const [date, setDate] = useState(initialDate || todayLocal());
-  const [time, setTime] = useState(nowLocalTime());
-  const [name, setName] = useState('');
-  const [portion, setPortion] = useState(1);
-  const [calories, setCalories] = useState('');
-  const [proteinGrams, setProteinGrams] = useState('');
-  const [notes, setNotes] = useState('');
-  const [saveDefault, setSaveDefault] = useState(false);
-  const [managing, setManaging] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState(null);
-  const dateRef = useRef(null);
+  // Which saved meal the log screen is for (null = a one-off meal), and which
+  // saved meal the saved-meal screen is editing (null = a new one).
+  const [loggingSavedMeal, setLoggingSavedMeal] = useState(null);
+  const [editingSavedMeal, setEditingSavedMeal] = useState(null);
 
   useEffect(() => {
     let active = true;
     fetchMealTemplates()
-      .then((data) => { if (active) setTemplates(data?.templates || []); })
-      .catch((err) => { if (active) setError(`Meal defaults could not be loaded: ${err.message}`); })
-      .finally(() => { if (active) setTemplatesLoaded(true); });
+      .then((data) => { if (active) setSavedMeals(data?.templates || []); })
+      .catch((err) => { if (active) setLoadError(`Saved meals could not be loaded: ${err.message}`); })
+      .finally(() => { if (active) setSavedMealsLoaded(true); });
     return () => { active = false; };
   }, [fetchMealTemplates]);
 
-  // Reopening a logged meal shows its own numbers, per portion, and reselects
-  // its default only if that default still exists.
+  // Editing a logged meal: show it as its saved meal if that still exists.
   useEffect(() => {
-    if (!viewMeal) return;
-    const perPortion = unscaleMeal(viewMeal);
-    setDate(viewMeal.date || todayLocal());
-    setTime(viewMeal.time || '');
-    setName(viewMeal.name || '');
-    setPortion(viewMeal.portion || 1);
-    setCalories(String(perPortion.calories));
-    setProteinGrams(String(perPortion.proteinGrams));
-    setNotes(viewMeal.notes || '');
-    setSaveDefault(false);
-    setConfirmDelete(false);
-  }, [viewMeal]);
-
-  useEffect(() => {
-    if (!viewMeal || !templatesLoaded) return;
-    setSelectedId(templates.some((t) => t.id === viewMeal.templateId) ? viewMeal.templateId : OTHER);
-    // Only on load: the template list changing afterwards must not reset a choice.
+    if (!viewMeal || !savedMealsLoaded) return;
+    setLoggingSavedMeal(savedMeals.find((meal) => meal.id === viewMeal.templateId) || null);
+    // Only on load: later changes to the list must not swap the meal being edited.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMeal, templatesLoaded]);
+  }, [viewMeal, savedMealsLoaded]);
 
-  const selected = templates.find((t) => t.id === selectedId) || null;
-  const perPortion = { calories: Number(calories), proteinGrams: Number(proteinGrams) };
-  const eaten = scaleMeal(perPortion, portion);
-  const numbersValid = calories !== '' && proteinGrams !== ''
-    && Number.isFinite(perPortion.calories) && Number.isFinite(perPortion.proteinGrams)
-    && perPortion.calories >= 0 && perPortion.proteinGrams >= 0;
-  const trimmedName = (selected ? selected.name : name).trim();
-  const canSubmit = numbersValid && trimmedName && !submitting;
+  if (screen === 'saved-meal') {
+    return (
+      <>
+        <BackButton onClick={() => { setEditingSavedMeal(null); setScreen('choose'); }} />
+        <SavedMealForm
+          savedMeal={editingSavedMeal}
+          onDone={(change) => {
+            if (change?.saved) {
+              setSavedMeals((current) => [
+                ...current.filter((meal) => meal.id !== change.saved.id),
+                change.saved,
+              ].sort((a, b) => a.name.localeCompare(b.name)));
+            }
+            if (change?.deletedId) {
+              setSavedMeals((current) => current.filter((meal) => meal.id !== change.deletedId));
+            }
+            setEditingSavedMeal(null);
+            setScreen('choose');
+          }}
+        />
+      </>
+    );
+  }
 
-  const numbersDifferFromDefault = useMemo(() => (
-    !!selected && (
-      Math.round(perPortion.calories) !== selected.calories
-      || Math.round(perPortion.proteinGrams) !== selected.proteinGrams
-    )
-  ), [selected, perPortion.calories, perPortion.proteinGrams]);
+  if (screen === 'log') {
+    // Editing a logged meal waits for the saved meals, so it can tell whether
+    // the meal came from one.
+    if (viewMeal && !savedMealsLoaded) return <p className="text-slate-400">Loading…</p>;
+    return (
+      <>
+        {!viewMeal && <BackButton onClick={() => { setLoggingSavedMeal(null); setScreen('choose'); }} />}
+        <LogMealForm
+          key={`${viewMeal?.id || 'new'}-${loggingSavedMeal?.id || 'one-off'}`}
+          viewMeal={viewMeal}
+          savedMeal={loggingSavedMeal}
+          initialDate={initialDate}
+          onSaved={onSaved}
+        />
+      </>
+    );
+  }
 
-  const chooseTemplate = (template) => {
+  return (
+    <>
+      {onBack && <BackButton onClick={onBack} />}
+      <div className="mb-6">
+        <h2 className="text-4xl font-black uppercase tracking-wide mb-2" style={{ color: MEAL_COLOR }}>
+          Log Meal
+        </h2>
+        <p className="text-slate-400">Pick a saved meal, or log one without saving it.</p>
+      </div>
+
+      <h3 className={labelClass}>Saved meals</h3>
+      {loadError && <p className="mb-3 text-sm text-red-400">{loadError}</p>}
+      {savedMealsLoaded && savedMeals.length === 0 && !loadError && (
+        <p className="mb-3 text-slate-400">No saved meals yet.</p>
+      )}
+      <div className="flex flex-col gap-2">
+        {savedMeals.map((meal) => (
+          <div key={meal.id} className="flex items-stretch gap-2">
+            <button
+              type="button"
+              onClick={() => { setLoggingSavedMeal(meal); setScreen('log'); }}
+              className="flex-1 min-w-0 text-left rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-3 hover:border-slate-400 transition-colors"
+            >
+              <span className="block truncate font-bold text-slate-100">{meal.name}</span>
+              <span className="block mt-0.5 text-xs font-mono text-slate-400">{formatMealNumbers(meal)}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setEditingSavedMeal(meal); setScreen('saved-meal'); }}
+              aria-label={`Edit saved meal ${meal.name}`}
+              className="shrink-0 w-12 grid place-items-center rounded-lg border border-slate-700 text-slate-400 hover:text-slate-100 hover:border-slate-400"
+            >
+              <Pencil size={16} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => { setEditingSavedMeal(null); setScreen('saved-meal'); }}
+        className="mt-3 w-full rounded-lg border border-dashed border-slate-500 px-4 py-3 font-bold text-slate-200 hover:border-slate-300 transition-colors"
+      >
+        + New saved meal
+      </button>
+
+      <div className="mt-8 border-t border-slate-700/60 pt-6">
+        <button
+          type="button"
+          onClick={() => { setLoggingSavedMeal(null); setScreen('log'); }}
+          className={secondaryButtonClass}
+        >
+          Log a meal without saving it
+        </button>
+      </div>
+    </>
+  );
+}
+
+function SavedMealForm({ savedMeal, onDone }) {
+  const isNew = !savedMeal;
+  const [name, setName] = useState(savedMeal?.name || '');
+  const [calories, setCalories] = useState(savedMeal ? String(savedMeal.calories) : '');
+  const [proteinGrams, setProteinGrams] = useState(savedMeal ? String(savedMeal.proteinGrams) : '');
+  const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [error, setError] = useState(null);
+
+  const canSave = name.trim() && validNumber(calories) && validNumber(proteinGrams) && !saving;
+
+  const save = async () => {
+    if (!canSave) return;
+    setSaving(true);
     setError(null);
-    setSaveDefault(false);
-    if (!template) {
-      setSelectedId(OTHER);
-      setName('');
-      setCalories('');
-      setProteinGrams('');
-      return;
-    }
-    setSelectedId(template.id);
-    setName(template.name);
-    setCalories(String(template.calories));
-    setProteinGrams(String(template.proteinGrams));
-  };
-
-  const deleteTemplate = async (template) => {
-    if (!window.confirm(`Delete the "${template.name}" default? Meals already logged keep their numbers.`)) return;
+    const body = JSON.stringify({ name: name.trim(), calories: Number(calories), proteinGrams: Number(proteinGrams) });
     try {
-      await apiFetch(`/api/meal-templates/${encodeURIComponent(template.id)}`, { method: 'DELETE' });
-      setTemplates((current) => current.filter((t) => t.id !== template.id));
-      if (selectedId === template.id) setSelectedId(OTHER);
+      const result = isNew
+        ? await apiFetch('/api/meal-templates', { method: 'POST', body })
+        : await apiFetch(`/api/meal-templates/${encodeURIComponent(savedMeal.id)}`, { method: 'PUT', body });
+      onDone({ saved: result.template });
     } catch (err) {
-      setError(`The default could not be deleted: ${err.message}`);
+      setError(`The saved meal was not saved: ${err.message}`);
+      setSaving(false);
     }
   };
 
-  const handleSubmit = async () => {
+  const remove = async () => {
+    setSaving(true);
+    try {
+      await apiFetch(`/api/meal-templates/${encodeURIComponent(savedMeal.id)}`, { method: 'DELETE' });
+      onDone({ deletedId: savedMeal.id });
+    } catch (err) {
+      setError(`The saved meal was not deleted: ${err.message}`);
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="mb-6">
+        <h2 className="text-4xl font-black uppercase tracking-wide mb-2" style={{ color: MEAL_COLOR }}>
+          {isNew ? 'New Saved Meal' : 'Edit Saved Meal'}
+        </h2>
+        <p className="text-slate-400">
+          {isNew
+            ? 'Saves a meal you eat often. Nothing is logged.'
+            : 'Meals already logged keep their own numbers.'}
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className={labelClass}>Name</label>
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+        </div>
+        <NumberFields
+          calories={calories}
+          proteinGrams={proteinGrams}
+          onCalories={setCalories}
+          onProteinGrams={setProteinGrams}
+          caption="For one portion."
+        />
+
+        {error && <p className="text-sm text-red-400">{error}</p>}
+
+        <button
+          type="button"
+          onClick={save}
+          disabled={!canSave}
+          className={primaryButtonClass}
+          style={{ backgroundColor: MEAL_COLOR }}
+        >
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+        <button type="button" onClick={() => onDone(null)} className={secondaryButtonClass}>
+          Cancel
+        </button>
+
+        {!isNew && (
+          confirmDelete ? (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={remove}
+                disabled={saving}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-xl font-bold uppercase tracking-wide transition-all disabled:opacity-50"
+              >
+                Confirm Delete
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-3 rounded-xl font-bold uppercase tracking-wide transition-all"
+              >
+                Keep It
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="w-full bg-transparent text-slate-500 hover:text-red-400 px-6 py-3 rounded-xl font-bold uppercase tracking-wide transition-all"
+            >
+              Delete Saved Meal
+            </button>
+          )
+        )}
+      </div>
+    </>
+  );
+}
+
+function LogMealForm({ viewMeal, savedMeal, initialDate, onSaved }) {
+  const isEditMode = !!viewMeal;
+  // A logged meal reopens with its own numbers; a saved meal fills in its numbers.
+  const start = viewMeal ? unscaleMeal(viewMeal) : savedMeal;
+
+  const [date, setDate] = useState(viewMeal?.date || initialDate || todayLocal());
+  const [time, setTime] = useState(viewMeal ? (viewMeal.time || '') : nowLocalTime());
+  const [name, setName] = useState(viewMeal?.name || '');
+  const [portion, setPortion] = useState(viewMeal?.portion || 1);
+  const [calories, setCalories] = useState(start ? String(start.calories) : '');
+  const [proteinGrams, setProteinGrams] = useState(start ? String(start.proteinGrams) : '');
+  const [notes, setNotes] = useState(viewMeal?.notes || '');
+  const [submitting, setSubmitting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [error, setError] = useState(null);
+  const dateRef = useRef(null);
+
+  const mealName = (savedMeal && !viewMeal ? savedMeal.name : name).trim();
+  const numbersValid = validNumber(calories) && validNumber(proteinGrams);
+  const eaten = scaleMeal({ calories, proteinGrams }, portion);
+  const canSubmit = numbersValid && mealName && !submitting;
+  const changedFromSaved = !!savedMeal && !viewMeal && (
+    Number(calories) !== savedMeal.calories || Number(proteinGrams) !== savedMeal.proteinGrams
+  );
+
+  const submit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
     setError(null);
+    const body = JSON.stringify({
+      date,
+      time: time || null,
+      templateId: viewMeal ? (viewMeal.templateId || null) : (savedMeal?.id || null),
+      name: mealName,
+      portion,
+      calories: eaten.calories,
+      proteinGrams: eaten.proteinGrams,
+      notes,
+    });
     try {
-      const numbers = {
-        name: trimmedName,
-        calories: Math.round(perPortion.calories),
-        proteinGrams: Math.round(perPortion.proteinGrams),
-      };
-      let templateId = selected?.id || null;
-
-      // The default is written before the meal, as with the walk default: if it
-      // cannot be saved, nothing is logged, so the two never disagree.
-      if (saveDefault && selected && numbersDifferFromDefault) {
-        await apiFetch(`/api/meal-templates/${encodeURIComponent(selected.id)}`, {
-          method: 'PUT',
-          body: JSON.stringify({ ...numbers, name: selected.name }),
-        });
-      } else if (saveDefault && !selected) {
-        const created = await apiFetch('/api/meal-templates', {
-          method: 'POST',
-          body: JSON.stringify(numbers),
-        });
-        templateId = created.template.id;
-      }
-
-      const body = {
-        date,
-        time: time || null,
-        templateId,
-        name: trimmedName,
-        portion,
-        calories: eaten.calories,
-        proteinGrams: eaten.proteinGrams,
-        notes,
-      };
-
       if (isEditMode) {
-        await apiFetch(`/api/meals/${encodeURIComponent(viewMeal.id)}`, { method: 'PUT', body: JSON.stringify(body) });
+        await apiFetch(`/api/meals/${encodeURIComponent(viewMeal.id)}`, { method: 'PUT', body });
       } else {
-        await apiFetch('/api/meals', { method: 'POST', body: JSON.stringify(body) });
+        await apiFetch('/api/meals', { method: 'POST', body });
       }
       onSaved?.();
     } catch (err) {
       setError(`The meal was not saved: ${err.message}`);
-    } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDelete = async () => {
-    setDeleting(true);
+  const remove = async () => {
+    setSubmitting(true);
     try {
       await apiFetch(`/api/meals/${encodeURIComponent(viewMeal.id)}`, { method: 'DELETE' });
       onSaved?.();
     } catch (err) {
       setError(`The meal was not deleted: ${err.message}`);
-      setDeleting(false);
+      setSubmitting(false);
     }
   };
-
-  const chipStyle = (active) => ({
-    borderColor: active ? MEAL_COLOR : undefined,
-    background: active ? `${MEAL_COLOR}1f` : undefined,
-  });
 
   return (
     <>
@@ -193,100 +340,47 @@ export function MealLogForm({ viewMeal = null, initialDate = null, onSaved }) {
         <h2 className="text-4xl font-black uppercase tracking-wide mb-2" style={{ color: MEAL_COLOR }}>
           {isEditMode ? 'Edit Meal' : 'Log Meal'}
         </h2>
-        <p className="text-slate-400">Calories and protein as eaten</p>
       </div>
 
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row">
-        <div className="flex-1">
-          <label className={labelClass}>Date</label>
-          <input
-            ref={dateRef}
-            type="date"
-            value={date}
-            max={todayLocal()}
-            onChange={(e) => setDate(e.target.value)}
-            onClick={() => { try { dateRef.current?.showPicker(); } catch { /* showPicker is optional */ } }}
-            className={`${inputClass} cursor-pointer`}
-          />
+      {savedMeal && !isEditMode ? (
+        <div className="mb-5 rounded-lg border px-4 py-3" style={{ borderColor: `${MEAL_COLOR}99`, background: `${MEAL_COLOR}14` }}>
+          <div className="text-xs font-bold uppercase tracking-wide text-slate-400">Saved meal</div>
+          <div className="mt-0.5 text-lg font-bold text-slate-100">{savedMeal.name}</div>
         </div>
-        <div className="w-full sm:w-40 sm:shrink-0">
-          <label className={labelClass}>Time</label>
-          <input
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-            className={`${inputClass} px-3 cursor-pointer`}
-          />
-        </div>
-      </div>
-
-      <div className="mb-5">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-bold text-slate-300 uppercase tracking-wide">Meal</span>
-          {templates.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setManaging((value) => !value)}
-              className="text-xs font-bold text-slate-400 hover:text-slate-200 uppercase tracking-wide"
-            >
-              {managing ? 'Done' : 'Edit defaults'}
-            </button>
+      ) : (
+        <div className="mb-5">
+          <label className={labelClass}>Name</label>
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+          {!isEditMode && (
+            <p className="mt-1.5 text-xs text-slate-500">This meal is logged once and not saved.</p>
           )}
         </div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {templates.map((template) => (
-            <div key={template.id} className="flex items-stretch gap-2">
-              <button
-                type="button"
-                onClick={() => chooseTemplate(template)}
-                className="flex-1 min-w-0 text-left rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-3 hover:border-slate-500 transition-colors"
-                style={chipStyle(selectedId === template.id)}
-              >
-                <span className="block truncate font-bold text-slate-100">{template.name}</span>
-                <span className="block mt-0.5 text-xs font-mono text-slate-400">{formatMealNumbers(template)}</span>
-              </button>
-              {managing && (
-                <button
-                  type="button"
-                  onClick={() => deleteTemplate(template)}
-                  aria-label={`Delete the ${template.name} default`}
-                  className="shrink-0 w-11 grid place-items-center rounded-lg border border-slate-700 text-slate-400 hover:text-red-400 hover:border-red-500/50"
-                >
-                  <Trash2 size={16} />
-                </button>
-              )}
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => chooseTemplate(null)}
-            className="text-left rounded-lg border border-dashed border-slate-600 bg-transparent px-4 py-3 hover:border-slate-400 transition-colors"
-            style={chipStyle(selectedId === OTHER)}
-          >
-            <span className="block font-bold text-slate-200">Something else</span>
-            <span className="block mt-0.5 text-xs text-slate-400">Type it in</span>
-          </button>
-        </div>
-        {templatesLoaded && templates.length === 0 && (
-          <p className="mt-2 text-xs text-slate-500">
-            No defaults yet. Log a meal as something else and tick “Save as a default”.
-          </p>
-        )}
-      </div>
+      )}
 
       <div className="space-y-4">
-        {!selected && (
-          <div>
-            <label className={labelClass}>Name</label>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex-1">
+            <label className={labelClass}>Date</label>
             <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Rice and beans bowl"
-              className={inputClass}
+              ref={dateRef}
+              type="date"
+              value={date}
+              max={todayLocal()}
+              onChange={(e) => setDate(e.target.value)}
+              onClick={() => { try { dateRef.current?.showPicker(); } catch { /* showPicker is optional */ } }}
+              className={`${inputClass} cursor-pointer`}
             />
           </div>
-        )}
+          <div className="w-full sm:w-40 sm:shrink-0">
+            <label className={labelClass}>Time</label>
+            <input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className={`${inputClass} px-3 cursor-pointer`}
+            />
+          </div>
+        </div>
 
         <div>
           <label className={labelClass}>Portion</label>
@@ -308,84 +402,35 @@ export function MealLogForm({ viewMeal = null, initialDate = null, onSaved }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelClass}>Calories</label>
-            <input
-              type="number"
-              inputMode="numeric"
-              min="0"
-              value={calories}
-              onChange={(e) => setCalories(e.target.value)}
-              placeholder="650"
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>Protein (g)</label>
-            <input
-              type="number"
-              inputMode="numeric"
-              min="0"
-              value={proteinGrams}
-              onChange={(e) => setProteinGrams(e.target.value)}
-              placeholder="45"
-              className={inputClass}
-            />
-          </div>
-        </div>
+        <NumberFields
+          calories={calories}
+          proteinGrams={proteinGrams}
+          onCalories={setCalories}
+          onProteinGrams={setProteinGrams}
+          caption={changedFromSaved
+            ? `For one portion. Changed for this meal only; ${savedMeal.name} keeps its saved numbers.`
+            : 'For one portion.'}
+        />
 
-        {portion !== 1 && numbersValid && (
+        {numbersValid && (
           <p className="text-sm text-slate-400">
-            Numbers above are for one portion. Logged as eaten:{' '}
+            Total for this meal:{' '}
             <span className="font-mono font-bold text-slate-200">{formatMealNumbers(eaten)}</span>
           </p>
         )}
 
-        {(!selected || numbersDifferFromDefault) && (
-          <label
-            className={`flex items-start gap-3 rounded-lg border px-3 py-3 cursor-pointer transition-colors ${
-              saveDefault ? 'bg-amber-100/5' : 'border-slate-600/60 bg-slate-800/40 hover:border-slate-500'
-            }`}
-            style={saveDefault ? { borderColor: `${MEAL_COLOR}99` } : {}}
-          >
-            <input
-              type="checkbox"
-              checked={saveDefault}
-              onChange={(e) => setSaveDefault(e.target.checked)}
-              className="mt-0.5 w-5 h-5 rounded bg-slate-800 border-slate-600 cursor-pointer"
-            />
-            <span>
-              <span className="block text-sm font-bold text-slate-200">
-                {selected ? 'This is the new default' : 'Save as a default'}
-              </span>
-              <span className="block mt-0.5 text-xs text-slate-400">
-                {selected
-                  ? `Update ${selected.name} to these numbers. Meals already logged keep theirs.`
-                  : 'Log it in one tap next time.'}
-              </span>
-            </span>
-          </label>
-        )}
-
         <div>
           <label className={labelClass}>Notes (optional)</label>
-          <input
-            type="text"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Extra dressing, skipped the cheese…"
-            className={inputClass}
-          />
+          <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
         </div>
 
         {error && <p className="text-sm text-red-400">{error}</p>}
 
         <button
           type="button"
-          onClick={handleSubmit}
+          onClick={submit}
           disabled={!canSubmit}
-          className="w-full text-slate-900 px-8 py-4 rounded-xl font-black text-xl uppercase tracking-wider shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+          className={primaryButtonClass}
           style={{ backgroundColor: MEAL_COLOR }}
         >
           {submitting ? 'Saving...' : isEditMode ? 'Save Changes' : 'Log Meal'}
@@ -396,11 +441,11 @@ export function MealLogForm({ viewMeal = null, initialDate = null, onSaved }) {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={handleDelete}
-                disabled={deleting}
+                onClick={remove}
+                disabled={submitting}
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-xl font-bold uppercase tracking-wide transition-all disabled:opacity-50"
               >
-                {deleting ? 'Deleting...' : 'Confirm Delete'}
+                Confirm Delete
               </button>
               <button
                 type="button"
@@ -422,5 +467,52 @@ export function MealLogForm({ viewMeal = null, initialDate = null, onSaved }) {
         )}
       </div>
     </>
+  );
+}
+
+// Calories and protein for one portion. The grey hints give the rough scale.
+function NumberFields({ calories, proteinGrams, onCalories, onProteinGrams, caption }) {
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelClass}>Calories</label>
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            value={calories}
+            onChange={(e) => onCalories(e.target.value)}
+            placeholder="650"
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Protein (g)</label>
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            value={proteinGrams}
+            onChange={(e) => onProteinGrams(e.target.value)}
+            placeholder="45"
+            className={inputClass}
+          />
+        </div>
+      </div>
+      {caption && <p className="mt-1.5 text-xs text-slate-500">{caption}</p>}
+    </div>
+  );
+}
+
+function BackButton({ onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-1.5 mb-4 text-slate-400 hover:text-slate-200 transition-colors font-bold uppercase tracking-wide text-sm"
+    >
+      <ChevronLeft size={18} /> Back
+    </button>
   );
 }

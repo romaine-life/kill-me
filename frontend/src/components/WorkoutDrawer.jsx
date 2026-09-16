@@ -631,7 +631,7 @@ export function LogTab({
       )}
 
       {/* Back to picker (create mode only) */}
-      {logStep === 'form' && !viewWorkout && !viewCardio && !viewMeal && (
+      {logStep === 'form' && logType !== 'meal' && !viewWorkout && !viewCardio && !viewMeal && (
         <button
           onClick={() => setLogStep('picker')}
           className="flex items-center gap-1.5 mb-4 text-slate-400 hover:text-slate-200 transition-colors font-bold uppercase tracking-wide text-sm"
@@ -1514,6 +1514,7 @@ export function LogTab({
           viewMeal={viewMeal}
           initialDate={initialMealDate}
           onSaved={onMealChanged}
+          onBack={viewMeal ? undefined : () => setLogStep('picker')}
         />
       )}
 
