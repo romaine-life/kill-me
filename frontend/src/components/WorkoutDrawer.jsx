@@ -1,5 +1,6 @@
 // Log tab — single form for both creating new workouts and editing existing ones.
-// Also handles cardio session logging (treadmill with templates, bike with manual entry).
+// Also handles cardio session logging (treadmill with interval templates or a steady
+// walk, bike with manual entry).
 //
 // When viewWorkout is null (create mode): form starts with defaults, submits via
 // POST, no delete option. When viewWorkout is set (edit mode): form pre-fills
@@ -15,7 +16,7 @@ import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { apiFetch } from '../api/client.js';
 import { todayLocal, nowLocalTime } from '../utils/dateUtils';
 import { useApi } from '../api/useApi.js';
-import { getTotalDuration } from '../utils/cardioTemplates.js';
+import { getTotalDuration, buildWalkIntervals, isSteadySession } from '../utils/cardioTemplates.js';
 import { CARDIO_CONFIG, cardioColor } from '../utils/cardioConfig.js';
 
 const buildWeightEntries = (variation = {}, savedWeights = []) => {
@@ -110,8 +111,17 @@ export function LogTab({
   const [bikeAvgSpeed, setBikeAvgSpeed] = useState('');
   const [bikeAvgHR, setBikeAvgHR] = useState('');
   const [bikeCalories, setBikeCalories] = useState('');
+  // Steady-template fields (the walk): pace and duration are per session, and
+  // can be written back to the template as the new default.
+  const [walkSpeed, setWalkSpeed] = useState('');
+  const [walkDuration, setWalkDuration] = useState('');
+  const [walkUseAsDefault, setWalkUseAsDefault] = useState(false);
 
   const isCardioEditMode = !!viewCardio;
+  // The walk is a treadmill option, not an activity: it sits in the same template
+  // dropdown but carries a pace instead of an interval list.
+  const selectedTemplate = templates.find(t => t.id === cardioTemplateId) || null;
+  const isWalkSelected = !!selectedTemplate?.steady;
 
   const dateInputRef = useRef(null);
   const cardioDateRef = useRef(null);
@@ -172,6 +182,16 @@ export function LogTab({
       });
   }, [fetchCardioTemplates, viewCardio]);
 
+  // Selecting the steady walk prefills its saved default. Editing an existing
+  // session keeps that session's own pace instead.
+  useEffect(() => {
+    if (viewCardio || !selectedTemplate?.steady) return;
+    const [interval] = selectedTemplate.intervals || [];
+    setWalkSpeed(interval?.speedMph ?? '');
+    setWalkDuration(interval?.durationMinutes ?? '');
+    setWalkUseAsDefault(false);
+  }, [selectedTemplate, viewCardio]);
+
   // Switch logType/step when viewCardio/viewWorkout changes. Edit mode jumps
   // straight to the form; create mode starts on the type picker.
   useEffect(() => {
@@ -191,6 +211,11 @@ export function LogTab({
       if (viewCardio.treadmill?.templateId) {
         setCardioTemplateId(viewCardio.treadmill.templateId);
       }
+      if (isSteadySession(viewCardio.treadmill)) {
+        const [interval] = viewCardio.treadmill.intervals;
+        setWalkSpeed(interval.speedMph ?? '');
+        setWalkDuration(viewCardio.durationMinutes ?? interval.durationMinutes ?? '');
+      }
       if (viewCardio.bike) {
         setBikeDuration(viewCardio.durationMinutes || '');
         setBikeDistance(viewCardio.bike.distanceMiles || '');
@@ -208,7 +233,10 @@ export function LogTab({
       setBikeAvgSpeed('');
       setBikeAvgHR('');
       setBikeCalories('');
+      setWalkSpeed('');
+      setWalkDuration('');
     }
+    setWalkUseAsDefault(false);
   }, [viewCardio]);
 
   // Clean up cooldown/toast timers on unmount
@@ -457,8 +485,6 @@ export function LogTab({
   const handleCardioSubmit = async () => {
     setCardioSubmitting(true);
     try {
-      const selectedTemplate = templates.find(t => t.id === cardioTemplateId);
-
       const body = {
         date: cardioDate,
         time: cardioTime || null,
@@ -466,7 +492,37 @@ export function LogTab({
         notes: cardioNotes || '',
       };
 
-      if (cardioActivity === 'treadmill' && selectedTemplate) {
+      if (cardioActivity === 'treadmill' && isWalkSelected) {
+        const intervals = buildWalkIntervals(
+          walkSpeed ? parseFloat(walkSpeed) : null,
+          walkDuration ? parseFloat(walkDuration) : null,
+        );
+        body.durationMinutes = getTotalDuration(intervals);
+        body.treadmill = {
+          templateId: selectedTemplate.id,
+          templateName: selectedTemplate.name,
+          intervals,
+        };
+
+        // Promote the entered pace to the template before logging, mirroring how a
+        // strength exercise promotes its default: if the default cannot be saved,
+        // nothing is logged, so the two never disagree.
+        if (walkUseAsDefault) {
+          try {
+            await apiFetch(`/api/cardio-templates/${encodeURIComponent(selectedTemplate.id)}`, {
+              method: 'PUT',
+              body: JSON.stringify({ intervals }),
+            });
+            setTemplates((prev) => prev.map((t) => (
+              t.id === selectedTemplate.id ? { ...t, intervals } : t
+            )));
+          } catch (error) {
+            console.error('Error updating walk default:', error);
+            alert('The new default could not be saved, so the walk was not logged. Please try again.');
+            return;
+          }
+        }
+      } else if (cardioActivity === 'treadmill' && selectedTemplate) {
         body.durationMinutes = getTotalDuration(selectedTemplate.intervals);
         body.treadmill = {
           templateId: selectedTemplate.id,
@@ -499,7 +555,9 @@ export function LogTab({
       }
 
       // Success: show toast and start cooldown
-      const label = cardioActivity === 'treadmill' ? 'Treadmill session' : 'Bike ride';
+      const label = cardioActivity === 'bike'
+        ? 'Bike ride'
+        : isWalkSelected ? 'Walk' : 'Treadmill session';
       setCardioToast(`${label} logged`);
       clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(() => setCardioToast(null), 4000);
@@ -534,7 +592,7 @@ export function LogTab({
   // Render — one form, always
   // ─────────────────────────────────────────────
 
-  const selectedTemplate = templates.find(t => t.id === cardioTemplateId);
+  const walkIncomplete = isWalkSelected && (!walkSpeed || !walkDuration);
 
   return (
     <div className="max-w-2xl">
@@ -1165,7 +1223,7 @@ export function LogTab({
             {/* Template Selector */}
             <div>
               <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">
-                Template
+                Workout
               </label>
               <select
                 value={cardioTemplateId}
@@ -1180,8 +1238,60 @@ export function LogTab({
               </select>
             </div>
 
+            {/* Walk — pace and duration instead of an interval list */}
+            {isWalkSelected && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">
+                    Speed (mph)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={walkSpeed}
+                    onChange={(e) => setWalkSpeed(e.target.value)}
+                    placeholder="3.2"
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">
+                    Duration (min)
+                  </label>
+                  <input
+                    type="number"
+                    value={walkDuration}
+                    onChange={(e) => setWalkDuration(e.target.value)}
+                    placeholder="30"
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {isWalkSelected && !isCardioEditMode && (
+              <label className={`flex items-start gap-3 rounded-lg border px-3 py-3 cursor-pointer transition-colors ${
+                walkUseAsDefault
+                  ? 'border-emerald-400/60 bg-emerald-500/10'
+                  : 'border-slate-600/60 bg-slate-800/40 hover:border-slate-500'
+              }`}>
+                <input
+                  type="checkbox"
+                  checked={walkUseAsDefault}
+                  onChange={(e) => setWalkUseAsDefault(e.target.checked)}
+                  className="mt-0.5 w-5 h-5 rounded bg-slate-800 border-slate-600 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer"
+                />
+                <span>
+                  <span className="block text-sm font-bold text-slate-200">This is the new default</span>
+                  <span className="block mt-0.5 text-xs text-slate-400">
+                    Prefill this pace and duration next time.
+                  </span>
+                </span>
+              </label>
+            )}
+
             {/* Interval Preview */}
-            {selectedTemplate && (
+            {selectedTemplate && !isWalkSelected && (
               <div className="bg-slate-800/50 backdrop-blur-md rounded-xl border border-slate-700/50 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wide">Intervals</h4>
@@ -1230,7 +1340,7 @@ export function LogTab({
             {/* Submit */}
             <button
               onClick={handleCardioSubmit}
-              disabled={cardioSubmitting || cardioCooldown}
+              disabled={cardioSubmitting || cardioCooldown || walkIncomplete}
               className="w-full text-white px-8 py-4 rounded-xl font-black text-xl uppercase tracking-wider shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
               style={{ background: `linear-gradient(to right, ${CARDIO_CONFIG.treadmill.color}, #059669)` }}
             >
@@ -1242,7 +1352,9 @@ export function LogTab({
                   ? 'Saving...'
                   : cardioCooldown
                     ? '✓ Logged'
-                    : isCardioEditMode ? 'Save Changes' : 'Log Treadmill Session'}
+                    : isCardioEditMode
+                      ? 'Save Changes'
+                      : isWalkSelected ? 'Log Walk' : 'Log Treadmill Session'}
               </span>
             </button>
           </div>
