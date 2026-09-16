@@ -1,5 +1,5 @@
 import { createElement, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Bike, ChevronLeft, Dumbbell, Wrench } from 'lucide-react';
+import { Activity, Bike, ChevronLeft, Dumbbell, Utensils, Wrench } from 'lucide-react';
 import { useApi } from '../api/useApi.js';
 import { colors } from '../colors';
 import { cardioColor, cardioName } from '../utils/cardioConfig';
@@ -7,6 +7,7 @@ import { isSteadySession } from '../utils/cardioTemplates.js';
 import { formatTime12h } from '../utils/dateUtils';
 import { describeLoggedDay, getDayInfo } from '../utils/dayConfig';
 import { dayColor, pad2 } from '../utils/dayDesign';
+import { MEAL_COLOR, formatCalories, portionLabel } from '../utils/mealConfig';
 
 function formatDate(dateStr) {
   if (!dateStr) return 'Date not recorded';
@@ -63,6 +64,7 @@ export function ActivityRecordDetail({
   onEdit,
   onOpenRecord,
   onAddSoreness,
+  onAddMeal,
 }) {
   const { fetchWorkouts, fetchCardioSessions, fetchSoreness } = useApi();
   const fetchers = useRef({ fetchWorkouts, fetchCardioSessions, fetchSoreness });
@@ -142,6 +144,14 @@ export function ActivityRecordDetail({
           session={record}
           isAdmin={isAdmin}
           onEdit={() => onEdit?.('cardio', record)}
+        />
+      )}
+      {kind === 'meals' && (
+        <MealDayDetail
+          day={record}
+          isAdmin={isAdmin}
+          onEditMeal={(meal) => onEdit?.('meal', meal)}
+          onAddMeal={onAddMeal ? () => onAddMeal(record.date) : undefined}
         />
       )}
       {kind === 'soreness' && (
@@ -338,6 +348,59 @@ function CardioDetail({ session, isAdmin, onEdit }) {
           <div style={styles.note}>{session.notes}</div>
         </section>
       )}
+    </>
+  );
+}
+
+function MealDayDetail({ day, isAdmin, onEditMeal, onAddMeal }) {
+  const { meals, totals } = day;
+
+  return (
+    <>
+      <DetailHeader
+        eyebrow="Meals"
+        title={`${formatCalories(totals.calories)} · ${totals.proteinGrams} g protein`}
+        date={day.date}
+        accent={MEAL_COLOR}
+        icon={Utensils}
+        actions={isAdmin && onAddMeal && (
+          <button onClick={onAddMeal} style={styles.secondaryAction}>+ Add meal</button>
+        )}
+      />
+
+      <section style={styles.section}>
+        <div style={styles.sectionHeadingRow}>
+          <h3 style={{ ...styles.sectionHeading, margin: 0 }}>Meals</h3>
+          <span style={styles.count}>{meals.length}</span>
+        </div>
+        <div style={styles.cardList}>
+          {meals.map((meal) => (
+            <div key={meal.id} style={styles.exerciseRow}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={styles.exerciseName}>
+                  {meal.name}
+                  {meal.portion && meal.portion !== 1 && (
+                    <span style={{ marginLeft: 6, color: MEAL_COLOR, fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                      ×{portionLabel(meal.portion)}
+                    </span>
+                  )}
+                </div>
+                {meal.time && <div style={styles.exerciseVariation}>{formatTime12h(meal.time)}</div>}
+                <div style={styles.metricGrid}>
+                  <DetailField label="Calories" value={meal.calories} compact />
+                  <DetailField label="Protein" value={`${meal.proteinGrams} g`} compact />
+                </div>
+                {meal.notes && <div style={{ ...styles.recordDetail, marginTop: 8 }}>{meal.notes}</div>}
+              </div>
+              {isAdmin && (
+                <button onClick={() => onEditMeal(meal)} style={styles.secondaryAction}>
+                  <Wrench size={13} /> Edit
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
     </>
   );
 }

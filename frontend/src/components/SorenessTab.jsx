@@ -114,13 +114,15 @@ export function SorenessTab({
   onOpenWorkout,
   onOpenCardio,
   onOpenSoreness,
+  onOpenMealDay,
 }) {
   const [entries, setEntries] = useState([]);
   const [workouts, setWorkouts] = useState([]);
   const [cardioSessions, setCardioSessions] = useState([]);
+  const [meals, setMeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { fetchSoreness, fetchWorkouts, fetchCardioSessions } = useApi();
+  const { fetchSoreness, fetchWorkouts, fetchCardioSessions, fetchMeals } = useApi();
   const isMobile = useIsMobile();
 
   // Editor state
@@ -151,20 +153,22 @@ export function SorenessTab({
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const [sorenessData, workoutData, cardioData] = await Promise.all([
+      const [sorenessData, workoutData, cardioData, mealData] = await Promise.all([
         fetchSoreness(),
         fetchWorkouts(),
         fetchCardioSessions(),
+        fetchMeals(),
       ]);
       setEntries(sorenessData.entries || []);
       setWorkouts(workoutData.workouts || []);
       setCardioSessions(cardioData.sessions || []);
+      setMeals(mealData.meals || []);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [fetchSoreness, fetchWorkouts, fetchCardioSessions]);
+  }, [fetchSoreness, fetchWorkouts, fetchCardioSessions, fetchMeals]);
 
   // Fetch the recovery records and the strength/cardio activity that gives
   // them context on the shared date rail.
@@ -690,9 +694,11 @@ export function SorenessTab({
           entries={entries}
           workouts={workoutsByDate}
           cardioSessions={cardioSessions}
+          meals={meals}
           onOpenWorkout={showWorkout}
           onOpenCardio={onOpenCardio}
           onOpenSoreness={onOpenSoreness}
+          onOpenMealDay={onOpenMealDay}
         />
       </div>
     );

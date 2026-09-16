@@ -18,6 +18,7 @@ import { todayLocal, nowLocalTime } from '../utils/dateUtils';
 import { useApi } from '../api/useApi.js';
 import { getTotalDuration, buildWalkIntervals, isSteadySession } from '../utils/cardioTemplates.js';
 import { CARDIO_CONFIG, cardioColor } from '../utils/cardioConfig.js';
+import { MealLogForm } from './MealLogForm.jsx';
 
 const buildWeightEntries = (variation = {}, savedWeights = []) => {
   const savedByKey = new Map(
@@ -53,19 +54,22 @@ const getDefaultVariation = (exercise) => {
 export function LogTab({
   initialDay = null,
   initialDate = null,
+  initialMealDate = null,
   onSuccess,
   onViewWorkout,
   onViewCardio,
   onWorkoutChanged,
   onCardioChanged,
+  onMealChanged,
   onLogSoreness,
   viewWorkout = null,
   viewCardio = null,
+  viewMeal = null,
   currentDay = null,
 }) {
-  // Top-level toggle: 'weight' or 'cardio'
-  const [logType, setLogType] = useState(viewCardio ? 'cardio' : 'weight');
-  const [logStep, setLogStep] = useState(viewWorkout || viewCardio ? 'form' : 'picker'); // 'picker' | 'form'
+  // Top-level toggle: 'weight', 'cardio' or 'meal'
+  const [logType, setLogType] = useState(viewMeal ? 'meal' : viewCardio ? 'cardio' : 'weight');
+  const [logStep, setLogStep] = useState(viewWorkout || viewCardio || viewMeal ? 'form' : 'picker'); // 'picker' | 'form'
 
   const isEditMode = !!viewWorkout;
 
@@ -192,13 +196,16 @@ export function LogTab({
     setWalkUseAsDefault(false);
   }, [selectedTemplate, viewCardio]);
 
-  // Switch logType/step when viewCardio/viewWorkout changes. Edit mode jumps
+  // Switch logType/step when viewCardio/viewWorkout/viewMeal changes. Edit mode jumps
   // straight to the form; create mode starts on the type picker.
   useEffect(() => {
-    if (viewCardio) { setLogType('cardio'); setLogStep('form'); }
+    if (viewMeal) { setLogType('meal'); setLogStep('form'); }
+    else if (viewCardio) { setLogType('cardio'); setLogStep('form'); }
     else if (viewWorkout) { setLogType('weight'); setLogStep('form'); }
+    // A date handed in from a meal day opens straight onto a new meal for it.
+    else if (initialMealDate) { setLogType('meal'); setLogStep('form'); }
     else { setLogStep('picker'); }
-  }, [viewCardio, viewWorkout]);
+  }, [viewCardio, viewWorkout, viewMeal, initialMealDate]);
 
   // Populate cardio form from viewCardio (edit) or defaults (create)
   useEffect(() => {
@@ -597,7 +604,7 @@ export function LogTab({
   return (
     <div className="max-w-2xl">
       {/* Type picker (create mode) */}
-      {logStep === 'picker' && !viewWorkout && !viewCardio && (
+      {logStep === 'picker' && !viewWorkout && !viewCardio && !viewMeal && (
         <div className="flex flex-col gap-3">
           <button
             onClick={() => { setLogType('weight'); onViewCardio?.(null); setLogStep('form'); }}
@@ -613,11 +620,18 @@ export function LogTab({
             <span className="text-2xl font-black text-slate-100 uppercase tracking-wide">Cardio</span>
             <ChevronRight className="text-slate-400" size={24} />
           </button>
+          <button
+            onClick={() => { setLogType('meal'); onViewWorkout?.(null); onViewCardio?.(null); setLogStep('form'); }}
+            className="flex items-center justify-between px-6 py-6 rounded-xl bg-slate-800/40 border border-slate-700/50 hover:border-amber-200/60 hover:bg-slate-800/70 transition-all"
+          >
+            <span className="text-2xl font-black text-slate-100 uppercase tracking-wide">Meal</span>
+            <ChevronRight className="text-slate-400" size={24} />
+          </button>
         </div>
       )}
 
       {/* Back to picker (create mode only) */}
-      {logStep === 'form' && !viewWorkout && !viewCardio && (
+      {logStep === 'form' && !viewWorkout && !viewCardio && !viewMeal && (
         <button
           onClick={() => setLogStep('picker')}
           className="flex items-center gap-1.5 mb-4 text-slate-400 hover:text-slate-200 transition-colors font-bold uppercase tracking-wide text-sm"
@@ -1493,6 +1507,15 @@ export function LogTab({
           </div>
         )}
       </>)} {/* end logType === 'cardio' */}
+
+      {logStep === 'form' && logType === 'meal' && (
+        <MealLogForm
+          key={viewMeal?.id || 'new-meal'}
+          viewMeal={viewMeal}
+          initialDate={initialMealDate}
+          onSaved={onMealChanged}
+        />
+      )}
 
       {/* Cardio success toast */}
       {cardioToast && (

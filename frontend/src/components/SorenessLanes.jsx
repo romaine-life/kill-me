@@ -1,6 +1,8 @@
 // Lanes view — a vertical date rail where each workout spawns a stripe that
 // runs for as long as its soreness lasted. Cardio sessions share the date rail
-// as peer activity records, but never spawn a soreness stripe.
+// as peer activity records, but never spawn a soreness stripe. Meals sit beside
+// the date as one daily-total node per day, since what was eaten is read as a
+// property of the date rather than as an activity.
 //
 // Reads like a git graph: the date axis is the trunk, workouts are commits, and
 // each recovery is a branch that slopes off its workout and runs down the page
@@ -25,11 +27,13 @@ import { dayColor, pad2 } from '../utils/dayDesign';
 import { cardioColor, cardioLabel, cardioName } from '../utils/cardioConfig';
 import { buildTracks, packLanes, datesBetween, daysBetween } from '../utils/sorenessLink';
 import { todayLocal } from '../utils/dateUtils';
+import { MEAL_COLOR, groupMealsByDate, formatMealNumbers, formatCalories, portionLabel } from '../utils/mealConfig';
 import { colors } from '../colors';
 
 const ROW_H = 30;
 const GAP_H = 22; // a collapsed run of dates with nothing in them
 const ACTIVITY_W = 146;
+const MEAL_W = 128;
 const CARDIO_GAP = 12;
 const DATE_W = 74; // wide enough for "Sat Aug 13" in 10px monospace
 const ACTIVITY_GAP = 6;
@@ -76,13 +80,14 @@ function shiftDays(date, delta) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWorkout, onOpenCardio, onOpenSoreness }) {
+export function SorenessLanes({ entries, workouts, cardioSessions = [], meals = [], onOpenWorkout, onOpenCardio, onOpenSoreness, onOpenMealDay }) {
   const [group, setGroup] = useState('workout');   // 'workout' | 'muscle'
   const [gaps, setGaps] = useState('bridge');     // 'bridge' | 'break'
   const [order, setOrder] = useState('oldest');    // 'oldest' | 'newest'
   const [quiet, setQuiet] = useState('collapse');  // 'collapse' | 'show'
   const [windowDays, setWindowDays] = useState(30); // 30 | 90 | 0 (all)
   const [activityContext, setActivityContext] = useState('all'); // 'all' | 'weights'
+  const [mealsShown, setMealsShown] = useState('show'); // 'show' | 'hide'
   const [hover, setHover] = useState(null);
   const narrow = useNarrow();
 
@@ -96,16 +101,20 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
     const visibleCardio = activityContext === 'all'
       ? cardioSessions.filter((session) => inWindow(session.date))
       : [];
+    const mealsByDate = mealsShown === 'show'
+      ? groupMealsByDate(meals.filter((meal) => inWindow(meal.date)))
+      : new Map();
 
     const stamps = [
       ...visibleWorkouts.map((w) => w.date),
       ...visibleCardio.map((session) => session.date),
+      ...mealsByDate.keys(),
       ...tracks.flatMap((t) => [t.startDate, t.endDate, t.sourceWorkoutDate].filter(Boolean)),
     ];
     if (stamps.length === 0) {
       return {
         layout: [], yByDate: new Map(), bottom: TOP, tracks: [], laneCount: 0,
-        workoutsByDate: new Map(), cardioByDate: new Map(),
+        workoutsByDate: new Map(), cardioByDate: new Map(), mealsByDate,
       };
     }
 
@@ -130,6 +139,7 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
     // length — the one thing this view exists to show — would lie.
     const active = new Set(workoutsByDate.keys());
     for (const date of cardioByDate.keys()) active.add(date);
+    for (const date of mealsByDate.keys()) active.add(date);
     for (const t of tracks) {
       if (t.sourceWorkoutDate) active.add(t.sourceWorkoutDate);
       for (const d of datesBetween(t.startDate, t.endDate)) active.add(d);
@@ -165,10 +175,10 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
     const yByDate = new Map();
     for (const r of layout) if (r.kind === 'date') yByDate.set(r.date, r.y);
 
-    return { layout, yByDate, bottom: yPos, tracks, laneCount, workoutsByDate, cardioByDate };
-  }, [entries, workouts, cardioSessions, activityContext, group, order, windowDays, quiet]);
+    return { layout, yByDate, bottom: yPos, tracks, laneCount, workoutsByDate, cardioByDate, mealsByDate };
+  }, [entries, workouts, cardioSessions, meals, activityContext, mealsShown, group, order, windowDays, quiet]);
 
-  const { layout, yByDate, bottom, tracks, laneCount, workoutsByDate, cardioByDate } = model;
+  const { layout, yByDate, bottom, tracks, laneCount, workoutsByDate, cardioByDate, mealsByDate } = model;
   const y = (date) => yByDate.get(date);
 
   // A muscle stripe's label sits at whichever end is visually on top, which
@@ -197,8 +207,10 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
   }, [tracks, order]);
 
   const showCardioColumn = activityContext === 'all';
+  const showMealColumn = mealsByDate.size > 0;
   const dateX = 0;
-  const cardioX = dateX + DATE_W + ACTIVITY_GAP;
+  const mealX = dateX + DATE_W + ACTIVITY_GAP;
+  const cardioX = showMealColumn ? mealX + MEAL_W + CARDIO_GAP : mealX;
   const workoutX = showCardioColumn
     ? cardioX + ACTIVITY_W + CARDIO_GAP
     : cardioX;
@@ -216,7 +228,7 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
   const controls = (
     <Controls {...{
       group, setGroup, gaps, setGaps, order, setOrder, quiet, setQuiet,
-      windowDays, setWindowDays, activityContext, setActivityContext, narrow,
+      windowDays, setWindowDays, activityContext, setActivityContext, mealsShown, setMealsShown, narrow,
     }} />
   );
 
@@ -225,7 +237,7 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
       <div style={{ maxWidth: '100%', minWidth: 0 }}>
         {controls}
         <p style={{ color: colors.text.tertiary, fontSize: 13, marginTop: 16 }}>
-          No strength, cardio, or soreness activity in this window.
+          No strength, cardio, soreness, or meals in this window.
         </p>
       </div>
     );
@@ -236,6 +248,7 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
       {controls}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginTop: 10, color: colors.text.tertiary, fontSize: 10 }}>
+        {showMealColumn && <LegendMark color={MEAL_COLOR} label="Meals · daily total" />}
         <LegendMark color={colors.text.secondary} label="Strength workout" />
         {visibleCardioActivities.map((activity) => (
           <LegendMark key={activity} color={cardioColor(activity)} label={cardioLabel(activity)} />
@@ -275,6 +288,11 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
             <text x={dateX} y={12} style={{ fontSize: 8, fontFamily: 'monospace', fill: colors.text.disabled, letterSpacing: '0.08em' }}>
               DATE
             </text>
+            {showMealColumn && (
+              <text x={mealX} y={12} style={{ fontSize: 8, fontFamily: 'monospace', fill: colors.text.disabled, letterSpacing: '0.08em' }}>
+                MEALS
+              </text>
+            )}
             {showCardioColumn && (
               <text x={cardioX} y={12} style={{ fontSize: 8, fontFamily: 'monospace', fill: colors.text.disabled, letterSpacing: '0.08em' }}>
                 CARDIO
@@ -505,6 +523,56 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
               );
             })}
 
+            {/* One node per day with meals: that day's totals, opening the day. */}
+            {showMealColumn && layout
+              .filter((r) => r.kind === 'date' && mealsByDate.has(r.date))
+              .map((r) => {
+                const day = mealsByDate.get(r.date);
+                const nodeHeight = ROW_H - 6;
+                const nodeY = r.y - nodeHeight / 2;
+                const label = formatMealNumbers(day.totals);
+                return (
+                  <g
+                    key={`meals-${r.date}`}
+                    role={onOpenMealDay ? 'button' : undefined}
+                    tabIndex={onOpenMealDay ? 0 : undefined}
+                    aria-label={onOpenMealDay ? `View meals from ${r.date}: ${label}` : undefined}
+                    style={{ cursor: onOpenMealDay ? 'pointer' : 'default' }}
+                    onClick={() => onOpenMealDay?.(day)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        onOpenMealDay?.(day);
+                      }
+                    }}
+                    onMouseEnter={() => setHover({ kind: 'meals', day })}
+                    onMouseLeave={() => setHover(null)}
+                    onFocus={() => setHover({ kind: 'meals', day })}
+                    onBlur={() => setHover(null)}
+                  >
+                    <rect
+                      x={mealX}
+                      y={nodeY}
+                      width={MEAL_W}
+                      height={nodeHeight}
+                      rx={4}
+                      fill={colors.bg.surface}
+                      stroke={MEAL_COLOR}
+                      strokeWidth={0.75}
+                    />
+                    <rect x={mealX} y={nodeY} width={3} height={nodeHeight} fill={MEAL_COLOR} />
+                    <text
+                      x={mealX + 10}
+                      y={nodeY + nodeHeight / 2}
+                      dominantBaseline="middle"
+                      style={{ fontSize: 11, fill: colors.text.primary, fontWeight: 600 }}
+                    >
+                      {label}
+                    </text>
+                  </g>
+                );
+              })}
+
             {/* Cardio and strength are peer records on the shared date rail. */}
             {showCardioColumn && layout
               .filter((r) => r.kind === 'date')
@@ -635,6 +703,44 @@ function HoverPanel({ hover, narrow }) {
   // chart, and dropping it outright would reflow the chart on every hover.
   if (!hover) return narrow ? null : <div style={{ width: 200, flexShrink: 0 }} />;
 
+  if (hover.kind === 'meals') {
+    const { day } = hover;
+    return (
+      <div
+        style={{
+          width: narrow ? '100%' : 200,
+          boxSizing: 'border-box',
+          flexShrink: 0,
+          padding: 12,
+          borderRadius: 10,
+          background: colors.bg.raised,
+          border: `1px solid ${MEAL_COLOR}47`,
+          ...(narrow ? {} : { position: 'sticky', top: 12 }),
+        }}
+      >
+        <div style={{ color: MEAL_COLOR, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          Meals
+        </div>
+        <div style={{ marginTop: 5, color: colors.text.primary, fontSize: 13, fontWeight: 700 }}>
+          {formatCalories(day.totals.calories)} · {day.totals.proteinGrams} g protein
+        </div>
+        <div style={{ marginTop: 3, color: colors.text.tertiary, fontSize: 11 }}>
+          {weekday(day.date)} {shortDate(day.date)}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 9 }}>
+          {day.meals.map((meal) => (
+            <div key={meal.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11 }}>
+              <span style={{ color: colors.text.secondary, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {meal.name}{meal.portion && meal.portion !== 1 ? ` ×${portionLabel(meal.portion)}` : ''}
+              </span>
+              <span style={{ color: colors.text.primary, fontFamily: 'monospace', flexShrink: 0 }}>{meal.calories}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   if (hover.kind === 'cardio') {
     const session = hover.session;
     const activityColor = cardioColor(session.activity);
@@ -720,7 +826,7 @@ function LegendMark({ color, label }) {
 
 function Controls({
   group, setGroup, gaps, setGaps, order, setOrder, quiet, setQuiet,
-  windowDays, setWindowDays, activityContext, setActivityContext, narrow,
+  windowDays, setWindowDays, activityContext, setActivityContext, mealsShown, setMealsShown, narrow,
 }) {
   return (
     <div
@@ -741,6 +847,15 @@ function Controls({
         opts={[
           { id: 'all', label: 'Strength + cardio' },
           { id: 'weights', label: 'Strength only' },
+        ]}
+      />
+      <Seg
+        label="Meals"
+        value={mealsShown}
+        onChange={setMealsShown}
+        opts={[
+          { id: 'show', label: 'Show' },
+          { id: 'hide', label: 'Hide' },
         ]}
       />
       <Seg

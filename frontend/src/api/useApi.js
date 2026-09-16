@@ -16,6 +16,8 @@ const api = Object.freeze({
   fetchSoreness: () => apiFetch('/api/soreness'),
   fetchCardioSessions: () => apiFetch('/api/cardio-sessions'),
   fetchCardioTemplates: () => apiFetch('/api/cardio-templates'),
+  fetchMeals: () => apiFetch('/api/meals'),
+  fetchMealTemplates: () => apiFetch('/api/meal-templates'),
 });
 
 export function useApi() {

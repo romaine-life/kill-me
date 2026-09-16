@@ -55,6 +55,8 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [logViewWorkout, setLogViewWorkout] = useState(null);
   const [logViewCardio, setLogViewCardio] = useState(null);
+  const [logViewMeal, setLogViewMeal] = useState(null);
+  const [logInitialMealDate, setLogInitialMealDate] = useState(null);
   const [detailStack, setDetailStack] = useState([]);
   // Workout handed to the Soreness tab by a "Log soreness" action elsewhere,
   // so the editor opens already attributed to it. Cleared once consumed.
@@ -112,6 +114,8 @@ function App() {
     setDetailStack([]);
     setLogViewWorkout(null);
     setLogViewCardio(null);
+    setLogViewMeal(null);
+    setLogInitialMealDate(null);
     setLogInitialDay(dayNumber);
     setLogInitialDate(date);
     navigateTab('log');
@@ -135,6 +139,8 @@ function App() {
     setDetailStack([]);
     setLogViewWorkout(workout);
     setLogViewCardio(null);
+    setLogViewMeal(null);
+    setLogInitialMealDate(null);
     setLogInitialDay(null);
     setLogInitialDate(null);
     navigateTab('log');
@@ -159,6 +165,31 @@ function App() {
     setDetailStack([]);
     setLogViewCardio(session);
     setLogViewWorkout(null);
+    setLogViewMeal(null);
+    setLogInitialMealDate(null);
+    setLogInitialDay(null);
+    setLogInitialDate(null);
+    navigateTab('log');
+  };
+
+  const handleEditMeal = (meal) => {
+    setDetailStack([]);
+    setLogViewMeal(meal);
+    setLogInitialMealDate(null);
+    setLogViewWorkout(null);
+    setLogViewCardio(null);
+    setLogInitialDay(null);
+    setLogInitialDate(null);
+    navigateTab('log');
+  };
+
+  // "+ Add meal" from a meal day opens a new meal already dated to that day.
+  const handleAddMeal = (date) => {
+    setDetailStack([]);
+    setLogViewMeal(null);
+    setLogInitialMealDate(date);
+    setLogViewWorkout(null);
+    setLogViewCardio(null);
     setLogInitialDay(null);
     setLogInitialDate(null);
     navigateTab('log');
@@ -213,6 +244,7 @@ function App() {
     if (kind === 'workout') handleEditWorkout(record);
     if (kind === 'cardio') handleEditCardio(record);
     if (kind === 'soreness') handleEditSoreness(record);
+    if (kind === 'meal') handleEditMeal(record);
   };
 
   const handleWorkoutSuccess = (advancedTo) => {
@@ -224,6 +256,8 @@ function App() {
     setLogInitialDate(null);
     setLogViewWorkout(null);
     setLogViewCardio(null);
+    setLogViewMeal(null);
+    setLogInitialMealDate(null);
     setDetailStack([]);
     setActivityView(DEFAULT_ACTIVITY_VIEW);
     navigateTab('soreness');
@@ -231,6 +265,10 @@ function App() {
 
   const handleNav = (tab) => {
     setDetailStack([]);
+    // A meal opened from a record or a day is a one-off destination; the Log
+    // tab itself always starts on the type picker.
+    setLogViewMeal(null);
+    setLogInitialMealDate(null);
     clearSorenessEditor();
     setSorenessReturnContext(null);
     navigateTab(tab);
@@ -300,6 +338,7 @@ function App() {
               onEdit={handleEditRecord}
               onOpenRecord={handleOpenRecord}
               onAddSoreness={handleLogSoreness}
+              onAddMeal={isAdmin ? handleAddMeal : undefined}
             />
           ) : (
             <>
@@ -357,6 +396,7 @@ function App() {
                   onOpenWorkout={(workout) => handleOpenRecord('workout', workout)}
                   onOpenCardio={(session) => handleOpenRecord('cardio', session)}
                   onOpenSoreness={(entry) => handleOpenRecord('soreness', entry)}
+                  onOpenMealDay={(day) => handleOpenRecord('meals', day)}
                 />
               )}
             </ActivityWorkspace>
@@ -385,6 +425,9 @@ function App() {
                 setLogViewCardio(null);
                 setRefreshKey(prev => prev + 1);
               }}
+              viewMeal={logViewMeal}
+              initialMealDate={logInitialMealDate}
+              onMealChanged={() => handleWorkoutSuccess(null)}
             />
           )}
 

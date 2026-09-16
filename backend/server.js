@@ -18,6 +18,7 @@ import {
   createWorkoutRoutes,
   createSorenessRoutes,
   createCardioRoutes,
+  createMealRoutes,
 } from './routes/index.js';
 import { createRequireAuth, requireAdmin, currentCaller } from './auth.js';
 import { fetchConfig } from './config.js';
@@ -99,6 +100,7 @@ async function start() {
   app.use(createWorkoutRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
   app.use(createSorenessRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
   app.use(createCardioRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
+  app.use(createMealRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
 
   // Hashed Vite assets are immutable. Keep their routing separate so a stale
   // document requesting a removed hash receives a real 404 instead of the SPA
