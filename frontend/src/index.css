@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Tailwind 4 gives buttons the default arrow cursor. Components styled with
+   inline styles set a pointer themselves; this covers the Tailwind-styled ones
+   (the Log type picker, the log forms) so every clickable button shows a hand. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+
 @font-face {
   font-family: "Archivo";
   src: url("/fonts/Archivo.ttf") format("truetype-variations"),
