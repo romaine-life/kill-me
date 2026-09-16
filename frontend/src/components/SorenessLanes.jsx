@@ -76,7 +76,7 @@ function shiftDays(date, delta) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWorkout, onOpenCardio }) {
+export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWorkout, onOpenCardio, onOpenSoreness }) {
   const [group, setGroup] = useState('workout');   // 'workout' | 'muscle'
   const [gaps, setGaps] = useState('bridge');     // 'bridge' | 'break'
   const [order, setOrder] = useState('oldest');    // 'oldest' | 'newest'
@@ -449,8 +449,8 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
                     );
                   })}
 
-                  {/* Invisible per-day hit targets preserve precise hover details.
-                      Editing remains an explicit action on a record card. */}
+                  {/* Invisible per-day hit targets preserve precise hover details,
+                      and open that day's soreness record like any other node. */}
                   {segments
                     .filter((seg) => seg.logged)
                     .flatMap((seg) => seg.days)
@@ -463,6 +463,11 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
                         height={ROW_H}
                         fill="transparent"
                         pointerEvents="all"
+                        style={{ cursor: onOpenSoreness ? 'pointer' : 'default' }}
+                        onClick={() => {
+                          const entry = t.entries.get(d);
+                          if (entry) onOpenSoreness?.(entry);
+                        }}
                         onMouseEnter={() =>
                           setHover({
                             kind: 'soreness',

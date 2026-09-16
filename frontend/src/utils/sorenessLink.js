@@ -195,6 +195,7 @@ export function buildTracks(entries, mode = 'workout') {
         logged: new Set(),  // every date this stripe was logged on
         levels: new Map(),  // date -> record-level intensity
         detail: new Map(),  // date -> [{ name, level }]
+        entries: new Map(), // date -> the soreness record logged that day
       };
       tracks.set(key, t);
     }
@@ -207,6 +208,7 @@ export function buildTracks(entries, mode = 'workout') {
       t.levels.set(date, Math.max(t.levels.get(date) ?? 0, entry.level));
     }
     t.detail.set(date, muscles.map((m) => ({ name: m.muscle || m.group, level: m.level })));
+    t.entries.set(date, entry);
   };
 
   for (const entry of entries) {

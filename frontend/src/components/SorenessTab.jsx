@@ -692,6 +692,7 @@ export function SorenessTab({
           cardioSessions={cardioSessions}
           onOpenWorkout={showWorkout}
           onOpenCardio={onOpenCardio}
+          onOpenSoreness={onOpenSoreness}
         />
       </div>
     );
