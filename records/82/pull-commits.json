@@ -1,0 +1,86 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/e77b3ac1c45154be4384919ac5a1d5b44787a5fc/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-23T09:24:09Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-23T09:24:09Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "Make a logged soreness day clickable wherever it is drawn\n\nThe journal list had the only way into the editor — a wrench icon beside the\ndate. Lanes and Timeline draw the same entries and offered hover detail only,\nso the view you spot a mistake in was not the view you could fix it in. Since\nLanes is now the landing view, the default page had no edit affordance at all.\n\nA soreness entry is identified by (date, sourceWorkoutId), and both views\nalready hold that pair for every cell they draw, so each can hand off to the\neditor the wrench opens: a lane stripe's logged day, and a filled cell in a\nrecovery curve. Unlogged days stay inert — there is no entry to edit.",
+      "tree": {
+        "sha": "7e4aa0ae1bc88e9c14a510cc2332d7b11594a4e2",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/7e4aa0ae1bc88e9c14a510cc2332d7b11594a4e2"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/e77b3ac1c45154be4384919ac5a1d5b44787a5fc",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/e77b3ac1c45154be4384919ac5a1d5b44787a5fc",
+    "node_id": "C_kwDORV0mMdoAKGU3N2IzYWMxYzQ1MTU0YmU0Mzg0OTE5YWM1YTFkNWI0NDc4N2E1ZmM",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/4b99dcd79c0e323b003b37b5c744ad2d778d677c",
+        "sha": "4b99dcd79c0e323b003b37b5c744ad2d778d677c",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/4b99dcd79c0e323b003b37b5c744ad2d778d677c"
+      }
+    ],
+    "sha": "e77b3ac1c45154be4384919ac5a1d5b44787a5fc",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/e77b3ac1c45154be4384919ac5a1d5b44787a5fc"
+  },
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/0f57786fad45e8715568b35dee57346e905a45da/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-23T09:24:09Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-23T09:24:09Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "Give kill-me its own devctl environment\n\ndevctl will not mark an environment ready until the process on the port proves\nit is the exact instance, project, worktree and revision it was asked for, and\nkill-me could satisfy neither half of that: no identity endpoint, and Vite's\ndefault host resolves verbatim to ::1 alone here while the probe and the Caddy\nroute in front of it both dial 127.0.0.1. Every attempt to run this repo under\ndevctl therefore ended as a failed launch that left an orphaned Vite behind.\n\nSo serve /__devctl/health off the DEVCTL_* environment, bind IPv4 loopback, and\nhonour the assigned port. The endpoint is serve-only and inert unless devctl\nlaunched us, so it cannot reach a production build.\n\nBinding 127.0.0.1 has one consequence worth writing down: headless Chrome does\nnot fall back from ::1, so a screenshot against localhost now fails silently\nwith no PNG at all. The verification recipe uses the literal address.",
+      "tree": {
+        "sha": "d97c7b94d63d26ad645f3e0d294e8b197088c6c6",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/d97c7b94d63d26ad645f3e0d294e8b197088c6c6"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/0f57786fad45e8715568b35dee57346e905a45da",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/0f57786fad45e8715568b35dee57346e905a45da",
+    "node_id": "C_kwDORV0mMdoAKDBmNTc3ODZmYWQ0NWU4NzE1NTY4YjM1ZGVlNTczNDZlOTA1YTQ1ZGE",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/e77b3ac1c45154be4384919ac5a1d5b44787a5fc",
+        "sha": "e77b3ac1c45154be4384919ac5a1d5b44787a5fc",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/e77b3ac1c45154be4384919ac5a1d5b44787a5fc"
+      }
+    ],
+    "sha": "0f57786fad45e8715568b35dee57346e905a45da",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/0f57786fad45e8715568b35dee57346e905a45da"
+  }
+]

@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/267193182?v=4",
+      "events_url": "https://api.github.com/users/codex/events{/privacy}",
+      "followers_url": "https://api.github.com/users/codex/followers",
+      "following_url": "https://api.github.com/users/codex/following{/other_user}",
+      "gists_url": "https://api.github.com/users/codex/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/codex",
+      "id": 267193182,
+      "login": "codex",
+      "node_id": "U_kgDOD-0LXg",
+      "organizations_url": "https://api.github.com/users/codex/orgs",
+      "received_events_url": "https://api.github.com/users/codex/received_events",
+      "repos_url": "https://api.github.com/users/codex/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/codex/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/codex/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/codex",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/2684f7bd6d6e66371acd81efcbe70ed79ec271d4/comments",
+    "commit": {
+      "author": {
+        "date": "2026-05-25T06:41:28Z",
+        "email": "codex@openai.com",
+        "name": "codex"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-05-25T06:41:28Z",
+        "email": "codex@openai.com",
+        "name": "codex"
+      },
+      "message": "chore: remove shared key vault reference",
+      "tree": {
+        "sha": "8a31a1a406bb917ad0afd9f010b15875b8f702dc",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/8a31a1a406bb917ad0afd9f010b15875b8f702dc"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/2684f7bd6d6e66371acd81efcbe70ed79ec271d4",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/267193182?v=4",
+      "events_url": "https://api.github.com/users/codex/events{/privacy}",
+      "followers_url": "https://api.github.com/users/codex/followers",
+      "following_url": "https://api.github.com/users/codex/following{/other_user}",
+      "gists_url": "https://api.github.com/users/codex/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/codex",
+      "id": 267193182,
+      "login": "codex",
+      "node_id": "U_kgDOD-0LXg",
+      "organizations_url": "https://api.github.com/users/codex/orgs",
+      "received_events_url": "https://api.github.com/users/codex/received_events",
+      "repos_url": "https://api.github.com/users/codex/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/codex/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/codex/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/codex",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/2684f7bd6d6e66371acd81efcbe70ed79ec271d4",
+    "node_id": "C_kwDORV0mMdoAKDI2ODRmN2JkNmQ2ZTY2MzcxYWNkODFlZmNiZTcwZWQ3OWVjMjcxZDQ",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/642c88f3be5f4a9a2e8c7205b2bcf697efb309f5",
+        "sha": "642c88f3be5f4a9a2e8c7205b2bcf697efb309f5",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/642c88f3be5f4a9a2e8c7205b2bcf697efb309f5"
+      }
+    ],
+    "sha": "2684f7bd6d6e66371acd81efcbe70ed79ec271d4",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/2684f7bd6d6e66371acd81efcbe70ed79ec271d4"
+  }
+]

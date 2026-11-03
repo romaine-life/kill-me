@@ -1,0 +1,1693 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 3fef03b..4e87439 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -111,7 +111,7 @@ frontend/          React 19 SPA (Vite + Tailwind CSS 4)
+   ├── All reads use the same-origin public API
+   └── Built into the application image and served by Express on AKS
+ 
+-backend/routes/    Express router factories (workouts, soreness, cardio)
++backend/routes/    Express router factories (workouts, soreness, cardio, meals)
+   ├── Public GET routes read Cosmos DB for every visitor
+   ├── Authenticated admin routes perform writes
+   └── Imported locally by backend/server.js — no longer published to GitHub Packages
+@@ -191,6 +191,8 @@ distinguished by a `type` field:
+ | `schema-migration` | Record that a migration ran. Its existence is what stops it running again | `version`, `name`, `appliedAt`, `durationMs` |
+ | `cardio-session` | A completed cardio session | `userId`, `date`, `time` (HH:MM, nullable), `activity` (treadmill/bike), `durationMinutes`, `treadmill{}`, `bike{}`. A steady walk is a treadmill session with a single `walk` interval — not its own activity |
+ | `cardio-template` | Shared treadmill template (library) | `userId` (`shared`), `templateId`, `name`, `description`, `activity`, `intervals[]` (`{type, speedMph, durationMinutes}`), `sortOrder`, `steady`. A `steady` template (the walk) has its pace entered per session, and the document holds the default — logging with "this is the new default" writes the entered values back to it, exactly as an exercise definition holds a strength default |
++| `meal-template` | A saved meal (library) | `userId` (`shared`), `templateId`, `name`, `calories`, `proteinGrams`. One set of numbers for one portion — not ingredient-level. Created, edited and deleted only from its own "saved meal" screen; logging a meal never creates or changes one. There is no seed |
++| `meal-entry` | A logged meal | `userId`, `date`, `time` (HH:MM, nullable), `templateId` (provenance only, nullable), `name`, `portion`, `calories`, `proteinGrams`, `notes`. Numbers are stored as eaten (already × portion), so changing or deleting a saved meal never rewrites a past day |
+ | `soreness-entry` | Soreness record linked to an optional originating workout | `userId`, `date`, required `level` (1–10), optional `muscles[]` (`{group, muscle, level}`), optional source-workout fields |
+ | `settings` | Per-user settings (current day) | `userId`, `currentDaySlug` |
+ | `account` | Microsoft auth account record | `userId`, `provider`, `name`, `email`, `role` |
+diff --git a/backend/routes/index.js b/backend/routes/index.js
+index ff801f4..c0bb155 100644
+--- a/backend/routes/index.js
++++ b/backend/routes/index.js
+@@ -1,3 +1,4 @@
+ export { createWorkoutRoutes } from './routes/workouts.js';
+ export { createSorenessRoutes } from './routes/soreness.js';
+ export { createCardioRoutes } from './routes/cardio.js';
++export { createMealRoutes } from './routes/meals.js';
+diff --git a/backend/routes/routes/meals.js b/backend/routes/routes/meals.js
+new file mode 100644
+index 0000000..834e600
+--- /dev/null
++++ b/backend/routes/routes/meals.js
+@@ -0,0 +1,265 @@
++import { Router } from 'express';
++import { randomUUID } from 'node:crypto';
++
++/**
++ * Meal log + meal default routes.
++ *
++ * A meal default (`meal-template`) is a named meal eaten often enough to log in
++ * one tap, holding one set of numbers for one portion. It is a shared library
++ * document, like a cardio template.
++ *
++ * A meal entry (`meal-entry`) is a faithful record of what was eaten. It stores
++ * its own name, calories and protein — already multiplied by the portion —
++ * rather than pointing at the default, so editing or deleting a default never
++ * rewrites a past day's totals. `templateId` is kept only as provenance.
++ *
++ * Public:
++ *   GET    /api/meals
++ *   GET    /api/meal-templates
++ *
++ * Admin:
++ *   POST   /api/meals
++ *   PUT    /api/meals/:id
++ *   DELETE /api/meals/:id
++ *   POST   /api/meal-templates
++ *   PUT    /api/meal-templates/:templateId
++ *   DELETE /api/meal-templates/:templateId
++ */
++
++const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
++const TIME_PATTERN = /^\d{2}:\d{2}$/;
++
++// A non-negative number, accepting numeric strings from form inputs. Returns
++// undefined for anything else so callers can report the specific field.
++function nonNegativeNumber(value) {
++  if (value === '' || value === null || value === undefined) return undefined;
++  const number = typeof value === 'number' ? value : Number(value);
++  return Number.isFinite(number) && number >= 0 ? number : undefined;
++}
++
++export function parseMealTemplateBody(body = {}) {
++  const name = typeof body.name === 'string' ? body.name.trim() : '';
++  if (!name) return { error: 'Missing required field: name' };
++
++  const calories = nonNegativeNumber(body.calories);
++  if (calories === undefined) return { error: 'calories must be a non-negative number' };
++  const proteinGrams = nonNegativeNumber(body.proteinGrams);
++  if (proteinGrams === undefined) return { error: 'proteinGrams must be a non-negative number' };
++
++  return { value: { name, calories: Math.round(calories), proteinGrams: Math.round(proteinGrams) } };
++}
++
++export function parseMealEntryBody(body = {}) {
++  const { date, time = null, templateId = null, notes = '' } = body;
++
++  if (typeof date !== 'string' || !DATE_PATTERN.test(date)) {
++    return { error: 'date must be YYYY-MM-DD' };
++  }
++  if (time !== null && time !== '' && !(typeof time === 'string' && TIME_PATTERN.test(time))) {
++    return { error: 'time must be HH:MM' };
++  }
++
++  const name = typeof body.name === 'string' ? body.name.trim() : '';
++  if (!name) return { error: 'Missing required field: name' };
++
++  const portion = body.portion === undefined ? 1 : nonNegativeNumber(body.portion);
++  if (portion === undefined || portion === 0) return { error: 'portion must be a positive number' };
++
++  const calories = nonNegativeNumber(body.calories);
++  if (calories === undefined) return { error: 'calories must be a non-negative number' };
++  const proteinGrams = nonNegativeNumber(body.proteinGrams);
++  if (proteinGrams === undefined) return { error: 'proteinGrams must be a non-negative number' };
++
++  return {
++    value: {
++      date,
++      time: time || null,
++      templateId: templateId || null,
++      name,
++      portion,
++      calories: Math.round(calories),
++      proteinGrams: Math.round(proteinGrams),
++      notes: typeof notes === 'string' ? notes.trim() : '',
++    },
++  };
++}
++
++const shapeTemplate = (doc) => ({
++  id: doc.templateId,
++  name: doc.name,
++  calories: doc.calories,
++  proteinGrams: doc.proteinGrams,
++});
++
++export function createMealRoutes({ container, requireAuth, requireAdmin }) {
++  const router = Router();
++
++  const findTemplate = async (templateId) => {
++    const { resources } = await container.items.query({
++      query: 'SELECT * FROM c WHERE c.type = @type AND c.templateId = @templateId',
++      parameters: [
++        { name: '@type', value: 'meal-template' },
++        { name: '@templateId', value: templateId },
++      ],
++    }).fetchAll();
++    return resources[0] ?? null;
++  };
++
++  // Get all meal entries (public).
++  router.get('/api/meals', async (req, res) => {
++    try {
++      const { resources: meals } = await container.items.query({
++        query: 'SELECT * FROM c WHERE c.type = @type ORDER BY c.date DESC',
++        parameters: [{ name: '@type', value: 'meal-entry' }],
++      }).fetchAll();
++      res.json({ meals });
++    } catch (error) {
++      console.error('Error fetching meals:', error);
++      res.status(500).json({ error: 'Failed to fetch meals', message: error.message });
++    }
++  });
++
++  // Log a meal (admin only). Creation always gets a unique identity, so several
++  // meals on one date never collide.
++  router.post('/api/meals', requireAuth, requireAdmin, async (req, res) => {
++    try {
++      const parsed = parseMealEntryBody(req.body);
++      if (parsed.error) return res.status(400).json({ error: parsed.error });
++
++      const now = new Date().toISOString();
++      const doc = {
++        id: `meal-${parsed.value.date}-${randomUUID()}`,
++        type: 'meal-entry',
++        userId: req.user.sub,
++        ...parsed.value,
++        createdAt: now,
++        updatedAt: now,
++      };
++
++      const { resource } = await container.items.create(doc);
++      res.status(201).json({ meal: resource });
++    } catch (error) {
++      console.error('Error logging meal:', error);
++      res.status(500).json({ error: 'Failed to log meal', message: error.message });
++    }
++  });
++
++  // Update one meal (admin only).
++  router.put('/api/meals/:id', requireAuth, requireAdmin, async (req, res) => {
++    try {
++      const userId = req.user.sub;
++      const { id } = req.params;
++      const parsed = parseMealEntryBody(req.body);
++      if (parsed.error) return res.status(400).json({ error: parsed.error });
++
++      const { resource: existing } = await container.item(id, userId).read();
++      if (!existing || existing.type !== 'meal-entry') {
++        return res.status(404).json({ error: 'Meal not found' });
++      }
++
++      const { resource } = await container.item(id, userId).replace({
++        ...existing,
++        ...parsed.value,
++        id,
++        type: 'meal-entry',
++        userId,
++        updatedAt: new Date().toISOString(),
++      });
++      res.json({ meal: resource });
++    } catch (error) {
++      if (error.code === 404) return res.status(404).json({ error: 'Meal not found' });
++      console.error('Error updating meal:', error);
++      res.status(500).json({ error: 'Failed to update meal', message: error.message });
++    }
++  });
++
++  // Delete one meal (admin only).
++  router.delete('/api/meals/:id', requireAuth, requireAdmin, async (req, res) => {
++    try {
++      await container.item(req.params.id, req.user.sub).delete();
++      res.status(204).send();
++    } catch (error) {
++      if (error.code === 404) return res.status(404).json({ error: 'Meal not found' });
++      console.error('Error deleting meal:', error);
++      res.status(500).json({ error: 'Failed to delete meal', message: error.message });
++    }
++  });
++
++  // Get all meal defaults (public), alphabetical for the picker.
++  router.get('/api/meal-templates', async (req, res) => {
++    try {
++      const { resources } = await container.items.query({
++        query: 'SELECT * FROM c WHERE c.type = @type',
++        parameters: [{ name: '@type', value: 'meal-template' }],
++      }).fetchAll();
++      const templates = resources
++        .map(shapeTemplate)
++        .sort((a, b) => a.name.localeCompare(b.name));
++      res.json({ templates });
++    } catch (error) {
++      console.error('Error fetching meal templates:', error);
++      res.status(500).json({ error: 'Failed to fetch meal templates', message: error.message });
++    }
++  });
++
++  // Create a meal default (admin only).
++  router.post('/api/meal-templates', requireAuth, requireAdmin, async (req, res) => {
++    try {
++      const parsed = parseMealTemplateBody(req.body);
++      if (parsed.error) return res.status(400).json({ error: parsed.error });
++
++      const templateId = randomUUID();
++      const { resource } = await container.items.create({
++        id: `meal-template-${templateId}`,
++        type: 'meal-template',
++        userId: 'shared',
++        templateId,
++        ...parsed.value,
++        updatedAt: new Date().toISOString(),
++      });
++      res.status(201).json({ template: shapeTemplate(resource) });
++    } catch (error) {
++      console.error('Error creating meal template:', error);
++      res.status(500).json({ error: 'Failed to create meal template', message: error.message });
++    }
++  });
++
++  // Replace a meal default's name and numbers (admin only). Logged meals keep
++  // the numbers they were logged with.
++  router.put('/api/meal-templates/:templateId', requireAuth, requireAdmin, async (req, res) => {
++    try {
++      const parsed = parseMealTemplateBody(req.body);
++      if (parsed.error) return res.status(400).json({ error: parsed.error });
++
++      const existing = await findTemplate(req.params.templateId);
++      if (!existing) return res.status(404).json({ error: 'Meal template not found' });
++
++      const { resource } = await container.item(existing.id, existing.userId).replace({
++        ...existing,
++        ...parsed.value,
++        updatedAt: new Date().toISOString(),
++      });
++      res.json({ template: shapeTemplate(resource) });
++    } catch (error) {
++      console.error('Error updating meal template:', error);
++      res.status(500).json({ error: 'Failed to update meal template', message: error.message });
++    }
++  });
++
++  // Delete a meal default (admin only). Logged meals are unaffected.
++  router.delete('/api/meal-templates/:templateId', requireAuth, requireAdmin, async (req, res) => {
++    try {
++      const existing = await findTemplate(req.params.templateId);
++      if (!existing) return res.status(404).json({ error: 'Meal template not found' });
++
++      await container.item(existing.id, existing.userId).delete();
++      res.status(204).send();
++    } catch (error) {
++      if (error.code === 404) return res.status(404).json({ error: 'Meal template not found' });
++      console.error('Error deleting meal template:', error);
++      res.status(500).json({ error: 'Failed to delete meal template', message: error.message });
++    }
++  });
++
++  return router;
++}
+diff --git a/backend/routes/routes/meals.test.js b/backend/routes/routes/meals.test.js
+new file mode 100644
+index 0000000..95e3e86
+--- /dev/null
++++ b/backend/routes/routes/meals.test.js
+@@ -0,0 +1,61 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { parseMealEntryBody, parseMealTemplateBody } from './meals.js';
++
++test('a meal entry stores the numbers as eaten, rounded, with a default portion of 1', () => {
++  const parsed = parseMealEntryBody({
++    date: '2026-09-16',
++    time: '12:30',
++    templateId: 'abc',
++    name: '  Rice and beans bowl ',
++    calories: '712.4',
++    proteinGrams: 31.6,
++    notes: ' extra salsa ',
++  });
++
++  assert.deepEqual(parsed.value, {
++    date: '2026-09-16',
++    time: '12:30',
++    templateId: 'abc',
++    name: 'Rice and beans bowl',
++    portion: 1,
++    calories: 712,
++    proteinGrams: 32,
++    notes: 'extra salsa',
++  });
++});
++
++test('a one-off meal needs no template and no time', () => {
++  const parsed = parseMealEntryBody({
++    date: '2026-09-16',
++    time: '',
++    name: 'Burrito',
++    portion: 1.5,
++    calories: 0,
++    proteinGrams: 0,
++  });
++
++  assert.equal(parsed.value.templateId, null);
++  assert.equal(parsed.value.time, null);
++  assert.equal(parsed.value.portion, 1.5);
++  assert.equal(parsed.value.calories, 0);
++});
++
++test('a meal entry rejects missing or invalid fields', () => {
++  const valid = { date: '2026-09-16', name: 'Salad', calories: 400, proteinGrams: 30 };
++
++  assert.match(parseMealEntryBody({ ...valid, date: '9/16' }).error, /date/);
++  assert.match(parseMealEntryBody({ ...valid, time: '9pm' }).error, /time/);
++  assert.match(parseMealEntryBody({ ...valid, name: '   ' }).error, /name/);
++  assert.match(parseMealEntryBody({ ...valid, portion: 0 }).error, /portion/);
++  assert.match(parseMealEntryBody({ ...valid, calories: '' }).error, /calories/);
++  assert.match(parseMealEntryBody({ ...valid, proteinGrams: -1 }).error, /proteinGrams/);
++});
++
++test('a meal default holds one set of numbers', () => {
++  assert.deepEqual(
++    parseMealTemplateBody({ name: ' Chicken Caesar ', calories: '650', proteinGrams: '45' }).value,
++    { name: 'Chicken Caesar', calories: 650, proteinGrams: 45 },
++  );
++  assert.match(parseMealTemplateBody({ name: 'Salad', calories: 'lots', proteinGrams: 1 }).error, /calories/);
++});
+diff --git a/backend/server.js b/backend/server.js
+index 0da8893..1825212 100644
+--- a/backend/server.js
++++ b/backend/server.js
+@@ -18,6 +18,7 @@ import {
+   createWorkoutRoutes,
+   createSorenessRoutes,
+   createCardioRoutes,
++  createMealRoutes,
+ } from './routes/index.js';
+ import { createRequireAuth, requireAdmin, currentCaller } from './auth.js';
+ import { fetchConfig } from './config.js';
+@@ -99,6 +100,7 @@ async function start() {
+   app.use(createWorkoutRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
+   app.use(createSorenessRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
+   app.use(createCardioRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
++  app.use(createMealRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
+ 
+   // Hashed Vite assets are immutable. Keep their routing separate so a stale
+   // document requesting a removed hash receives a real 404 instead of the SPA
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 86abafd..300fde8 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -55,6 +55,8 @@ function App() {
+   const [refreshKey, setRefreshKey] = useState(0);
+   const [logViewWorkout, setLogViewWorkout] = useState(null);
+   const [logViewCardio, setLogViewCardio] = useState(null);
++  const [logViewMeal, setLogViewMeal] = useState(null);
++  const [logInitialMealDate, setLogInitialMealDate] = useState(null);
+   const [detailStack, setDetailStack] = useState([]);
+   // Workout handed to the Soreness tab by a "Log soreness" action elsewhere,
+   // so the editor opens already attributed to it. Cleared once consumed.
+@@ -112,6 +114,8 @@ function App() {
+     setDetailStack([]);
+     setLogViewWorkout(null);
+     setLogViewCardio(null);
++    setLogViewMeal(null);
++    setLogInitialMealDate(null);
+     setLogInitialDay(dayNumber);
+     setLogInitialDate(date);
+     navigateTab('log');
+@@ -135,6 +139,8 @@ function App() {
+     setDetailStack([]);
+     setLogViewWorkout(workout);
+     setLogViewCardio(null);
++    setLogViewMeal(null);
++    setLogInitialMealDate(null);
+     setLogInitialDay(null);
+     setLogInitialDate(null);
+     navigateTab('log');
+@@ -159,6 +165,31 @@ function App() {
+     setDetailStack([]);
+     setLogViewCardio(session);
+     setLogViewWorkout(null);
++    setLogViewMeal(null);
++    setLogInitialMealDate(null);
++    setLogInitialDay(null);
++    setLogInitialDate(null);
++    navigateTab('log');
++  };
++
++  const handleEditMeal = (meal) => {
++    setDetailStack([]);
++    setLogViewMeal(meal);
++    setLogInitialMealDate(null);
++    setLogViewWorkout(null);
++    setLogViewCardio(null);
++    setLogInitialDay(null);
++    setLogInitialDate(null);
++    navigateTab('log');
++  };
++
++  // "+ Add meal" from a meal day opens a new meal already dated to that day.
++  const handleAddMeal = (date) => {
++    setDetailStack([]);
++    setLogViewMeal(null);
++    setLogInitialMealDate(date);
++    setLogViewWorkout(null);
++    setLogViewCardio(null);
+     setLogInitialDay(null);
+     setLogInitialDate(null);
+     navigateTab('log');
+@@ -213,6 +244,7 @@ function App() {
+     if (kind === 'workout') handleEditWorkout(record);
+     if (kind === 'cardio') handleEditCardio(record);
+     if (kind === 'soreness') handleEditSoreness(record);
++    if (kind === 'meal') handleEditMeal(record);
+   };
+ 
+   const handleWorkoutSuccess = (advancedTo) => {
+@@ -224,6 +256,8 @@ function App() {
+     setLogInitialDate(null);
+     setLogViewWorkout(null);
+     setLogViewCardio(null);
++    setLogViewMeal(null);
++    setLogInitialMealDate(null);
+     setDetailStack([]);
+     setActivityView(DEFAULT_ACTIVITY_VIEW);
+     navigateTab('soreness');
+@@ -231,6 +265,10 @@ function App() {
+ 
+   const handleNav = (tab) => {
+     setDetailStack([]);
++    // A meal opened from a record or a day is a one-off destination; the Log
++    // tab itself always starts on the type picker.
++    setLogViewMeal(null);
++    setLogInitialMealDate(null);
+     clearSorenessEditor();
+     setSorenessReturnContext(null);
+     navigateTab(tab);
+@@ -300,6 +338,7 @@ function App() {
+               onEdit={handleEditRecord}
+               onOpenRecord={handleOpenRecord}
+               onAddSoreness={handleLogSoreness}
++              onAddMeal={isAdmin ? handleAddMeal : undefined}
+             />
+           ) : (
+             <>
+@@ -357,6 +396,7 @@ function App() {
+                   onOpenWorkout={(workout) => handleOpenRecord('workout', workout)}
+                   onOpenCardio={(session) => handleOpenRecord('cardio', session)}
+                   onOpenSoreness={(entry) => handleOpenRecord('soreness', entry)}
++                  onOpenMealDay={(day) => handleOpenRecord('meals', day)}
+                 />
+               )}
+             </ActivityWorkspace>
+@@ -385,6 +425,9 @@ function App() {
+                 setLogViewCardio(null);
+                 setRefreshKey(prev => prev + 1);
+               }}
++              viewMeal={logViewMeal}
++              initialMealDate={logInitialMealDate}
++              onMealChanged={() => handleWorkoutSuccess(null)}
+             />
+           )}
+ 
+diff --git a/frontend/src/api/useApi.js b/frontend/src/api/useApi.js
+index c3f593e..1ccad49 100644
+--- a/frontend/src/api/useApi.js
++++ b/frontend/src/api/useApi.js
+@@ -16,6 +16,8 @@ const api = Object.freeze({
+   fetchSoreness: () => apiFetch('/api/soreness'),
+   fetchCardioSessions: () => apiFetch('/api/cardio-sessions'),
+   fetchCardioTemplates: () => apiFetch('/api/cardio-templates'),
++  fetchMeals: () => apiFetch('/api/meals'),
++  fetchMealTemplates: () => apiFetch('/api/meal-templates'),
+ });
+ 
+ export function useApi() {
+diff --git a/frontend/src/components/ActivityRecordDetail.jsx b/frontend/src/components/ActivityRecordDetail.jsx
+index 35cde33..7be40c7 100644
+--- a/frontend/src/components/ActivityRecordDetail.jsx
++++ b/frontend/src/components/ActivityRecordDetail.jsx
+@@ -1,5 +1,5 @@
+ import { createElement, useEffect, useMemo, useRef, useState } from 'react';
+-import { Activity, Bike, ChevronLeft, Dumbbell, Wrench } from 'lucide-react';
++import { Activity, Bike, ChevronLeft, Dumbbell, Utensils, Wrench } from 'lucide-react';
+ import { useApi } from '../api/useApi.js';
+ import { colors } from '../colors';
+ import { cardioColor, cardioName } from '../utils/cardioConfig';
+@@ -7,6 +7,7 @@ import { isSteadySession } from '../utils/cardioTemplates.js';
+ import { formatTime12h } from '../utils/dateUtils';
+ import { describeLoggedDay, getDayInfo } from '../utils/dayConfig';
+ import { dayColor, pad2 } from '../utils/dayDesign';
++import { MEAL_COLOR, formatCalories, portionLabel } from '../utils/mealConfig';
+ 
+ function formatDate(dateStr) {
+   if (!dateStr) return 'Date not recorded';
+@@ -63,6 +64,7 @@ export function ActivityRecordDetail({
+   onEdit,
+   onOpenRecord,
+   onAddSoreness,
++  onAddMeal,
+ }) {
+   const { fetchWorkouts, fetchCardioSessions, fetchSoreness } = useApi();
+   const fetchers = useRef({ fetchWorkouts, fetchCardioSessions, fetchSoreness });
+@@ -144,6 +146,14 @@ export function ActivityRecordDetail({
+           onEdit={() => onEdit?.('cardio', record)}
+         />
+       )}
++      {kind === 'meals' && (
++        <MealDayDetail
++          day={record}
++          isAdmin={isAdmin}
++          onEditMeal={(meal) => onEdit?.('meal', meal)}
++          onAddMeal={onAddMeal ? () => onAddMeal(record.date) : undefined}
++        />
++      )}
+       {kind === 'soreness' && (
+         <SorenessDetail
+           entry={record}
+@@ -342,6 +352,59 @@ function CardioDetail({ session, isAdmin, onEdit }) {
+   );
+ }
+ 
++function MealDayDetail({ day, isAdmin, onEditMeal, onAddMeal }) {
++  const { meals, totals } = day;
++
++  return (
++    <>
++      <DetailHeader
++        eyebrow="Meals"
++        title={`${formatCalories(totals.calories)} · ${totals.proteinGrams} g protein`}
++        date={day.date}
++        accent={MEAL_COLOR}
++        icon={Utensils}
++        actions={isAdmin && onAddMeal && (
++          <button onClick={onAddMeal} style={styles.secondaryAction}>+ Add meal</button>
++        )}
++      />
++
++      <section style={styles.section}>
++        <div style={styles.sectionHeadingRow}>
++          <h3 style={{ ...styles.sectionHeading, margin: 0 }}>Meals</h3>
++          <span style={styles.count}>{meals.length}</span>
++        </div>
++        <div style={styles.cardList}>
++          {meals.map((meal) => (
++            <div key={meal.id} style={styles.exerciseRow}>
++              <div style={{ flex: 1, minWidth: 0 }}>
++                <div style={styles.exerciseName}>
++                  {meal.name}
++                  {meal.portion && meal.portion !== 1 && (
++                    <span style={{ marginLeft: 6, color: MEAL_COLOR, fontFamily: 'var(--font-mono)', fontSize: 12 }}>
++                      ×{portionLabel(meal.portion)}
++                    </span>
++                  )}
++                </div>
++                {meal.time && <div style={styles.exerciseVariation}>{formatTime12h(meal.time)}</div>}
++                <div style={styles.metricGrid}>
++                  <DetailField label="Calories" value={meal.calories} compact />
++                  <DetailField label="Protein" value={`${meal.proteinGrams} g`} compact />
++                </div>
++                {meal.notes && <div style={{ ...styles.recordDetail, marginTop: 8 }}>{meal.notes}</div>}
++              </div>
++              {isAdmin && (
++                <button onClick={() => onEditMeal(meal)} style={styles.secondaryAction}>
++                  <Wrench size={13} /> Edit
++                </button>
++              )}
++            </div>
++          ))}
++        </div>
++      </section>
++    </>
++  );
++}
++
+ function SorenessDetail({ entry, sourceWorkout, isAdmin, loading, onEdit, onOpenRecord }) {
+   const level = entryLevel(entry);
+   const muscles = entry.muscles || [];
+diff --git a/frontend/src/components/MealLogForm.jsx b/frontend/src/components/MealLogForm.jsx
+new file mode 100644
+index 0000000..61802db
+--- /dev/null
++++ b/frontend/src/components/MealLogForm.jsx
+@@ -0,0 +1,518 @@
++// Meal logging — saved meals and the meal log, kept visibly separate.
++//
++// The flow has three screens, and each does one thing:
++//
++//   choose      — the saved meals list, "+ New saved meal", and "Log a meal
++//                 without saving it"
++//   saved-meal  — create, edit or delete a saved meal. Logs nothing.
++//   log         — log one meal: a saved meal picked from the list, or a one-off
++//                 typed in. Never creates or changes a saved meal.
++//
++// A saved meal holds numbers for ONE portion. A logged meal is stored with its
++// numbers multiplied by the portion, so the log keeps what was actually eaten even
++// if the saved meal is later changed or deleted.
++
++import { useEffect, useRef, useState } from 'react';
++import { ChevronLeft, Pencil } from 'lucide-react';
++import { apiFetch } from '../api/client.js';
++import { useApi } from '../api/useApi.js';
++import { todayLocal, nowLocalTime } from '../utils/dateUtils';
++import {
++  MEAL_COLOR, PORTIONS, scaleMeal, unscaleMeal, formatMealNumbers,
++} from '../utils/mealConfig.js';
++
++const inputClass = 'w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-200/70';
++const labelClass = 'block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide';
++const primaryButtonClass = 'w-full text-slate-900 px-8 py-4 rounded-xl font-black text-xl uppercase tracking-wider shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed';
++const secondaryButtonClass = 'w-full bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-3 rounded-xl font-bold uppercase tracking-wide border border-slate-700 transition-all';
++
++const validNumber = (value) => value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0;
++
++export function MealLogForm({ viewMeal = null, initialDate = null, onSaved, onBack }) {
++  const { fetchMealTemplates } = useApi();
++  const [savedMeals, setSavedMeals] = useState([]);
++  const [savedMealsLoaded, setSavedMealsLoaded] = useState(false);
++  const [screen, setScreen] = useState(viewMeal ? 'log' : 'choose');
++  const [loadError, setLoadError] = useState(null);
++
++  // Which saved meal the log screen is for (null = a one-off meal), and which
++  // saved meal the saved-meal screen is editing (null = a new one).
++  const [loggingSavedMeal, setLoggingSavedMeal] = useState(null);
++  const [editingSavedMeal, setEditingSavedMeal] = useState(null);
++
++  useEffect(() => {
++    let active = true;
++    fetchMealTemplates()
++      .then((data) => { if (active) setSavedMeals(data?.templates || []); })
++      .catch((err) => { if (active) setLoadError(`Saved meals could not be loaded: ${err.message}`); })
++      .finally(() => { if (active) setSavedMealsLoaded(true); });
++    return () => { active = false; };
++  }, [fetchMealTemplates]);
++
++  // Editing a logged meal: show it as its saved meal if that still exists.
++  useEffect(() => {
++    if (!viewMeal || !savedMealsLoaded) return;
++    setLoggingSavedMeal(savedMeals.find((meal) => meal.id === viewMeal.templateId) || null);
++    // Only on load: later changes to the list must not swap the meal being edited.
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [viewMeal, savedMealsLoaded]);
++
++  if (screen === 'saved-meal') {
++    return (
++      <>
++        <BackButton onClick={() => { setEditingSavedMeal(null); setScreen('choose'); }} />
++        <SavedMealForm
++          savedMeal={editingSavedMeal}
++          onDone={(change) => {
++            if (change?.saved) {
++              setSavedMeals((current) => [
++                ...current.filter((meal) => meal.id !== change.saved.id),
++                change.saved,
++              ].sort((a, b) => a.name.localeCompare(b.name)));
++            }
++            if (change?.deletedId) {
++              setSavedMeals((current) => current.filter((meal) => meal.id !== change.deletedId));
++            }
++            setEditingSavedMeal(null);
++            setScreen('choose');
++          }}
++        />
++      </>
++    );
++  }
++
++  if (screen === 'log') {
++    // Editing a logged meal waits for the saved meals, so it can tell whether
++    // the meal came from one.
++    if (viewMeal && !savedMealsLoaded) return <p className="text-slate-400">Loading…</p>;
++    return (
++      <>
++        {!viewMeal && <BackButton onClick={() => { setLoggingSavedMeal(null); setScreen('choose'); }} />}
++        <LogMealForm
++          key={`${viewMeal?.id || 'new'}-${loggingSavedMeal?.id || 'one-off'}`}
++          viewMeal={viewMeal}
++          savedMeal={loggingSavedMeal}
++          initialDate={initialDate}
++          onSaved={onSaved}
++        />
++      </>
++    );
++  }
++
++  return (
++    <>
++      {onBack && <BackButton onClick={onBack} />}
++      <div className="mb-6">
++        <h2 className="text-4xl font-black uppercase tracking-wide mb-2" style={{ color: MEAL_COLOR }}>
++          Log Meal
++        </h2>
++        <p className="text-slate-400">Pick a saved meal, or log one without saving it.</p>
++      </div>
++
++      <h3 className={labelClass}>Saved meals</h3>
++      {loadError && <p className="mb-3 text-sm text-red-400">{loadError}</p>}
++      {savedMealsLoaded && savedMeals.length === 0 && !loadError && (
++        <p className="mb-3 text-slate-400">No saved meals yet.</p>
++      )}
++      <div className="flex flex-col gap-2">
++        {savedMeals.map((meal) => (
++          <div key={meal.id} className="flex items-stretch gap-2">
++            <button
++              type="button"
++              onClick={() => { setLoggingSavedMeal(meal); setScreen('log'); }}
++              className="flex-1 min-w-0 text-left rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-3 hover:border-slate-400 transition-colors"
++            >
++              <span className="block truncate font-bold text-slate-100">{meal.name}</span>
++              <span className="block mt-0.5 text-xs font-mono text-slate-400">{formatMealNumbers(meal)}</span>
++            </button>
++            <button
++              type="button"
++              onClick={() => { setEditingSavedMeal(meal); setScreen('saved-meal'); }}
++              aria-label={`Edit saved meal ${meal.name}`}
++              className="shrink-0 w-12 grid place-items-center rounded-lg border border-slate-700 text-slate-400 hover:text-slate-100 hover:border-slate-400"
++            >
++              <Pencil size={16} />
++            </button>
++          </div>
++        ))}
++      </div>
++
++      <button
++        type="button"
++        onClick={() => { setEditingSavedMeal(null); setScreen('saved-meal'); }}
++        className="mt-3 w-full rounded-lg border border-dashed border-slate-500 px-4 py-3 font-bold text-slate-200 hover:border-slate-300 transition-colors"
++      >
++        + New saved meal
++      </button>
++
++      <div className="mt-8 border-t border-slate-700/60 pt-6">
++        <button
++          type="button"
++          onClick={() => { setLoggingSavedMeal(null); setScreen('log'); }}
++          className={secondaryButtonClass}
++        >
++          Log a meal without saving it
++        </button>
++      </div>
++    </>
++  );
++}
++
++function SavedMealForm({ savedMeal, onDone }) {
++  const isNew = !savedMeal;
++  const [name, setName] = useState(savedMeal?.name || '');
++  const [calories, setCalories] = useState(savedMeal ? String(savedMeal.calories) : '');
++  const [proteinGrams, setProteinGrams] = useState(savedMeal ? String(savedMeal.proteinGrams) : '');
++  const [saving, setSaving] = useState(false);
++  const [confirmDelete, setConfirmDelete] = useState(false);
++  const [error, setError] = useState(null);
++
++  const canSave = name.trim() && validNumber(calories) && validNumber(proteinGrams) && !saving;
++
++  const save = async () => {
++    if (!canSave) return;
++    setSaving(true);
++    setError(null);
++    const body = JSON.stringify({ name: name.trim(), calories: Number(calories), proteinGrams: Number(proteinGrams) });
++    try {
++      const result = isNew
++        ? await apiFetch('/api/meal-templates', { method: 'POST', body })
++        : await apiFetch(`/api/meal-templates/${encodeURIComponent(savedMeal.id)}`, { method: 'PUT', body });
++      onDone({ saved: result.template });
++    } catch (err) {
++      setError(`The saved meal was not saved: ${err.message}`);
++      setSaving(false);
++    }
++  };
++
++  const remove = async () => {
++    setSaving(true);
++    try {
++      await apiFetch(`/api/meal-templates/${encodeURIComponent(savedMeal.id)}`, { method: 'DELETE' });
++      onDone({ deletedId: savedMeal.id });
++    } catch (err) {
++      setError(`The saved meal was not deleted: ${err.message}`);
++      setSaving(false);
++    }
++  };
++
++  return (
++    <>
++      <div className="mb-6">
++        <h2 className="text-4xl font-black uppercase tracking-wide mb-2" style={{ color: MEAL_COLOR }}>
++          {isNew ? 'New Saved Meal' : 'Edit Saved Meal'}
++        </h2>
++        <p className="text-slate-400">
++          {isNew
++            ? 'Saves a meal you eat often. Nothing is logged.'
++            : 'Meals already logged keep their own numbers.'}
++        </p>
++      </div>
++
++      <div className="space-y-4">
++        <div>
++          <label className={labelClass}>Name</label>
++          <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
++        </div>
++        <NumberFields
++          calories={calories}
++          proteinGrams={proteinGrams}
++          onCalories={setCalories}
++          onProteinGrams={setProteinGrams}
++          caption="For one portion."
++        />
++
++        {error && <p className="text-sm text-red-400">{error}</p>}
++
++        <button
++          type="button"
++          onClick={save}
++          disabled={!canSave}
++          className={primaryButtonClass}
++          style={{ backgroundColor: MEAL_COLOR }}
++        >
++          {saving ? 'Saving...' : 'Save'}
++        </button>
++        <button type="button" onClick={() => onDone(null)} className={secondaryButtonClass}>
++          Cancel
++        </button>
++
++        {!isNew && (
++          confirmDelete ? (
++            <div className="flex gap-2">
++              <button
++                type="button"
++                onClick={remove}
++                disabled={saving}
++                className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-xl font-bold uppercase tracking-wide transition-all disabled:opacity-50"
++              >
++                Confirm Delete
++              </button>
++              <button
++                type="button"
++                onClick={() => setConfirmDelete(false)}
++                className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-3 rounded-xl font-bold uppercase tracking-wide transition-all"
++              >
++                Keep It
++              </button>
++            </div>
++          ) : (
++            <button
++              type="button"
++              onClick={() => setConfirmDelete(true)}
++              className="w-full bg-transparent text-slate-500 hover:text-red-400 px-6 py-3 rounded-xl font-bold uppercase tracking-wide transition-all"
++            >
++              Delete Saved Meal
++            </button>
++          )
++        )}
++      </div>
++    </>
++  );
++}
++
++function LogMealForm({ viewMeal, savedMeal, initialDate, onSaved }) {
++  const isEditMode = !!viewMeal;
++  // A logged meal reopens with its own numbers; a saved meal fills in its numbers.
++  const start = viewMeal ? unscaleMeal(viewMeal) : savedMeal;
++
++  const [date, setDate] = useState(viewMeal?.date || initialDate || todayLocal());
++  const [time, setTime] = useState(viewMeal ? (viewMeal.time || '') : nowLocalTime());
++  const [name, setName] = useState(viewMeal?.name || '');
++  const [portion, setPortion] = useState(viewMeal?.portion || 1);
++  const [calories, setCalories] = useState(start ? String(start.calories) : '');
++  const [proteinGrams, setProteinGrams] = useState(start ? String(start.proteinGrams) : '');
++  const [notes, setNotes] = useState(viewMeal?.notes || '');
++  const [submitting, setSubmitting] = useState(false);
++  const [confirmDelete, setConfirmDelete] = useState(false);
++  const [error, setError] = useState(null);
++  const dateRef = useRef(null);
++
++  const mealName = (savedMeal && !viewMeal ? savedMeal.name : name).trim();
++  const numbersValid = validNumber(calories) && validNumber(proteinGrams);
++  const eaten = scaleMeal({ calories, proteinGrams }, portion);
++  const canSubmit = numbersValid && mealName && !submitting;
++  const changedFromSaved = !!savedMeal && !viewMeal && (
++    Number(calories) !== savedMeal.calories || Number(proteinGrams) !== savedMeal.proteinGrams
++  );
++
++  const submit = async () => {
++    if (!canSubmit) return;
++    setSubmitting(true);
++    setError(null);
++    const body = JSON.stringify({
++      date,
++      time: time || null,
++      templateId: viewMeal ? (viewMeal.templateId || null) : (savedMeal?.id || null),
++      name: mealName,
++      portion,
++      calories: eaten.calories,
++      proteinGrams: eaten.proteinGrams,
++      notes,
++    });
++    try {
++      if (isEditMode) {
++        await apiFetch(`/api/meals/${encodeURIComponent(viewMeal.id)}`, { method: 'PUT', body });
++      } else {
++        await apiFetch('/api/meals', { method: 'POST', body });
++      }
++      onSaved?.();
++    } catch (err) {
++      setError(`The meal was not saved: ${err.message}`);
++      setSubmitting(false);
++    }
++  };
++
++  const remove = async () => {
++    setSubmitting(true);
++    try {
++      await apiFetch(`/api/meals/${encodeURIComponent(viewMeal.id)}`, { method: 'DELETE' });
++      onSaved?.();
++    } catch (err) {
++      setError(`The meal was not deleted: ${err.message}`);
++      setSubmitting(false);
++    }
++  };
++
++  return (
++    <>
++      <div className="mb-6">
++        <h2 className="text-4xl font-black uppercase tracking-wide mb-2" style={{ color: MEAL_COLOR }}>
++          {isEditMode ? 'Edit Meal' : 'Log Meal'}
++        </h2>
++      </div>
++
++      {savedMeal && !isEditMode ? (
++        <div className="mb-5 rounded-lg border px-4 py-3" style={{ borderColor: `${MEAL_COLOR}99`, background: `${MEAL_COLOR}14` }}>
++          <div className="text-xs font-bold uppercase tracking-wide text-slate-400">Saved meal</div>
++          <div className="mt-0.5 text-lg font-bold text-slate-100">{savedMeal.name}</div>
++        </div>
++      ) : (
++        <div className="mb-5">
++          <label className={labelClass}>Name</label>
++          <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
++          {!isEditMode && (
++            <p className="mt-1.5 text-xs text-slate-500">This meal is logged once and not saved.</p>
++          )}
++        </div>
++      )}
++
++      <div className="space-y-4">
++        <div className="flex flex-col gap-3 sm:flex-row">
++          <div className="flex-1">
++            <label className={labelClass}>Date</label>
++            <input
++              ref={dateRef}
++              type="date"
++              value={date}
++              max={todayLocal()}
++              onChange={(e) => setDate(e.target.value)}
++              onClick={() => { try { dateRef.current?.showPicker(); } catch { /* showPicker is optional */ } }}
++              className={`${inputClass} cursor-pointer`}
++            />
++          </div>
++          <div className="w-full sm:w-40 sm:shrink-0">
++            <label className={labelClass}>Time</label>
++            <input
++              type="time"
++              value={time}
++              onChange={(e) => setTime(e.target.value)}
++              className={`${inputClass} px-3 cursor-pointer`}
++            />
++          </div>
++        </div>
++
++        <div>
++          <label className={labelClass}>Portion</label>
++          <div className="flex gap-2 bg-slate-800/30 rounded-xl p-1.5">
++            {PORTIONS.map((option) => (
++              <button
++                key={option.value}
++                type="button"
++                onClick={() => setPortion(option.value)}
++                aria-pressed={portion === option.value}
++                className={`flex-1 py-2.5 rounded-lg font-bold transition-all ${
++                  portion === option.value ? 'text-slate-900' : 'text-slate-400 hover:text-slate-200'
++                }`}
++                style={portion === option.value ? { backgroundColor: MEAL_COLOR } : {}}
++              >
++                ×{option.label}
++              </button>
++            ))}
++          </div>
++        </div>
++
++        <NumberFields
++          calories={calories}
++          proteinGrams={proteinGrams}
++          onCalories={setCalories}
++          onProteinGrams={setProteinGrams}
++          caption={changedFromSaved
++            ? `For one portion. Changed for this meal only; ${savedMeal.name} keeps its saved numbers.`
++            : 'For one portion.'}
++        />
++
++        {numbersValid && (
++          <p className="text-sm text-slate-400">
++            Total for this meal:{' '}
++            <span className="font-mono font-bold text-slate-200">{formatMealNumbers(eaten)}</span>
++          </p>
++        )}
++
++        <div>
++          <label className={labelClass}>Notes (optional)</label>
++          <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} className={inputClass} />
++        </div>
++
++        {error && <p className="text-sm text-red-400">{error}</p>}
++
++        <button
++          type="button"
++          onClick={submit}
++          disabled={!canSubmit}
++          className={primaryButtonClass}
++          style={{ backgroundColor: MEAL_COLOR }}
++        >
++          {submitting ? 'Saving...' : isEditMode ? 'Save Changes' : 'Log Meal'}
++        </button>
++
++        {isEditMode && (
++          confirmDelete ? (
++            <div className="flex gap-2">
++              <button
++                type="button"
++                onClick={remove}
++                disabled={submitting}
++                className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-xl font-bold uppercase tracking-wide transition-all disabled:opacity-50"
++              >
++                Confirm Delete
++              </button>
++              <button
++                type="button"
++                onClick={() => setConfirmDelete(false)}
++                className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-3 rounded-xl font-bold uppercase tracking-wide transition-all"
++              >
++                Cancel
++              </button>
++            </div>
++          ) : (
++            <button
++              type="button"
++              onClick={() => setConfirmDelete(true)}
++              className="w-full bg-slate-800 hover:bg-red-900/50 text-slate-400 hover:text-red-400 px-6 py-3 rounded-xl font-bold uppercase tracking-wide border border-slate-700 hover:border-red-500/50 transition-all"
++            >
++              Delete Meal
++            </button>
++          )
++        )}
++      </div>
++    </>
++  );
++}
++
++// Calories and protein for one portion. The grey hints give the rough scale.
++function NumberFields({ calories, proteinGrams, onCalories, onProteinGrams, caption }) {
++  return (
++    <div>
++      <div className="grid grid-cols-2 gap-3">
++        <div>
++          <label className={labelClass}>Calories</label>
++          <input
++            type="number"
++            inputMode="numeric"
++            min="0"
++            value={calories}
++            onChange={(e) => onCalories(e.target.value)}
++            placeholder="650"
++            className={inputClass}
++          />
++        </div>
++        <div>
++          <label className={labelClass}>Protein (g)</label>
++          <input
++            type="number"
++            inputMode="numeric"
++            min="0"
++            value={proteinGrams}
++            onChange={(e) => onProteinGrams(e.target.value)}
++            placeholder="45"
++            className={inputClass}
++          />
++        </div>
++      </div>
++      {caption && <p className="mt-1.5 text-xs text-slate-500">{caption}</p>}
++    </div>
++  );
++}
++
++function BackButton({ onClick }) {
++  return (
++    <button
++      type="button"
++      onClick={onClick}
++      className="flex items-center gap-1.5 mb-4 text-slate-400 hover:text-slate-200 transition-colors font-bold uppercase tracking-wide text-sm"
++    >
++      <ChevronLeft size={18} /> Back
++    </button>
++  );
++}
+diff --git a/frontend/src/components/SorenessLanes.jsx b/frontend/src/components/SorenessLanes.jsx
+index 149497d..2220984 100644
+--- a/frontend/src/components/SorenessLanes.jsx
++++ b/frontend/src/components/SorenessLanes.jsx
+@@ -1,6 +1,8 @@
+ // Lanes view — a vertical date rail where each workout spawns a stripe that
+ // runs for as long as its soreness lasted. Cardio sessions share the date rail
+-// as peer activity records, but never spawn a soreness stripe.
++// as peer activity records, but never spawn a soreness stripe. Meals sit beside
++// the date as one daily-total node per day, since what was eaten is read as a
++// property of the date rather than as an activity.
+ //
+ // Reads like a git graph: the date axis is the trunk, workouts are commits, and
+ // each recovery is a branch that slopes off its workout and runs down the page
+@@ -25,11 +27,13 @@ import { dayColor, pad2 } from '../utils/dayDesign';
+ import { cardioColor, cardioLabel, cardioName } from '../utils/cardioConfig';
+ import { buildTracks, packLanes, datesBetween, daysBetween } from '../utils/sorenessLink';
+ import { todayLocal } from '../utils/dateUtils';
++import { MEAL_COLOR, groupMealsByDate, formatMealNumbers, formatCalories, portionLabel } from '../utils/mealConfig';
+ import { colors } from '../colors';
+ 
+ const ROW_H = 30;
+ const GAP_H = 22; // a collapsed run of dates with nothing in them
+ const ACTIVITY_W = 146;
++const MEAL_W = 128;
+ const CARDIO_GAP = 12;
+ const DATE_W = 74; // wide enough for "Sat Aug 13" in 10px monospace
+ const ACTIVITY_GAP = 6;
+@@ -76,13 +80,14 @@ function shiftDays(date, delta) {
+   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+ }
+ 
+-export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWorkout, onOpenCardio, onOpenSoreness }) {
++export function SorenessLanes({ entries, workouts, cardioSessions = [], meals = [], onOpenWorkout, onOpenCardio, onOpenSoreness, onOpenMealDay }) {
+   const [group, setGroup] = useState('workout');   // 'workout' | 'muscle'
+   const [gaps, setGaps] = useState('bridge');     // 'bridge' | 'break'
+   const [order, setOrder] = useState('oldest');    // 'oldest' | 'newest'
+   const [quiet, setQuiet] = useState('collapse');  // 'collapse' | 'show'
+   const [windowDays, setWindowDays] = useState(30); // 30 | 90 | 0 (all)
+   const [activityContext, setActivityContext] = useState('all'); // 'all' | 'weights'
++  const [mealsShown, setMealsShown] = useState('show'); // 'show' | 'hide'
+   const [hover, setHover] = useState(null);
+   const narrow = useNarrow();
+ 
+@@ -96,16 +101,20 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+     const visibleCardio = activityContext === 'all'
+       ? cardioSessions.filter((session) => inWindow(session.date))
+       : [];
++    const mealsByDate = mealsShown === 'show'
++      ? groupMealsByDate(meals.filter((meal) => inWindow(meal.date)))
++      : new Map();
+ 
+     const stamps = [
+       ...visibleWorkouts.map((w) => w.date),
+       ...visibleCardio.map((session) => session.date),
++      ...mealsByDate.keys(),
+       ...tracks.flatMap((t) => [t.startDate, t.endDate, t.sourceWorkoutDate].filter(Boolean)),
+     ];
+     if (stamps.length === 0) {
+       return {
+         layout: [], yByDate: new Map(), bottom: TOP, tracks: [], laneCount: 0,
+-        workoutsByDate: new Map(), cardioByDate: new Map(),
++        workoutsByDate: new Map(), cardioByDate: new Map(), mealsByDate,
+       };
+     }
+ 
+@@ -130,6 +139,7 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+     // length — the one thing this view exists to show — would lie.
+     const active = new Set(workoutsByDate.keys());
+     for (const date of cardioByDate.keys()) active.add(date);
++    for (const date of mealsByDate.keys()) active.add(date);
+     for (const t of tracks) {
+       if (t.sourceWorkoutDate) active.add(t.sourceWorkoutDate);
+       for (const d of datesBetween(t.startDate, t.endDate)) active.add(d);
+@@ -165,10 +175,10 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+     const yByDate = new Map();
+     for (const r of layout) if (r.kind === 'date') yByDate.set(r.date, r.y);
+ 
+-    return { layout, yByDate, bottom: yPos, tracks, laneCount, workoutsByDate, cardioByDate };
+-  }, [entries, workouts, cardioSessions, activityContext, group, order, windowDays, quiet]);
++    return { layout, yByDate, bottom: yPos, tracks, laneCount, workoutsByDate, cardioByDate, mealsByDate };
++  }, [entries, workouts, cardioSessions, meals, activityContext, mealsShown, group, order, windowDays, quiet]);
+ 
+-  const { layout, yByDate, bottom, tracks, laneCount, workoutsByDate, cardioByDate } = model;
++  const { layout, yByDate, bottom, tracks, laneCount, workoutsByDate, cardioByDate, mealsByDate } = model;
+   const y = (date) => yByDate.get(date);
+ 
+   // A muscle stripe's label sits at whichever end is visually on top, which
+@@ -197,8 +207,10 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+   }, [tracks, order]);
+ 
+   const showCardioColumn = activityContext === 'all';
++  const showMealColumn = mealsByDate.size > 0;
+   const dateX = 0;
+-  const cardioX = dateX + DATE_W + ACTIVITY_GAP;
++  const mealX = dateX + DATE_W + ACTIVITY_GAP;
++  const cardioX = showMealColumn ? mealX + MEAL_W + CARDIO_GAP : mealX;
+   const workoutX = showCardioColumn
+     ? cardioX + ACTIVITY_W + CARDIO_GAP
+     : cardioX;
+@@ -216,7 +228,7 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+   const controls = (
+     <Controls {...{
+       group, setGroup, gaps, setGaps, order, setOrder, quiet, setQuiet,
+-      windowDays, setWindowDays, activityContext, setActivityContext, narrow,
++      windowDays, setWindowDays, activityContext, setActivityContext, mealsShown, setMealsShown, narrow,
+     }} />
+   );
+ 
+@@ -225,7 +237,7 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+       <div style={{ maxWidth: '100%', minWidth: 0 }}>
+         {controls}
+         <p style={{ color: colors.text.tertiary, fontSize: 13, marginTop: 16 }}>
+-          No strength, cardio, or soreness activity in this window.
++          No strength, cardio, soreness, or meals in this window.
+         </p>
+       </div>
+     );
+@@ -236,6 +248,7 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+       {controls}
+ 
+       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginTop: 10, color: colors.text.tertiary, fontSize: 10 }}>
++        {showMealColumn && <LegendMark color={MEAL_COLOR} label="Meals · daily total" />}
+         <LegendMark color={colors.text.secondary} label="Strength workout" />
+         {visibleCardioActivities.map((activity) => (
+           <LegendMark key={activity} color={cardioColor(activity)} label={cardioLabel(activity)} />
+@@ -275,6 +288,11 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+             <text x={dateX} y={12} style={{ fontSize: 8, fontFamily: 'monospace', fill: colors.text.disabled, letterSpacing: '0.08em' }}>
+               DATE
+             </text>
++            {showMealColumn && (
++              <text x={mealX} y={12} style={{ fontSize: 8, fontFamily: 'monospace', fill: colors.text.disabled, letterSpacing: '0.08em' }}>
++                MEALS
++              </text>
++            )}
+             {showCardioColumn && (
+               <text x={cardioX} y={12} style={{ fontSize: 8, fontFamily: 'monospace', fill: colors.text.disabled, letterSpacing: '0.08em' }}>
+                 CARDIO
+@@ -505,6 +523,56 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+               );
+             })}
+ 
++            {/* One node per day with meals: that day's totals, opening the day. */}
++            {showMealColumn && layout
++              .filter((r) => r.kind === 'date' && mealsByDate.has(r.date))
++              .map((r) => {
++                const day = mealsByDate.get(r.date);
++                const nodeHeight = ROW_H - 6;
++                const nodeY = r.y - nodeHeight / 2;
++                const label = formatMealNumbers(day.totals);
++                return (
++                  <g
++                    key={`meals-${r.date}`}
++                    role={onOpenMealDay ? 'button' : undefined}
++                    tabIndex={onOpenMealDay ? 0 : undefined}
++                    aria-label={onOpenMealDay ? `View meals from ${r.date}: ${label}` : undefined}
++                    style={{ cursor: onOpenMealDay ? 'pointer' : 'default' }}
++                    onClick={() => onOpenMealDay?.(day)}
++                    onKeyDown={(event) => {
++                      if (event.key === 'Enter' || event.key === ' ') {
++                        event.preventDefault();
++                        onOpenMealDay?.(day);
++                      }
++                    }}
++                    onMouseEnter={() => setHover({ kind: 'meals', day })}
++                    onMouseLeave={() => setHover(null)}
++                    onFocus={() => setHover({ kind: 'meals', day })}
++                    onBlur={() => setHover(null)}
++                  >
++                    <rect
++                      x={mealX}
++                      y={nodeY}
++                      width={MEAL_W}
++                      height={nodeHeight}
++                      rx={4}
++                      fill={colors.bg.surface}
++                      stroke={MEAL_COLOR}
++                      strokeWidth={0.75}
++                    />
++                    <rect x={mealX} y={nodeY} width={3} height={nodeHeight} fill={MEAL_COLOR} />
++                    <text
++                      x={mealX + 10}
++                      y={nodeY + nodeHeight / 2}
++                      dominantBaseline="middle"
++                      style={{ fontSize: 11, fill: colors.text.primary, fontWeight: 600 }}
++                    >
++                      {label}
++                    </text>
++                  </g>
++                );
++              })}
++
+             {/* Cardio and strength are peer records on the shared date rail. */}
+             {showCardioColumn && layout
+               .filter((r) => r.kind === 'date')
+@@ -635,6 +703,44 @@ function HoverPanel({ hover, narrow }) {
+   // chart, and dropping it outright would reflow the chart on every hover.
+   if (!hover) return narrow ? null : <div style={{ width: 200, flexShrink: 0 }} />;
+ 
++  if (hover.kind === 'meals') {
++    const { day } = hover;
++    return (
++      <div
++        style={{
++          width: narrow ? '100%' : 200,
++          boxSizing: 'border-box',
++          flexShrink: 0,
++          padding: 12,
++          borderRadius: 10,
++          background: colors.bg.raised,
++          border: `1px solid ${MEAL_COLOR}47`,
++          ...(narrow ? {} : { position: 'sticky', top: 12 }),
++        }}
++      >
++        <div style={{ color: MEAL_COLOR, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
++          Meals
++        </div>
++        <div style={{ marginTop: 5, color: colors.text.primary, fontSize: 13, fontWeight: 700 }}>
++          {formatCalories(day.totals.calories)} · {day.totals.proteinGrams} g protein
++        </div>
++        <div style={{ marginTop: 3, color: colors.text.tertiary, fontSize: 11 }}>
++          {weekday(day.date)} {shortDate(day.date)}
++        </div>
++        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 9 }}>
++          {day.meals.map((meal) => (
++            <div key={meal.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11 }}>
++              <span style={{ color: colors.text.secondary, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
++                {meal.name}{meal.portion && meal.portion !== 1 ? ` ×${portionLabel(meal.portion)}` : ''}
++              </span>
++              <span style={{ color: colors.text.primary, fontFamily: 'monospace', flexShrink: 0 }}>{meal.calories}</span>
++            </div>
++          ))}
++        </div>
++      </div>
++    );
++  }
++
+   if (hover.kind === 'cardio') {
+     const session = hover.session;
+     const activityColor = cardioColor(session.activity);
+@@ -720,7 +826,7 @@ function LegendMark({ color, label }) {
+ 
+ function Controls({
+   group, setGroup, gaps, setGaps, order, setOrder, quiet, setQuiet,
+-  windowDays, setWindowDays, activityContext, setActivityContext, narrow,
++  windowDays, setWindowDays, activityContext, setActivityContext, mealsShown, setMealsShown, narrow,
+ }) {
+   return (
+     <div
+@@ -743,6 +849,15 @@ function Controls({
+           { id: 'weights', label: 'Strength only' },
+         ]}
+       />
++      <Seg
++        label="Meals"
++        value={mealsShown}
++        onChange={setMealsShown}
++        opts={[
++          { id: 'show', label: 'Show' },
++          { id: 'hide', label: 'Hide' },
++        ]}
++      />
+       <Seg
+         label="Stripe per"
+         value={group}
+diff --git a/frontend/src/components/SorenessTab.jsx b/frontend/src/components/SorenessTab.jsx
+index 7cffab7..8f44a59 100644
+--- a/frontend/src/components/SorenessTab.jsx
++++ b/frontend/src/components/SorenessTab.jsx
+@@ -114,13 +114,15 @@ export function SorenessTab({
+   onOpenWorkout,
+   onOpenCardio,
+   onOpenSoreness,
++  onOpenMealDay,
+ }) {
+   const [entries, setEntries] = useState([]);
+   const [workouts, setWorkouts] = useState([]);
+   const [cardioSessions, setCardioSessions] = useState([]);
++  const [meals, setMeals] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState(null);
+-  const { fetchSoreness, fetchWorkouts, fetchCardioSessions } = useApi();
++  const { fetchSoreness, fetchWorkouts, fetchCardioSessions, fetchMeals } = useApi();
+   const isMobile = useIsMobile();
+ 
+   // Editor state
+@@ -151,20 +153,22 @@ export function SorenessTab({
+   const loadData = useCallback(async () => {
+     try {
+       setLoading(true);
+-      const [sorenessData, workoutData, cardioData] = await Promise.all([
++      const [sorenessData, workoutData, cardioData, mealData] = await Promise.all([
+         fetchSoreness(),
+         fetchWorkouts(),
+         fetchCardioSessions(),
++        fetchMeals(),
+       ]);
+       setEntries(sorenessData.entries || []);
+       setWorkouts(workoutData.workouts || []);
+       setCardioSessions(cardioData.sessions || []);
++      setMeals(mealData.meals || []);
+     } catch (err) {
+       setError(err.message);
+     } finally {
+       setLoading(false);
+     }
+-  }, [fetchSoreness, fetchWorkouts, fetchCardioSessions]);
++  }, [fetchSoreness, fetchWorkouts, fetchCardioSessions, fetchMeals]);
+ 
+   // Fetch the recovery records and the strength/cardio activity that gives
+   // them context on the shared date rail.
+@@ -690,9 +694,11 @@ export function SorenessTab({
+           entries={entries}
+           workouts={workoutsByDate}
+           cardioSessions={cardioSessions}
++          meals={meals}
+           onOpenWorkout={showWorkout}
+           onOpenCardio={onOpenCardio}
+           onOpenSoreness={onOpenSoreness}
++          onOpenMealDay={onOpenMealDay}
+         />
+       </div>
+     );
+diff --git a/frontend/src/components/WorkoutDrawer.jsx b/frontend/src/components/WorkoutDrawer.jsx
+index 701c75b..7ca4a6b 100644
+--- a/frontend/src/components/WorkoutDrawer.jsx
++++ b/frontend/src/components/WorkoutDrawer.jsx
+@@ -18,6 +18,7 @@ import { todayLocal, nowLocalTime } from '../utils/dateUtils';
+ import { useApi } from '../api/useApi.js';
+ import { getTotalDuration, buildWalkIntervals, isSteadySession } from '../utils/cardioTemplates.js';
+ import { CARDIO_CONFIG, cardioColor } from '../utils/cardioConfig.js';
++import { MealLogForm } from './MealLogForm.jsx';
+ 
+ const buildWeightEntries = (variation = {}, savedWeights = []) => {
+   const savedByKey = new Map(
+@@ -53,19 +54,22 @@ const getDefaultVariation = (exercise) => {
+ export function LogTab({
+   initialDay = null,
+   initialDate = null,
++  initialMealDate = null,
+   onSuccess,
+   onViewWorkout,
+   onViewCardio,
+   onWorkoutChanged,
+   onCardioChanged,
++  onMealChanged,
+   onLogSoreness,
+   viewWorkout = null,
+   viewCardio = null,
++  viewMeal = null,
+   currentDay = null,
+ }) {
+-  // Top-level toggle: 'weight' or 'cardio'
+-  const [logType, setLogType] = useState(viewCardio ? 'cardio' : 'weight');
+-  const [logStep, setLogStep] = useState(viewWorkout || viewCardio ? 'form' : 'picker'); // 'picker' | 'form'
++  // Top-level toggle: 'weight', 'cardio' or 'meal'
++  const [logType, setLogType] = useState(viewMeal ? 'meal' : viewCardio ? 'cardio' : 'weight');
++  const [logStep, setLogStep] = useState(viewWorkout || viewCardio || viewMeal ? 'form' : 'picker'); // 'picker' | 'form'
+ 
+   const isEditMode = !!viewWorkout;
+ 
+@@ -192,13 +196,16 @@ export function LogTab({
+     setWalkUseAsDefault(false);
+   }, [selectedTemplate, viewCardio]);
+ 
+-  // Switch logType/step when viewCardio/viewWorkout changes. Edit mode jumps
++  // Switch logType/step when viewCardio/viewWorkout/viewMeal changes. Edit mode jumps
+   // straight to the form; create mode starts on the type picker.
+   useEffect(() => {
+-    if (viewCardio) { setLogType('cardio'); setLogStep('form'); }
++    if (viewMeal) { setLogType('meal'); setLogStep('form'); }
++    else if (viewCardio) { setLogType('cardio'); setLogStep('form'); }
+     else if (viewWorkout) { setLogType('weight'); setLogStep('form'); }
++    // A date handed in from a meal day opens straight onto a new meal for it.
++    else if (initialMealDate) { setLogType('meal'); setLogStep('form'); }
+     else { setLogStep('picker'); }
+-  }, [viewCardio, viewWorkout]);
++  }, [viewCardio, viewWorkout, viewMeal, initialMealDate]);
+ 
+   // Populate cardio form from viewCardio (edit) or defaults (create)
+   useEffect(() => {
+@@ -597,7 +604,7 @@ export function LogTab({
+   return (
+     <div className="max-w-2xl">
+       {/* Type picker (create mode) */}
+-      {logStep === 'picker' && !viewWorkout && !viewCardio && (
++      {logStep === 'picker' && !viewWorkout && !viewCardio && !viewMeal && (
+         <div className="flex flex-col gap-3">
+           <button
+             onClick={() => { setLogType('weight'); onViewCardio?.(null); setLogStep('form'); }}
+@@ -613,11 +620,18 @@ export function LogTab({
+             <span className="text-2xl font-black text-slate-100 uppercase tracking-wide">Cardio</span>
+             <ChevronRight className="text-slate-400" size={24} />
+           </button>
++          <button
++            onClick={() => { setLogType('meal'); onViewWorkout?.(null); onViewCardio?.(null); setLogStep('form'); }}
++            className="flex items-center justify-between px-6 py-6 rounded-xl bg-slate-800/40 border border-slate-700/50 hover:border-amber-200/60 hover:bg-slate-800/70 transition-all"
++          >
++            <span className="text-2xl font-black text-slate-100 uppercase tracking-wide">Meal</span>
++            <ChevronRight className="text-slate-400" size={24} />
++          </button>
+         </div>
+       )}
+ 
+       {/* Back to picker (create mode only) */}
+-      {logStep === 'form' && !viewWorkout && !viewCardio && (
++      {logStep === 'form' && logType !== 'meal' && !viewWorkout && !viewCardio && !viewMeal && (
+         <button
+           onClick={() => setLogStep('picker')}
+           className="flex items-center gap-1.5 mb-4 text-slate-400 hover:text-slate-200 transition-colors font-bold uppercase tracking-wide text-sm"
+@@ -1494,6 +1508,16 @@ export function LogTab({
+         )}
+       </>)} {/* end logType === 'cardio' */}
+ 
++      {logStep === 'form' && logType === 'meal' && (
++        <MealLogForm
++          key={viewMeal?.id || 'new-meal'}
++          viewMeal={viewMeal}
++          initialDate={initialMealDate}
++          onSaved={onMealChanged}
++          onBack={viewMeal ? undefined : () => setLogStep('picker')}
++        />
++      )}
++
+       {/* Cardio success toast */}
+       {cardioToast && (
+         <motion.div
+diff --git a/frontend/src/index.css b/frontend/src/index.css
+index 82c03c8..88aea06 100644
+--- a/frontend/src/index.css
++++ b/frontend/src/index.css
+@@ -1,5 +1,15 @@
+ @import "tailwindcss";
+ 
++/* Tailwind 4 gives buttons the default arrow cursor. Components styled with
++   inline styles set a pointer themselves; this covers the Tailwind-styled ones
++   (the Log type picker, the log forms) so every clickable button shows a hand. */
++@layer base {
++  button:not(:disabled),
++  [role="button"]:not([aria-disabled="true"]) {
++    cursor: pointer;
++  }
++}
++
+ @font-face {
+   font-family: "Archivo";
+   src: url("/fonts/Archivo.ttf") format("truetype-variations"),
+diff --git a/frontend/src/utils/mealConfig.js b/frontend/src/utils/mealConfig.js
+new file mode 100644
+index 0000000..b9da604
+--- /dev/null
++++ b/frontend/src/utils/mealConfig.js
+@@ -0,0 +1,62 @@
++// Meal presentation and arithmetic shared by the log form, the Overview meal
++// column, and the meal day detail.
++//
++// A logged meal stores its numbers as eaten (already multiplied by the portion),
++// so a day's totals are plain sums and never consult the current defaults.
++
++// Sand — deliberately outside the day, soreness and cardio palettes, which all
++// carry meaning of their own.
++export const MEAL_COLOR = '#d8c9a3';
++
++export const PORTIONS = [
++  { value: 0.5, label: '½' },
++  { value: 1, label: '1' },
++  { value: 1.5, label: '1½' },
++  { value: 2, label: '2' },
++];
++
++export const portionLabel = (portion) =>
++  PORTIONS.find((option) => option.value === portion)?.label ?? String(portion);
++
++// Numbers for one portion → numbers as eaten.
++export const scaleMeal = ({ calories, proteinGrams }, portion) => ({
++  calories: Math.round((Number(calories) || 0) * portion),
++  proteinGrams: Math.round((Number(proteinGrams) || 0) * portion),
++});
++
++// Numbers as eaten → numbers for one portion, for reopening a logged meal.
++export const unscaleMeal = ({ calories, proteinGrams, portion }) => {
++  const divisor = portion > 0 ? portion : 1;
++  return {
++    calories: Math.round((calories ?? 0) / divisor),
++    proteinGrams: Math.round((proteinGrams ?? 0) / divisor),
++  };
++};
++
++export const sumMeals = (meals) => meals.reduce(
++  (totals, meal) => ({
++    calories: totals.calories + (meal.calories || 0),
++    proteinGrams: totals.proteinGrams + (meal.proteinGrams || 0),
++  }),
++  { calories: 0, proteinGrams: 0 },
++);
++
++// date → { date, meals (earliest first), totals }
++export function groupMealsByDate(meals) {
++  const byDate = new Map();
++  for (const meal of meals) {
++    if (!byDate.has(meal.date)) byDate.set(meal.date, []);
++    byDate.get(meal.date).push(meal);
++  }
++  const days = new Map();
++  for (const [date, dayMeals] of byDate) {
++    const sorted = [...dayMeals].sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
++    days.set(date, { date, meals: sorted, totals: sumMeals(sorted) });
++  }
++  return days;
++}
++
++export const formatCalories = (calories) => `${Math.round(calories).toLocaleString('en-US')} cal`;
++export const formatProtein = (grams) => `${Math.round(grams)} g protein`;
++export const formatMealNumbers = ({ calories, proteinGrams }) =>
++  `${Math.round(calories).toLocaleString('en-US')} cal · ${Math.round(proteinGrams)}g P`;
+diff --git a/frontend/src/utils/mealConfig.test.js b/frontend/src/utils/mealConfig.test.js
+new file mode 100644
+index 0000000..6441aff
+--- /dev/null
++++ b/frontend/src/utils/mealConfig.test.js
+@@ -0,0 +1,27 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { groupMealsByDate, scaleMeal, unscaleMeal, formatMealNumbers } from './mealConfig.js';
++
++test('a portion scales one set of numbers and reopens to the same numbers', () => {
++  const eaten = scaleMeal({ calories: 650, proteinGrams: 45 }, 1.5);
++  assert.deepEqual(eaten, { calories: 975, proteinGrams: 68 });
++  assert.deepEqual(unscaleMeal({ ...eaten, portion: 1.5 }), { calories: 650, proteinGrams: 45 });
++});
++
++test('meals group by date, earliest first, with untimed meals last', () => {
++  const days = groupMealsByDate([
++    { id: 'c', date: '2026-09-16', time: null, calories: 100, proteinGrams: 5 },
++    { id: 'b', date: '2026-09-16', time: '18:00', calories: 700, proteinGrams: 30 },
++    { id: 'a', date: '2026-09-16', time: '12:00', calories: 650, proteinGrams: 45 },
++    { id: 'd', date: '2026-09-15', time: '12:00', calories: 500, proteinGrams: 20 },
++  ]);
++
++  const today = days.get('2026-09-16');
++  assert.deepEqual(today.meals.map((meal) => meal.id), ['a', 'b', 'c']);
++  assert.deepEqual(today.totals, { calories: 1450, proteinGrams: 80 });
++  assert.equal(days.get('2026-09-15').meals.length, 1);
++});
++
++test('day totals read compactly', () => {
++  assert.equal(formatMealNumbers({ calories: 1850, proteinGrams: 142 }), '1,850 cal · 142g P');
++});

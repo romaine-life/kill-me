@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 2,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/ed3c0b1b410a8cd7a8867b222d46af410aead8dc/frontend%2Fsrc%2FApp.jsx",
+    "changes": 4,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fsrc%2FApp.jsx?ref=ed3c0b1b410a8cd7a8867b222d46af410aead8dc",
+    "deletions": 2,
+    "filename": "frontend/src/App.jsx",
+    "patch": "@@ -456,8 +456,8 @@ const styles = {\n     fontFamily: 'var(--font-mono)',\n   },\n   mobileMenuButton: {\n-    width: 32,\n-    height: 32,\n+    width: 40,\n+    height: 40,\n     borderRadius: 8,\n     border: '1px solid var(--border-subtle)',\n     background: 'var(--bg-raised)',",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/ed3c0b1b410a8cd7a8867b222d46af410aead8dc/frontend%2Fsrc%2FApp.jsx",
+    "sha": "d6c59ed354b144b38ce30448fa2d4e5431db5fed",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/ed3c0b1b410a8cd7a8867b222d46af410aead8dc/frontend%2Fsrc%2Fcomponents%2FListTab.jsx",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fsrc%2Fcomponents%2FListTab.jsx?ref=ed3c0b1b410a8cd7a8867b222d46af410aead8dc",
+    "deletions": 1,
+    "filename": "frontend/src/components/ListTab.jsx",
+    "patch": "@@ -172,7 +172,7 @@ export function ListTab({ onWorkoutClick, onCardioClick, currentDay = 1 }) {\n                 key={f.id}\n                 onClick={() =\u003e setFilter(f.id)}\n                 style={{\n-                  padding: '6px 12px',\n+                  padding: '9px 12px',\n                   borderRadius: 7,\n                   fontSize: 12,\n                   fontFamily: 'var(--font-primary)',",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/ed3c0b1b410a8cd7a8867b222d46af410aead8dc/frontend%2Fsrc%2Fcomponents%2FListTab.jsx",
+    "sha": "428e0c228df585475d46c8fb40dcc10d4103431b",
+    "status": "modified"
+  }
+]

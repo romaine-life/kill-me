@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/9003f0499819533b7ce7315f9ad85b8f0c3fcb38/comments",
+    "commit": {
+      "author": {
+        "date": "2026-05-16T15:28:07Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-05-16T15:28:07Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "message": "fix(tofu): read AKS OIDC issuer from infra-bootstrap remote state\n\nFollow-up to #37, which switched the federated identity credential's\n`issuer` to `data.azurerm_kubernetes_cluster.infra.oidc_issuer_url`.\nThat data source 404s because the cluster lives in subscription\n606a1ca1 (romaine-life) while this stack authenticates against\naee0cbd2 (Azure subscription 1). Same failure mode diagrams/tofu hits.\n\nSwitch to reading `aks_oidc_issuer_url` from infra-bootstrap's tfstate\noutput instead. The tfstate blob is in this subscription's storage\naccount (nelsontofu) and the CI principal already has access to it\n(that's where this stack's own state lives). Matches glimmung's\npattern in glimmung/tofu/remote-state.tf, which has been working.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) \u003cnoreply@anthropic.com\u003e",
+      "tree": {
+        "sha": "3aff47f93fc3081e444736f9a9c4adce595e493c",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/3aff47f93fc3081e444736f9a9c4adce595e493c"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/9003f0499819533b7ce7315f9ad85b8f0c3fcb38",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/9003f0499819533b7ce7315f9ad85b8f0c3fcb38",
+    "node_id": "C_kwDORV0mMdoAKDkwMDNmMDQ5OTgxOTUzM2I3Y2U3MzE1ZjlhZDg1YjhmMGMzZmNiMzg",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/8f0e27d4765529db6277c7516a5d9c47ef8756be",
+        "sha": "8f0e27d4765529db6277c7516a5d9c47ef8756be",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/8f0e27d4765529db6277c7516a5d9c47ef8756be"
+      }
+    ],
+    "sha": "9003f0499819533b7ce7315f9ad85b8f0c3fcb38",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/9003f0499819533b7ce7315f9ad85b8f0c3fcb38"
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/6dbfd2090868e9636a4768951c22e3518c33035b/tofu%2Fkeyvault.tf",
+    "changes": 6,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/tofu%2Fkeyvault.tf?ref=6dbfd2090868e9636a4768951c22e3518c33035b",
+    "deletions": 6,
+    "filename": "tofu/keyvault.tf",
+    "patch": "@@ -15,9 +15,3 @@ resource \"azurerm_key_vault_secret\" \"jwt_signing_secret\" {\n   value        = random_password.jwt_signing_secret.result\n   key_vault_id = data.azurerm_key_vault.main.id\n }\n-\n-# TODO: Remove after first successful apply (needed by auth0 provider for teardown)\n-data \"azurerm_key_vault_secret\" \"auth0_client_secret\" {\n-  name         = \"auth0-client-secret\"\n-  key_vault_id = data.azurerm_key_vault.main.id\n-}",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/6dbfd2090868e9636a4768951c22e3518c33035b/tofu%2Fkeyvault.tf",
+    "sha": "396f471f57d6687f87fd096fafa2175efa6cbde7",
+    "status": "modified"
+  },
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/6dbfd2090868e9636a4768951c22e3518c33035b/tofu%2Fprovider.tf",
+    "changes": 7,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/tofu%2Fprovider.tf?ref=6dbfd2090868e9636a4768951c22e3518c33035b",
+    "deletions": 7,
+    "filename": "tofu/provider.tf",
+    "patch": "@@ -13,10 +13,3 @@ provider \"azurerm\" {\n provider \"azuread\" {\n   use_oidc = true\n }\n-\n-# TODO: Remove after first successful apply (lets tofu destroy Auth0 resources in state)\n-provider \"auth0\" {\n-  domain        = \"dev-gtdi5x5p0nmticqd.us.auth0.com\"\n-  client_id     = \"7qsN7zrBAh7TwhjEUcgtU46yOSs9TXbg\"\n-  client_secret = data.azurerm_key_vault_secret.auth0_client_secret.value\n-}",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/6dbfd2090868e9636a4768951c22e3518c33035b/tofu%2Fprovider.tf",
+    "sha": "829561dd8403e9179c1279eddafa5f2f4509c7be",
+    "status": "modified"
+  }
+]

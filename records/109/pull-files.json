@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 8,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/457dc8c5941fecf91f32823e29736b0faeeee787/frontend%2Fsrc%2Fcomponents%2FSorenessLanes.jsx",
+    "changes": 11,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fsrc%2Fcomponents%2FSorenessLanes.jsx?ref=457dc8c5941fecf91f32823e29736b0faeeee787",
+    "deletions": 3,
+    "filename": "frontend/src/components/SorenessLanes.jsx",
+    "patch": "@@ -76,7 +76,7 @@ function shiftDays(date, delta) {\n   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;\n }\n \n-export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWorkout, onOpenCardio }) {\n+export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWorkout, onOpenCardio, onOpenSoreness }) {\n   const [group, setGroup] = useState('workout');   // 'workout' | 'muscle'\n   const [gaps, setGaps] = useState('bridge');     // 'bridge' | 'break'\n   const [order, setOrder] = useState('oldest');    // 'oldest' | 'newest'\n@@ -449,8 +449,8 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo\n                     );\n                   })}\n \n-                  {/* Invisible per-day hit targets preserve precise hover details.\n-                      Editing remains an explicit action on a record card. */}\n+                  {/* Invisible per-day hit targets preserve precise hover details,\n+                      and open that day's soreness record like any other node. */}\n                   {segments\n                     .filter((seg) =\u003e seg.logged)\n                     .flatMap((seg) =\u003e seg.days)\n@@ -463,6 +463,11 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo\n                         height={ROW_H}\n                         fill=\"transparent\"\n                         pointerEvents=\"all\"\n+                        style={{ cursor: onOpenSoreness ? 'pointer' : 'default' }}\n+                        onClick={() =\u003e {\n+                          const entry = t.entries.get(d);\n+                          if (entry) onOpenSoreness?.(entry);\n+                        }}\n                         onMouseEnter={() =\u003e\n                           setHover({\n                             kind: 'soreness',",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/457dc8c5941fecf91f32823e29736b0faeeee787/frontend%2Fsrc%2Fcomponents%2FSorenessLanes.jsx",
+    "sha": "149497d3310ce3b1cadb3592656d93e11b4ad7b7",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/457dc8c5941fecf91f32823e29736b0faeeee787/frontend%2Fsrc%2Fcomponents%2FSorenessTab.jsx",
+    "changes": 1,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fsrc%2Fcomponents%2FSorenessTab.jsx?ref=457dc8c5941fecf91f32823e29736b0faeeee787",
+    "deletions": 0,
+    "filename": "frontend/src/components/SorenessTab.jsx",
+    "patch": "@@ -692,6 +692,7 @@ export function SorenessTab({\n           cardioSessions={cardioSessions}\n           onOpenWorkout={showWorkout}\n           onOpenCardio={onOpenCardio}\n+          onOpenSoreness={onOpenSoreness}\n         /\u003e\n       \u003c/div\u003e\n     );",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/457dc8c5941fecf91f32823e29736b0faeeee787/frontend%2Fsrc%2Fcomponents%2FSorenessTab.jsx",
+    "sha": "7cffab7b859caa86961c086db7a88934ee7f79eb",
+    "status": "modified"
+  },
+  {
+    "additions": 2,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/457dc8c5941fecf91f32823e29736b0faeeee787/frontend%2Fsrc%2Futils%2FsorenessLink.js",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fsrc%2Futils%2FsorenessLink.js?ref=457dc8c5941fecf91f32823e29736b0faeeee787",
+    "deletions": 0,
+    "filename": "frontend/src/utils/sorenessLink.js",
+    "patch": "@@ -195,6 +195,7 @@ export function buildTracks(entries, mode = 'workout') {\n         logged: new Set(),  // every date this stripe was logged on\n         levels: new Map(),  // date -\u003e record-level intensity\n         detail: new Map(),  // date -\u003e [{ name, level }]\n+        entries: new Map(), // date -\u003e the soreness record logged that day\n       };\n       tracks.set(key, t);\n     }\n@@ -207,6 +208,7 @@ export function buildTracks(entries, mode = 'workout') {\n       t.levels.set(date, Math.max(t.levels.get(date) ?? 0, entry.level));\n     }\n     t.detail.set(date, muscles.map((m) =\u003e ({ name: m.muscle || m.group, level: m.level })));\n+    t.entries.set(date, entry);\n   };\n \n   for (const entry of entries) {",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/457dc8c5941fecf91f32823e29736b0faeeee787/frontend%2Fsrc%2Futils%2FsorenessLink.js",
+    "sha": "8d1eec8d62873424a1e8ee249ed46cc044d4509e",
+    "status": "modified"
+  }
+]

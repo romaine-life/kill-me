@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/ed3c0b1b410a8cd7a8867b222d46af410aead8dc/comments",
+    "commit": {
+      "author": {
+        "date": "2026-07-18T20:55:00Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-07-18T20:55:00Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "feat: enlarge undersized mobile touch targets (hamburger, filter chips)\n\nFrom the mobile audit: bump the two safe, self-contained offenders — the\nnav hamburger (32→40px) and the List filter chips (30→36px, via vertical\npadding). Verified at 375px: no overflow, targets enlarged.\n\nRemaining sub-44px controls noted in the audit (Today exercise links,\nHistory granularity/pagination, Exercises day buttons) are embedded in\nshared desktop/mobile layouts and are better tuned with visual review.",
+      "tree": {
+        "sha": "a2f20ed98478fd3e3a2a1199c0c502306556498c",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/a2f20ed98478fd3e3a2a1199c0c502306556498c"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/ed3c0b1b410a8cd7a8867b222d46af410aead8dc",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/ed3c0b1b410a8cd7a8867b222d46af410aead8dc",
+    "node_id": "C_kwDORV0mMdoAKGVkM2MwYjFiNDEwYThjZDdhODg2N2IyMjJkNDZhZjQxMGFlYWQ4ZGM",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/089a530e73234ff6189e3f057b95c30cc6dc89b3",
+        "sha": "089a530e73234ff6189e3f057b95c30cc6dc89b3",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/089a530e73234ff6189e3f057b95c30cc6dc89b3"
+      }
+    ],
+    "sha": "ed3c0b1b410a8cd7a8867b222d46af410aead8dc",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/ed3c0b1b410a8cd7a8867b222d46af410aead8dc"
+  }
+]

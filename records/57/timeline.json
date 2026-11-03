@@ -1,0 +1,164 @@
+[
+  {
+    "author": {
+      "date": "2026-06-20T22:39:36Z",
+      "email": "tank-operator-host[bot]@users.noreply.github.com",
+      "name": "tank-operator-host[bot]"
+    },
+    "committer": {
+      "date": "2026-06-20T22:39:36Z",
+      "email": "tank-operator-host[bot]@users.noreply.github.com",
+      "name": "tank-operator-host[bot]"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/5f2cbec592abef8503f200cb3e62bd6aeb454fcf",
+    "message": "ci(test-slots): remove dead ci-ref lookup tag from build-and-deploy\n\nThe deploy-image resolver resolves CI images by the sha-\u003ccommit\u003e alias\n(glimmung#873, deployed) and reads only docker-build-check runs, so the ci-ref\nlookup tag build-and-deploy emitted on main builds was never read by anything\n(verified: no code consumers). Remove it and migrate the\ncheck-image-fingerprint-config guard to assert the ci-ref surface is gone —\ncompleting the end-to-end ci-* deletion for kill-me.\n\nCo-Authored-By: Claude Opus 4.8 \u003cnoreply@anthropic.com\u003e",
+    "node_id": "C_kwDORV0mMdoAKDVmMmNiZWM1OTJhYmVmODUwM2YyMDBjYjNlNjJiZDZhZWI0NTRmY2Y",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/e57351cd1d10f99d11d568eb7a60dc9124dd2f93",
+        "sha": "e57351cd1d10f99d11d568eb7a60dc9124dd2f93",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/e57351cd1d10f99d11d568eb7a60dc9124dd2f93"
+      }
+    ],
+    "sha": "5f2cbec592abef8503f200cb3e62bd6aeb454fcf",
+    "tree": {
+      "sha": "f9466d181a403e66642b6ca007fc0bcd426c0dd3",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/f9466d181a403e66642b6ca007fc0bcd426c0dd3"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/5f2cbec592abef8503f200cb3e62bd6aeb454fcf",
+    "verification": {
+      "payload": null,
+      "reason": "unsigned",
+      "signature": null,
+      "verified": false,
+      "verified_at": null
+    }
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-06-20T22:39:56Z",
+    "event": "deployed",
+    "id": 27000076431,
+    "node_id": "DEE_lADORV0mMc8AAAABGKdmjc8AAAAGSVR4jw",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/27000076431"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": "e9422531c8dce6847e527a53526c3541ecb71866",
+    "commit_url": "https://api.github.com/repos/romaine-life/kill-me/commits/e9422531c8dce6847e527a53526c3541ecb71866",
+    "created_at": "2026-06-20T22:42:07Z",
+    "event": "merged",
+    "id": 27000099764,
+    "node_id": "ME_lADORV0mMc8AAAABGKdmjc8AAAAGSVTTtA",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/27000099764"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-06-20T22:42:07Z",
+    "event": "closed",
+    "id": 27000099792,
+    "intent": null,
+    "node_id": "CE_lADORV0mMc8AAAABGKdmjc8AAAAGSVTT0A",
+    "performed_via_github_app": null,
+    "state_reason": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/27000099792"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-06-20T22:42:09Z",
+    "event": "head_ref_deleted",
+    "id": 27000100061,
+    "node_id": "HRDE_lADORV0mMc8AAAABGKdmjc8AAAAGSVTU3Q",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/27000100061"
+  }
+]

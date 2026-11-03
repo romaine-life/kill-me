@@ -1,0 +1,91 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/61b2c2cc2238edbecbed27ddd2bc5323e0df35c8/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-21T15:47:19Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-21T15:47:19Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "Link soreness to the workout that caused it\n\nSoreness entries were keyed by date alone, with no reference to the workout\nthat caused them, so there was no way to see how long a session's soreness\nactually lasted.\n\nAn entry is now identified by (date, source workout), and you log against the\nsame workout repeatedly as it fades — that sequence is its recovery curve.\nTwo workouts' soreness can overlap on the same day without fighting over one\nrecord. Unattributed entries keep the bare `soreness-\u003cdate\u003e` id the old scheme\nused, so existing entries carry over as \"unattributed\" with no migration.\n\n- Log soreness from a workout in the History feed and in the workout editor\n- Soreness editor picks the originating workout first, which filters the\n  muscle picker to that day's groups (with a \"show all\" escape hatch)\n- New Lanes view: a vertical date rail where each workout spawns a stripe\n  running for as long as its soreness lasted. Lanes are packed greedily by\n  start date and never reflow — interval-graph colouring already gives the\n  minimum lane count, so shifting a live stripe would buy no width while\n  destroying the stable x-position that makes its length readable.\n  Grouping, missed-day handling, order, quiet-day collapsing and the date\n  window are all toggles.\n\nSnapshot schema gains id and source_workout_* columns; the committed\nsnapshot.db is migrated in place so anonymous visitors keep working before\nthe next cron regeneration.\n\nDELETE /api/soreness/:date becomes /api/soreness/:id, back-compatible since\na bare date still resolves to the unattributed entry.",
+      "tree": {
+        "sha": "2da4e4605d1d7295b3a5f9e522af50abe0605b0e",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/2da4e4605d1d7295b3a5f9e522af50abe0605b0e"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/61b2c2cc2238edbecbed27ddd2bc5323e0df35c8",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/61b2c2cc2238edbecbed27ddd2bc5323e0df35c8",
+    "node_id": "C_kwDORV0mMdoAKDYxYjJjMmNjMjIzOGVkYmVjYmVkMjdkZGQyYmM1MzIzZTBkZjM1Yzg",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/0010e1195d43ae95fa3083bfd55f9fce378b69ed",
+        "sha": "0010e1195d43ae95fa3083bfd55f9fce378b69ed",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/0010e1195d43ae95fa3083bfd55f9fce378b69ed"
+      }
+    ],
+    "sha": "61b2c2cc2238edbecbed27ddd2bc5323e0df35c8",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/61b2c2cc2238edbecbed27ddd2bc5323e0df35c8"
+  },
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/59a0cdf6f2b3b4fac74350d801112ce006a4a9d4/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-21T15:50:07Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-21T15:50:07Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "Merge remote-tracking branch 'origin/main' into claude/soreness-workout-connection-c8732f\n\n# Conflicts:\n#\tfrontend/public/snapshot.db",
+      "tree": {
+        "sha": "104610611d22ff3950e6b74dac32b9003d111fc8",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/104610611d22ff3950e6b74dac32b9003d111fc8"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/59a0cdf6f2b3b4fac74350d801112ce006a4a9d4",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/59a0cdf6f2b3b4fac74350d801112ce006a4a9d4",
+    "node_id": "C_kwDORV0mMdoAKDU5YTBjZGY2ZjJiM2I0ZmFjNzQzNTBkODAxMTEyY2UwMDZhNGE5ZDQ",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/61b2c2cc2238edbecbed27ddd2bc5323e0df35c8",
+        "sha": "61b2c2cc2238edbecbed27ddd2bc5323e0df35c8",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/61b2c2cc2238edbecbed27ddd2bc5323e0df35c8"
+      },
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/c62a937ae58b7db557e35403e3db5679019962b4",
+        "sha": "c62a937ae58b7db557e35403e3db5679019962b4",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/c62a937ae58b7db557e35403e3db5679019962b4"
+      }
+    ],
+    "sha": "59a0cdf6f2b3b4fac74350d801112ce006a4a9d4",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/59a0cdf6f2b3b4fac74350d801112ce006a4a9d4"
+  }
+]

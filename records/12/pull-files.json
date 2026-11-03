@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 4,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/5f96ad90200f589df6d6135c2d855f6e924d4323/frontend%2Fpackage-lock.json",
+    "changes": 8,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fpackage-lock.json?ref=5f96ad90200f589df6d6135c2d855f6e924d4323",
+    "deletions": 4,
+    "filename": "frontend/package-lock.json",
+    "patch": "@@ -30,7 +30,7 @@\n         \"globals\": \"^16.5.0\",\n         \"postcss\": \"^8.5.13\",\n         \"tailwindcss\": \"^4.1.18\",\n-        \"vite\": \"^7.3.1\"\n+        \"vite\": \"^7.3.2\"\n       }\n     },\n     \"node_modules/@alloc/quick-lru\": {\n@@ -3618,9 +3618,9 @@\n       }\n     },\n     \"node_modules/vite\": {\n-      \"version\": \"7.3.1\",\n-      \"resolved\": \"https://registry.npmjs.org/vite/-/vite-7.3.1.tgz\",\n-      \"integrity\": \"sha512-w+N7Hifpc3gRjZ63vYBXA56dvvRlNWRczTdmCBBa+CotUzAPf5b7YMdMR/8CQoeYE5LX3W4wj6RYTgonm1b9DA==\",\n+      \"version\": \"7.3.2\",\n+      \"resolved\": \"https://registry.npmjs.org/vite/-/vite-7.3.2.tgz\",\n+      \"integrity\": \"sha512-Bby3NOsna2jsjfLVOHKes8sGwgl4TT0E6vvpYgnAYDIF/tie7MRaFthmKuHx1NSXjiTueXH3do80FMQgvEktRg==\",\n       \"dev\": true,\n       \"license\": \"MIT\",\n       \"dependencies\": {",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/5f96ad90200f589df6d6135c2d855f6e924d4323/frontend%2Fpackage-lock.json",
+    "sha": "f4b3646b268ab6a7b58a972cf54701f36bcdd835",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/5f96ad90200f589df6d6135c2d855f6e924d4323/frontend%2Fpackage.json",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fpackage.json?ref=5f96ad90200f589df6d6135c2d855f6e924d4323",
+    "deletions": 1,
+    "filename": "frontend/package.json",
+    "patch": "@@ -32,6 +32,6 @@\n     \"globals\": \"^16.5.0\",\n     \"postcss\": \"^8.5.13\",\n     \"tailwindcss\": \"^4.1.18\",\n-    \"vite\": \"^7.3.1\"\n+    \"vite\": \"^7.3.2\"\n   }\n }",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/5f96ad90200f589df6d6135c2d855f6e924d4323/frontend%2Fpackage.json",
+    "sha": "0ce05633e4d348d7d722b0b8a9a06e114c7f91b9",
+    "status": "modified"
+  }
+]

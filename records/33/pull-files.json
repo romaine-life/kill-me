@@ -1,0 +1,123 @@
+[
+  {
+    "additions": 4,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/df886cad9ed35452a47c5e7e6591f81059d1300b/.github%2Fworkflows%2Fbuild-and-deploy.yaml",
+    "changes": 13,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fbuild-and-deploy.yaml?ref=df886cad9ed35452a47c5e7e6591f81059d1300b",
+    "deletions": 9,
+    "filename": ".github/workflows/build-and-deploy.yaml",
+    "patch": "@@ -62,22 +62,17 @@ jobs:\n           docker push \"$IMAGE\"\n           echo \"TAG=${TAG}\" \u003e\u003e $GITHUB_ENV\n \n-      - name: Install kustomize\n+      - name: Bump image tag in k8s/values.yaml\n         run: |\n-          curl -sSL \"https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh\" | bash\n-          sudo mv kustomize /usr/local/bin/\n-\n-      - name: Bump image tag in k8s/kustomization.yaml\n-        working-directory: k8s\n-        run: kustomize edit set image romainecr.azurecr.io/kill-me=romainecr.azurecr.io/kill-me:${{ env.TAG }}\n+          sed -i \"s|^  tag: .*|  tag: ${{ env.TAG }}|\" k8s/values.yaml\n \n       - name: Commit and push tag bump\n         run: |\n           git config user.name \"github-actions[bot]\"\n           git config user.email \"github-actions[bot]@users.noreply.github.com\"\n-          git add k8s/kustomization.yaml\n+          git add k8s/values.yaml\n           if git diff --cached --quiet; then\n-            echo \"No kustomization changes to commit\"\n+            echo \"No values changes to commit\"\n             exit 0\n           fi\n           git commit -m \"chore: bump kill-me image to ${{ env.TAG }} [skip ci]\"",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/df886cad9ed35452a47c5e7e6591f81059d1300b/.github%2Fworkflows%2Fbuild-and-deploy.yaml",
+    "sha": "bf8f8fc663f720a90c6e8c489613c8344826cd20",
+    "status": "modified"
+  },
+  {
+    "additions": 6,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2FChart.yaml",
+    "changes": 6,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/k8s%2FChart.yaml?ref=df886cad9ed35452a47c5e7e6591f81059d1300b",
+    "deletions": 0,
+    "filename": "k8s/Chart.yaml",
+    "patch": "@@ -0,0 +1,6 @@\n+apiVersion: v2\n+name: kill-me\n+description: Workout tracker (workout.romaine.life)\n+type: application\n+version: 0.1.0\n+appVersion: \"0.1.0\"",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2FChart.yaml",
+    "sha": "66eba7781f6e6a449ffb66a240fc5d117dbe364a",
+    "status": "added"
+  },
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/b03bde4b3192da5e719a987f91992f0709ad6bc7/k8s%2Fkustomization.yaml",
+    "changes": 14,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/k8s%2Fkustomization.yaml?ref=b03bde4b3192da5e719a987f91992f0709ad6bc7",
+    "deletions": 14,
+    "filename": "k8s/kustomization.yaml",
+    "patch": "@@ -1,14 +0,0 @@\n-apiVersion: kustomize.config.k8s.io/v1beta1\n-kind: Kustomization\n-namespace: kill-me\n-resources:\n-- serviceaccount.yaml\n-- deployment.yaml\n-- service.yaml\n-- certificate.yaml\n-- xlistenerset.yaml\n-- httproute.yaml\n-images:\n-- name: romainecr.azurecr.io/kill-me\n-  newName: romainecr.azurecr.io/kill-me\n-  newTag: f02f97a",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/b03bde4b3192da5e719a987f91992f0709ad6bc7/k8s%2Fkustomization.yaml",
+    "sha": "46107c6d57ee5a16a9da07703cd54abce973a416",
+    "status": "removed"
+  },
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2Ftemplates%2Fcertificate.yaml",
+    "changes": 0,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/k8s%2Ftemplates%2Fcertificate.yaml?ref=df886cad9ed35452a47c5e7e6591f81059d1300b",
+    "deletions": 0,
+    "filename": "k8s/templates/certificate.yaml",
+    "previous_filename": "k8s/certificate.yaml",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2Ftemplates%2Fcertificate.yaml",
+    "sha": "7c5b79f8b228325b15031d5f32b5bf65d32d2de8",
+    "status": "renamed"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2Ftemplates%2Fdeployment.yaml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/k8s%2Ftemplates%2Fdeployment.yaml?ref=df886cad9ed35452a47c5e7e6591f81059d1300b",
+    "deletions": 1,
+    "filename": "k8s/templates/deployment.yaml",
+    "patch": "@@ -24,7 +24,7 @@ spec:\n       serviceAccountName: infra-shared\n       containers:\n         - name: kill-me\n-          image: romainecr.azurecr.io/kill-me:placeholder\n+          image: \"{{ .Values.image.repository }}:{{ .Values.image.tag }}\"\n           imagePullPolicy: IfNotPresent\n           ports:\n             - name: http",
+    "previous_filename": "k8s/deployment.yaml",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2Ftemplates%2Fdeployment.yaml",
+    "sha": "6441b3e5e1711d503063d8f6a67797ea89284f80",
+    "status": "renamed"
+  },
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2Ftemplates%2Fhttproute.yaml",
+    "changes": 0,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/k8s%2Ftemplates%2Fhttproute.yaml?ref=df886cad9ed35452a47c5e7e6591f81059d1300b",
+    "deletions": 0,
+    "filename": "k8s/templates/httproute.yaml",
+    "previous_filename": "k8s/httproute.yaml",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2Ftemplates%2Fhttproute.yaml",
+    "sha": "bbea79bf6aa455f65a9d237464752fd7439eb85c",
+    "status": "renamed"
+  },
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2Ftemplates%2Fservice.yaml",
+    "changes": 0,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/k8s%2Ftemplates%2Fservice.yaml?ref=df886cad9ed35452a47c5e7e6591f81059d1300b",
+    "deletions": 0,
+    "filename": "k8s/templates/service.yaml",
+    "previous_filename": "k8s/service.yaml",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2Ftemplates%2Fservice.yaml",
+    "sha": "17eea5b2270d0d9749f2a1d907dd01730d5ce1c8",
+    "status": "renamed"
+  },
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2Ftemplates%2Fserviceaccount.yaml",
+    "changes": 0,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/k8s%2Ftemplates%2Fserviceaccount.yaml?ref=df886cad9ed35452a47c5e7e6591f81059d1300b",
+    "deletions": 0,
+    "filename": "k8s/templates/serviceaccount.yaml",
+    "previous_filename": "k8s/serviceaccount.yaml",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2Ftemplates%2Fserviceaccount.yaml",
+    "sha": "ac48561ab6ca66211eb311e9d8ebeb235201051a",
+    "status": "renamed"
+  },
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2Ftemplates%2Fxlistenerset.yaml",
+    "changes": 0,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/k8s%2Ftemplates%2Fxlistenerset.yaml?ref=df886cad9ed35452a47c5e7e6591f81059d1300b",
+    "deletions": 0,
+    "filename": "k8s/templates/xlistenerset.yaml",
+    "previous_filename": "k8s/xlistenerset.yaml",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2Ftemplates%2Fxlistenerset.yaml",
+    "sha": "a2f79d2a4520577f7493dd62166d45c1df18131b",
+    "status": "renamed"
+  },
+  {
+    "additions": 5,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2Fvalues.yaml",
+    "changes": 5,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/k8s%2Fvalues.yaml?ref=df886cad9ed35452a47c5e7e6591f81059d1300b",
+    "deletions": 0,
+    "filename": "k8s/values.yaml",
+    "patch": "@@ -0,0 +1,5 @@\n+# The image tag is bumped by .github/workflows/build-and-deploy.yaml on every\n+# push to main (via `sed` on this file).\n+image:\n+  repository: romainecr.azurecr.io/kill-me\n+  tag: f02f97a",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/df886cad9ed35452a47c5e7e6591f81059d1300b/k8s%2Fvalues.yaml",
+    "sha": "75397bd980411d10bff3ec1da255260f804d113c",
+    "status": "added"
+  }
+]

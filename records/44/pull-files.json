@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 3,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/897be69513a177e0959aed23ea8554ea0e2cbd33/.github%2Fworkflows%2Fbuild-and-deploy.yaml",
+    "changes": 4,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fbuild-and-deploy.yaml?ref=897be69513a177e0959aed23ea8554ea0e2cbd33",
+    "deletions": 1,
+    "filename": ".github/workflows/build-and-deploy.yaml",
+    "patch": "@@ -52,7 +52,9 @@ jobs:\n \n       - name: Bump image tag in k8s/values.yaml\n         run: |\n-          sed -i \"s|^  tag: .*|  tag: ${{ env.TAG }}|\" k8s/values.yaml\n+          # Quote the tag: short SHAs like 4255e97 are valid YAML scientific\n+          # notation and parse as a float (4.255e+100) unless quoted.\n+          sed -i \"s|^  tag: .*|  tag: \\\"${{ env.TAG }}\\\"|\" k8s/values.yaml\n \n       - name: Commit and push tag bump\n         run: |",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/897be69513a177e0959aed23ea8554ea0e2cbd33/.github%2Fworkflows%2Fbuild-and-deploy.yaml",
+    "sha": "4bd5bddaf6d96f9146440afaa9249dbf861bdb83",
+    "status": "modified"
+  },
+  {
+    "additions": 2,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/897be69513a177e0959aed23ea8554ea0e2cbd33/k8s%2Fvalues.yaml",
+    "changes": 3,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/k8s%2Fvalues.yaml?ref=897be69513a177e0959aed23ea8554ea0e2cbd33",
+    "deletions": 1,
+    "filename": "k8s/values.yaml",
+    "patch": "@@ -2,7 +2,8 @@\n # push to main (via `sed` on this file).\n image:\n   repository: romainecr.azurecr.io/kill-me\n-  tag: fb74764\n+  # Quoted on purpose: a bare SHA like 4255e97 is valid YAML scientific notation; keep the quotes.\n+  tag: \"fb74764\"\n   pullPolicy: IfNotPresent\n \n name: kill-me",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/897be69513a177e0959aed23ea8554ea0e2cbd33/k8s%2Fvalues.yaml",
+    "sha": "a24c3eedbbddb5b95ace1230de030dab46947269",
+    "status": "modified"
+  }
+]

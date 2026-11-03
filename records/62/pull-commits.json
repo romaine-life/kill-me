@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/32d5d81ac902c623112aa187b3a7fe563a6c5ee1/comments",
+    "commit": {
+      "author": {
+        "date": "2026-07-15T06:36:10Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-07-15T06:36:10Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "fix: scope current-day settings reads/writes to the authenticated user\n\nThe `settings` document read in `GET /api/current-day` and the log-workout\nauto-advance queried `SELECT * FROM c WHERE c.type='settings'` with no userId\nfilter and used an arbitrary cross-partition `settings[0]`. After the\nMSAL -\u003e auth.romaine.life migration left workout data (and a stale settings\ndoc) under a legacy `microsoft|...` userId, that stale doc (currentDay=1)\nkept winning, so the app perpetually suggested Day 1 (Legs) even after Day 1\nwas logged.\n\n- GET /api/current-day: dedupe by most-recent `updatedAt` and coerce to Number\n- log-workout auto-advance: scope the settings lookup to `c.userId = req.user.sub`\n  (partition-keyed), always upsert with `id = settings_\u003cuserId\u003e` so a stray/legacy\n  doc id can't spawn a duplicate, and coerce day comparison/increment to Number\n- PUT /api/current-day: coerce incoming currentDay to Number so a string can\n  never be persisted\n\nProduction data was separately consolidated onto the current auth.romaine.life\nuserId (duplicate settings docs collapsed to one, currentDay=2).",
+      "tree": {
+        "sha": "d4d4158ad11dca49522d7e2f9b3e213f1c300c8b",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/d4d4158ad11dca49522d7e2f9b3e213f1c300c8b"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/32d5d81ac902c623112aa187b3a7fe563a6c5ee1",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/32d5d81ac902c623112aa187b3a7fe563a6c5ee1",
+    "node_id": "C_kwDORV0mMdoAKDMyZDVkODFhYzkwMmM2MjMxMTJhYTE4N2IzYTdmZTU2M2E2YzVlZTE",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/076f56008cc8d85ef7dd3a861b06dfcc6595322a",
+        "sha": "076f56008cc8d85ef7dd3a861b06dfcc6595322a",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/076f56008cc8d85ef7dd3a861b06dfcc6595322a"
+      }
+    ],
+    "sha": "32d5d81ac902c623112aa187b3a7fe563a6c5ee1",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/32d5d81ac902c623112aa187b3a7fe563a6c5ee1"
+  }
+]

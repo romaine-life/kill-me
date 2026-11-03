@@ -1,0 +1,49 @@
+diff --git a/.github/workflows/build-and-deploy.yaml b/.github/workflows/build-and-deploy.yaml
+index 3b8ce7a6..e6130f18 100644
+--- a/.github/workflows/build-and-deploy.yaml
++++ b/.github/workflows/build-and-deploy.yaml
+@@ -117,30 +117,6 @@ jobs:
+           cache-from: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app
+           cache-to: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app,mode=max
+ 
+-      - name: Compute ACR lookup tag
+-        id: lookup
+-        shell: bash
+-        env:
+-          REF_NAME: ${{ inputs.git_ref || github.ref_name || github.ref }}
+-        run: |
+-          set -euo pipefail
+-          ref_hash="$(printf '%s' "${REF_NAME:-unknown}" | sha256sum | cut -c1-16)"
+-          lookup_tag="ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
+-          echo "tag=${lookup_tag}" >>"${GITHUB_OUTPUT}"
+-          echo "Computed lookup tag ${lookup_tag}"
+-
+-      - name: Create ACR lookup tag
+-        shell: bash
+-        run: |
+-          set -euo pipefail
+-          canonical="${ALIAS_TAG}"
+-          lookup='${{ steps.lookup.outputs.tag }}'
+-          az acr import --name romainecr \
+-            --source "romainecr.azurecr.io/kill-me:${canonical}" \
+-            --image "kill-me:${lookup}" \
+-            --force
+-          echo "Tagged romainecr.azurecr.io/kill-me:${lookup} -> ${canonical}"
+-
+       - name: Bump image tag in k8s/values.yaml
+         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+         run: |
+diff --git a/scripts/check-image-fingerprint-config.mjs b/scripts/check-image-fingerprint-config.mjs
+index cfcc1bc7..d0cf00d4 100755
+--- a/scripts/check-image-fingerprint-config.mjs
++++ b/scripts/check-image-fingerprint-config.mjs
+@@ -31,8 +31,7 @@ assertNotIncludes(dockerBuildCheck, "romainecr.azurecr.io/kill-me:${{ env.IMAGE_
+ assertIncludes(buildAndDeploy, "scripts/image-fingerprint.sh", "build-and-deploy");
+ assertIncludes(buildAndDeploy, "ALIAS_TAG=app-${fingerprint}", "build-and-deploy");
+ assertIncludes(buildAndDeploy, "romainecr.azurecr.io/kill-me:${{ env.ALIAS_TAG }}", "build-and-deploy");
+-assertIncludes(buildAndDeploy, "ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}", "build-and-deploy");
+-assertIncludes(buildAndDeploy, "az acr import --name romainecr", "build-and-deploy");
++assertNotIncludes(buildAndDeploy, "ci-ref-", "build-and-deploy");
+ assertNotIncludes(buildAndDeploy, 'TAG="${GITHUB_SHA::7}"', "build-and-deploy");
+ assertNotIncludes(buildAndDeploy, '--build-arg BUILD_NUMBER="${TAG}"', "build-and-deploy");
+ assertNotIncludes(buildAndDeploy, "tag: \\\"${{ env.TAG }}\\\"", "build-and-deploy");

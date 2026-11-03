@@ -1,0 +1,13 @@
+diff --git a/.github/workflows/docker-build-check.yaml b/.github/workflows/docker-build-check.yaml
+index 78a3df76..820ec04e 100644
+--- a/.github/workflows/docker-build-check.yaml
++++ b/.github/workflows/docker-build-check.yaml
+@@ -50,7 +50,7 @@ jobs:
+         uses: docker/setup-buildx-action@v4
+ 
+       - name: Build image without pushing
+-        uses: docker/build-push-action@v6
++        uses: docker/build-push-action@v7
+         with:
+           context: .
+           file: Dockerfile

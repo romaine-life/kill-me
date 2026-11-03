@@ -1,0 +1,62 @@
+[
+  {
+    "additions": 2,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/2684f7bd6d6e66371acd81efcbe70ed79ec271d4/CLAUDE.md",
+    "changes": 5,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/CLAUDE.md?ref=2684f7bd6d6e66371acd81efcbe70ed79ec271d4",
+    "deletions": 3,
+    "filename": "CLAUDE.md",
+    "patch": "@@ -108,7 +108,6 @@ This repo builds on shared resources provisioned by **infra-bootstrap**:\n - Azure Container Registry (`romainecr`) — AcrPush granted per-app\n - Azure App Configuration (`infra-appconfig`)\n - DNS zone (`romaine.life`) — ExternalDNS manages records from HTTPRoute\n-- Key Vault (`romaine-kv`)\n \n App-specific resources created by this repo: the Cosmos DB database and container.\n Microsoft sign-in is delegated to **auth.romaine.life** — kill-me holds no Entra\n@@ -159,8 +158,8 @@ All workflows delegate to **nelsong6/pipeline-templates** reusable templates:\n ### Prerequisites\n \n - Node 20+\n-- Azure CLI (`az login` for local Cosmos DB and Key Vault access)\n-- Backend `.env` with `AZURE_APP_CONFIG_ENDPOINT` and `KEY_VAULT_URL`\n+- Azure CLI (`az login` for local Cosmos DB access)\n+- Backend `.env` with `AZURE_APP_CONFIG_ENDPOINT`\n - Frontend `.env` with `VITE_API_URL` (Microsoft sign-in is delegated upstream to auth.romaine.life)\n \n ### Running locally",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/2684f7bd6d6e66371acd81efcbe70ed79ec271d4/CLAUDE.md",
+    "sha": "e2add8f9fe89cd7e340fd066dfd3cba58d790282",
+    "status": "modified"
+  },
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/2684f7bd6d6e66371acd81efcbe70ed79ec271d4/backend%2F.env.example",
+    "changes": 1,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/backend%2F.env.example?ref=2684f7bd6d6e66371acd81efcbe70ed79ec271d4",
+    "deletions": 1,
+    "filename": "backend/.env.example",
+    "patch": "@@ -1,3 +1,2 @@\n AZURE_APP_CONFIG_ENDPOINT=https://infra-appconfig.azconfig.io\n-KEY_VAULT_URL=https://romaine-kv.vault.azure.net/\n PORT=3000",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/2684f7bd6d6e66371acd81efcbe70ed79ec271d4/backend%2F.env.example",
+    "sha": "2d3c7397a962817f7d2305b349d7180fe45d8935",
+    "status": "modified"
+  },
+  {
+    "additions": 2,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/2684f7bd6d6e66371acd81efcbe70ed79ec271d4/frontend%2Fpublic%2Fanatomy%2FREADME.md",
+    "changes": 3,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fpublic%2Fanatomy%2FREADME.md?ref=2684f7bd6d6e66371acd81efcbe70ed79ec271d4",
+    "deletions": 1,
+    "filename": "frontend/public/anatomy/README.md",
+    "patch": "@@ -9,7 +9,8 @@ Generated muscle anatomy illustrations for the soreness tracker.\n | OpenAI (`gpt-image-1`) | `openai-api-key` | Base anatomy illustrations (best prompt adherence) |\n | Replicate (Flux Dev) | `replicate-api-key` | Stylized variants, img2img, LoRA training (no content filter) |\n \n-Keys stored in Azure Key Vault (`romaine-kv`).\n+These API keys are used only for offline image-generation work and are not\n+consumed by the deployed workout app.\n \n ## Image Set Per Muscle Group\n ",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/2684f7bd6d6e66371acd81efcbe70ed79ec271d4/frontend%2Fpublic%2Fanatomy%2FREADME.md",
+    "sha": "8318c533c7639ff486e66691e8710b7eb404ec54",
+    "status": "modified"
+  },
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/2684f7bd6d6e66371acd81efcbe70ed79ec271d4/k8s%2Ftemplates%2Fdeployment.yaml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/k8s%2Ftemplates%2Fdeployment.yaml?ref=2684f7bd6d6e66371acd81efcbe70ed79ec271d4",
+    "deletions": 2,
+    "filename": "k8s/templates/deployment.yaml",
+    "patch": "@@ -34,8 +34,6 @@ spec:\n               value: \"3000\"\n             - name: AZURE_APP_CONFIG_ENDPOINT\n               value: https://infra-appconfig.azconfig.io\n-            - name: KEY_VAULT_URL\n-              value: https://romaine-kv.vault.azure.net/\n           resources:\n             requests:\n               cpu: 50m",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/2684f7bd6d6e66371acd81efcbe70ed79ec271d4/k8s%2Ftemplates%2Fdeployment.yaml",
+    "sha": "31b41e9661c25f01c3dbcd6a85a7796a3749be6b",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/2684f7bd6d6e66371acd81efcbe70ed79ec271d4/k8s%2Ftemplates%2Fserviceaccount.yaml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/k8s%2Ftemplates%2Fserviceaccount.yaml?ref=2684f7bd6d6e66371acd81efcbe70ed79ec271d4",
+    "deletions": 1,
+    "filename": "k8s/templates/serviceaccount.yaml",
+    "patch": "@@ -1,6 +1,6 @@\n # Federated to kill-me-identity (tofu/identity.tf::azurerm_federated_identity_credential.kill_me)\n # instead of the shared infra-shared-identity. New identity is scoped to\n-# kill-me's actual surface: Cosmos data on dbs/WorkoutTrackerDB, KV\n+# kill-me's actual surface: Cosmos data on dbs/WorkoutTrackerDB and\n # App Config Data Reader at store level for the single cosmos_db_endpoint\n # key config.js reads. (No Key Vault grant — sessions are delegated to\n # auth.romaine.life via cookie forward, this pod signs nothing locally.)",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/2684f7bd6d6e66371acd81efcbe70ed79ec271d4/k8s%2Ftemplates%2Fserviceaccount.yaml",
+    "sha": "204889ffe67177f33c2357222105bcd1b87cb4d5",
+    "status": "modified"
+  }
+]

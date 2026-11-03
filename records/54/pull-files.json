@@ -1,0 +1,50 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/bbba7c190303983c9a0f66188060d4866255a964/.github%2Fworkflows%2Fbuild-and-deploy.yaml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fbuild-and-deploy.yaml?ref=bbba7c190303983c9a0f66188060d4866255a964",
+    "deletions": 1,
+    "filename": ".github/workflows/build-and-deploy.yaml",
+    "patch": "@@ -33,7 +33,7 @@ jobs:\n     environment: ${{ github.ref == 'refs/heads/main' \u0026\u0026 'prod' || 'dev' }}\n     steps:\n       - name: Checkout\n-        uses: actions/checkout@v6\n+        uses: actions/checkout@v7\n         with:\n           fetch-depth: 0\n ",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/bbba7c190303983c9a0f66188060d4866255a964/.github%2Fworkflows%2Fbuild-and-deploy.yaml",
+    "sha": "3b8ce7a634392d341bc5a35a1b00b3d6d59fa1c4",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/bbba7c190303983c9a0f66188060d4866255a964/.github%2Fworkflows%2Fdocker-build-check.yaml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fdocker-build-check.yaml?ref=bbba7c190303983c9a0f66188060d4866255a964",
+    "deletions": 1,
+    "filename": ".github/workflows/docker-build-check.yaml",
+    "patch": "@@ -25,7 +25,7 @@ jobs:\n     environment: ${{ github.ref == 'refs/heads/main' \u0026\u0026 'prod' || 'dev' }}\n     steps:\n       - name: Checkout\n-        uses: actions/checkout@v6\n+        uses: actions/checkout@v7\n         with:\n           fetch-depth: 0\n           ref: ${{ github.event.pull_request.head.sha || github.sha }}",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/bbba7c190303983c9a0f66188060d4866255a964/.github%2Fworkflows%2Fdocker-build-check.yaml",
+    "sha": "7fa7f21369f88d08b7e21be978ce26c26b0edba2",
+    "status": "modified"
+  },
+  {
+    "additions": 2,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/bbba7c190303983c9a0f66188060d4866255a964/.github%2Fworkflows%2Flint.yaml",
+    "changes": 4,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Flint.yaml?ref=bbba7c190303983c9a0f66188060d4866255a964",
+    "deletions": 2,
+    "filename": ".github/workflows/lint.yaml",
+    "patch": "@@ -19,7 +19,7 @@ jobs:\n     name: Removed MSAL surface\n     runs-on: ubuntu-latest\n     steps:\n-      - uses: actions/checkout@v6\n+      - uses: actions/checkout@v7\n       - uses: actions/setup-node@v6\n         with:\n           node-version: '20'\n@@ -30,7 +30,7 @@ jobs:\n     name: Image fingerprint config\n     runs-on: ubuntu-latest\n     steps:\n-      - uses: actions/checkout@v6\n+      - uses: actions/checkout@v7\n       - uses: actions/setup-node@v6\n         with:\n           node-version: '20'",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/bbba7c190303983c9a0f66188060d4866255a964/.github%2Fworkflows%2Flint.yaml",
+    "sha": "9ad899ab01c8f695fa62b0892aab6bfe4dcb4657",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/bbba7c190303983c9a0f66188060d4866255a964/.github%2Fworkflows%2Fsnapshot.yaml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fsnapshot.yaml?ref=bbba7c190303983c9a0f66188060d4866255a964",
+    "deletions": 1,
+    "filename": ".github/workflows/snapshot.yaml",
+    "patch": "@@ -24,7 +24,7 @@ jobs:\n     environment: ${{ github.ref == 'refs/heads/main' \u0026\u0026 'prod' || 'dev' }}\n     steps:\n       - name: Checkout code\n-        uses: actions/checkout@v6\n+        uses: actions/checkout@v7\n \n       - name: Setup Node.js\n         uses: actions/setup-node@v6",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/bbba7c190303983c9a0f66188060d4866255a964/.github%2Fworkflows%2Fsnapshot.yaml",
+    "sha": "348beb3f9e778c9a62ad84775a7858f03d40b457",
+    "status": "modified"
+  }
+]

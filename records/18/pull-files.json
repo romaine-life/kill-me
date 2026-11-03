@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 64,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/010b463f794fd0643df8c80e8f7ef5af58cb4bdf/frontend%2Fpackage-lock.json",
+    "changes": 68,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fpackage-lock.json?ref=010b463f794fd0643df8c80e8f7ef5af58cb4bdf",
+    "deletions": 4,
+    "filename": "frontend/package-lock.json",
+    "patch": "@@ -28,7 +28,7 @@\n         \"eslint-plugin-react-hooks\": \"^7.0.1\",\n         \"eslint-plugin-react-refresh\": \"^0.4.24\",\n         \"globals\": \"^16.5.0\",\n-        \"postcss\": \"^8.5.6\",\n+        \"postcss\": \"^8.5.13\",\n         \"tailwindcss\": \"^4.1.18\",\n         \"vite\": \"^7.3.1\"\n       }\n@@ -1630,6 +1630,66 @@\n         \"node\": \"\u003e=14.0.0\"\n       }\n     },\n+    \"node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@emnapi/core\": {\n+      \"version\": \"1.7.1\",\n+      \"dev\": true,\n+      \"inBundle\": true,\n+      \"license\": \"MIT\",\n+      \"optional\": true,\n+      \"dependencies\": {\n+        \"@emnapi/wasi-threads\": \"1.1.0\",\n+        \"tslib\": \"^2.4.0\"\n+      }\n+    },\n+    \"node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@emnapi/runtime\": {\n+      \"version\": \"1.7.1\",\n+      \"dev\": true,\n+      \"inBundle\": true,\n+      \"license\": \"MIT\",\n+      \"optional\": true,\n+      \"dependencies\": {\n+        \"tslib\": \"^2.4.0\"\n+      }\n+    },\n+    \"node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@emnapi/wasi-threads\": {\n+      \"version\": \"1.1.0\",\n+      \"dev\": true,\n+      \"inBundle\": true,\n+      \"license\": \"MIT\",\n+      \"optional\": true,\n+      \"dependencies\": {\n+        \"tslib\": \"^2.4.0\"\n+      }\n+    },\n+    \"node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@napi-rs/wasm-runtime\": {\n+      \"version\": \"1.1.0\",\n+      \"dev\": true,\n+      \"inBundle\": true,\n+      \"license\": \"MIT\",\n+      \"optional\": true,\n+      \"dependencies\": {\n+        \"@emnapi/core\": \"^1.7.1\",\n+        \"@emnapi/runtime\": \"^1.7.1\",\n+        \"@tybys/wasm-util\": \"^0.10.1\"\n+      }\n+    },\n+    \"node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/@tybys/wasm-util\": {\n+      \"version\": \"0.10.1\",\n+      \"dev\": true,\n+      \"inBundle\": true,\n+      \"license\": \"MIT\",\n+      \"optional\": true,\n+      \"dependencies\": {\n+        \"tslib\": \"^2.4.0\"\n+      }\n+    },\n+    \"node_modules/@tailwindcss/oxide-wasm32-wasi/node_modules/tslib\": {\n+      \"version\": \"2.8.1\",\n+      \"dev\": true,\n+      \"inBundle\": true,\n+      \"license\": \"0BSD\",\n+      \"optional\": true\n+    },\n     \"node_modules/@tailwindcss/oxide-win32-arm64-msvc\": {\n       \"version\": \"4.1.18\",\n       \"resolved\": \"https://registry.npmjs.org/@tailwindcss/oxide-win32-arm64-msvc/-/oxide-win32-arm64-msvc-4.1.18.tgz\",\n@@ -3227,9 +3287,9 @@\n       }\n     },\n     \"node_modules/postcss\": {\n-      \"version\": \"8.5.6\",\n-      \"resolved\": \"https://registry.npmjs.org/postcss/-/postcss-8.5.6.tgz\",\n-      \"integrity\": \"sha512-3Ybi1tAuwAP9s0r1UQ2J4n5Y0G05bJkpUIO0/bI9MhwmD70S5aTWbXGBwxHrelT+XM1k6dM0pk+SwNkpTRN7Pg==\",\n+      \"version\": \"8.5.13\",\n+      \"resolved\": \"https://registry.npmjs.org/postcss/-/postcss-8.5.13.tgz\",\n+      \"integrity\": \"sha512-qif0+jGGZoLWdHey3UFHHWP0H7Gbmsk8T5VEqyYFbWqPr1XqvLGBbk/sl8V5exGmcYJklJOhOQq1pV9IcsiFag==\",\n       \"dev\": true,\n       \"funding\": [\n         {",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/010b463f794fd0643df8c80e8f7ef5af58cb4bdf/frontend%2Fpackage-lock.json",
+    "sha": "f068d126b2bbc4dac6e534afe54b03dd01463899",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/010b463f794fd0643df8c80e8f7ef5af58cb4bdf/frontend%2Fpackage.json",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fpackage.json?ref=010b463f794fd0643df8c80e8f7ef5af58cb4bdf",
+    "deletions": 1,
+    "filename": "frontend/package.json",
+    "patch": "@@ -30,7 +30,7 @@\n     \"eslint-plugin-react-hooks\": \"^7.0.1\",\n     \"eslint-plugin-react-refresh\": \"^0.4.24\",\n     \"globals\": \"^16.5.0\",\n-    \"postcss\": \"^8.5.6\",\n+    \"postcss\": \"^8.5.13\",\n     \"tailwindcss\": \"^4.1.18\",\n     \"vite\": \"^7.3.1\"\n   }",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/010b463f794fd0643df8c80e8f7ef5af58cb4bdf/frontend%2Fpackage.json",
+    "sha": "260462a4440bc0361a3c78f035ff4e5b56976109",
+    "status": "modified"
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/c3c5e3ba27262d393ba72576a53db59fe639a9e4/.github%2Fworkflows%2Fbuild-and-deploy.yml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fbuild-and-deploy.yml?ref=c3c5e3ba27262d393ba72576a53db59fe639a9e4",
+    "deletions": 1,
+    "filename": ".github/workflows/build-and-deploy.yml",
+    "patch": "@@ -31,7 +31,7 @@ jobs:\n           fetch-depth: 0\n \n       - name: Azure Login (OIDC)\n-        uses: azure/login@v2\n+        uses: azure/login@v3\n         with:\n           client-id: ${{ vars.ARM_CLIENT_ID }}\n           tenant-id: ${{ vars.ARM_TENANT_ID }}",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/c3c5e3ba27262d393ba72576a53db59fe639a9e4/.github%2Fworkflows%2Fbuild-and-deploy.yml",
+    "sha": "72061649ccbbce7b79063d87cb9abaa28ce417c8",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/c3c5e3ba27262d393ba72576a53db59fe639a9e4/.github%2Fworkflows%2Fsnapshot.yml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fsnapshot.yml?ref=c3c5e3ba27262d393ba72576a53db59fe639a9e4",
+    "deletions": 1,
+    "filename": ".github/workflows/snapshot.yml",
+    "patch": "@@ -31,7 +31,7 @@ jobs:\n           node-version: '20'\n \n       - name: Azure Login via OIDC\n-        uses: azure/login@v2\n+        uses: azure/login@v3\n         with:\n           client-id: ${{ vars.ARM_CLIENT_ID }}\n           tenant-id: ${{ vars.ARM_TENANT_ID }}",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/c3c5e3ba27262d393ba72576a53db59fe639a9e4/.github%2Fworkflows%2Fsnapshot.yml",
+    "sha": "228fb0a7520e083fd4af60ce4a3946d5948c21c1",
+    "status": "modified"
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/2b761584ff017c487b705bfbcfcd455f6b2d4395/backend%2Froutes%2Fdata%2Fseed-data.js",
+    "changes": 1,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/backend%2Froutes%2Fdata%2Fseed-data.js?ref=2b761584ff017c487b705bfbcfcd455f6b2d4395",
+    "deletions": 0,
+    "filename": "backend/routes/data/seed-data.js",
+    "patch": "@@ -233,6 +233,7 @@ export const exercises = [\n       { name: 'Standard', targetWeight: 20, targetReps: 'Failure', targetSets: 3, cableSetting: '', default: true },\n       { name: 'Rope Hammer', targetWeight: 20, targetReps: 'Failure', targetSets: 3, cableSetting: '' },\n       { name: 'Single Arm', targetWeight: 10, targetReps: 'Failure', targetSets: 3, cableSetting: '' },\n+      { name: 'Bayesian', targetWeight: 13, targetReps: 12, targetSets: 3, cableSetting: '' },\n     ],\n   },\n ",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/2b761584ff017c487b705bfbcfcd455f6b2d4395/backend%2Froutes%2Fdata%2Fseed-data.js",
+    "sha": "5dee2ef561dee3c5bbe488b63e4f0339f4c3c49a",
+    "status": "modified"
+  },
+  {
+    "additions": 9,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/2b761584ff017c487b705bfbcfcd455f6b2d4395/frontend%2Fsrc%2Fcomponents%2FWorkoutDrawer.jsx",
+    "changes": 13,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fsrc%2Fcomponents%2FWorkoutDrawer.jsx?ref=2b761584ff017c487b705bfbcfcd455f6b2d4395",
+    "deletions": 4,
+    "filename": "frontend/src/components/WorkoutDrawer.jsx",
+    "patch": "@@ -775,22 +775,27 @@ export function LogTab({\n                             return (\n                               \u003c\u003e\n                                 {hasMultipleVars \u0026\u0026 (\n-                                  \u003cdiv className=\"flex flex-wrap gap-1.5 mb-2\"\u003e\n+                                  \u003cdiv className=\"flex flex-wrap items-center gap-1.5 mb-2\"\u003e\n+                                    {/* Labelled so the chips read as a control, not as tags. */}\n+                                    \u003cspan className=\"text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-0.5\"\u003e\n+                                      Variation\n+                                    \u003c/span\u003e\n                                     {vars.map((v, vi) =\u003e (\n                                       \u003cbutton\n                                         key={vi}\n                                         type=\"button\"\n+                                        aria-pressed={exercise.variation === v.name}\n                                         onClick={() =\u003e {\n                                           updateExercise(idx, 'variation', v.name);\n                                           updateExercise(idx, 'weight', v.targetWeight || '');\n                                           updateExercise(idx, 'reps', v.targetReps || '');\n                                           updateExercise(idx, 'sets', v.targetSets || '');\n                                           updateExercise(idx, 'cableSetting', v.cableSetting || '');\n                                         }}\n-                                        className={`text-xs px-2 py-0.5 rounded-full border cursor-pointer transition-all ${\n+                                        className={`text-xs px-2.5 py-1 rounded-full border cursor-pointer transition-all ${\n                                           exercise.variation === v.name\n-                                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'\n-                                            : 'bg-slate-700/50 text-slate-400 border-slate-600/40 hover:border-slate-500'\n+                                            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 font-bold'\n+                                            : 'bg-slate-700 text-slate-200 border-slate-500 hover:border-slate-400'\n                                         }`}\n                                       \u003e\n                                         {v.name}",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/2b761584ff017c487b705bfbcfcd455f6b2d4395/frontend%2Fsrc%2Fcomponents%2FWorkoutDrawer.jsx",
+    "sha": "b340fe03512772efb02b38637042f4247bf1951f",
+    "status": "modified"
+  }
+]

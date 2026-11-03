@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/f6857efe62deca49dbfa91bbc4cad30805af44da/.github%2Fworkflows%2Fsnapshot.yml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fsnapshot.yml?ref=f6857efe62deca49dbfa91bbc4cad30805af44da",
+    "deletions": 1,
+    "filename": ".github/workflows/snapshot.yml",
+    "patch": "@@ -26,7 +26,7 @@ jobs:\n         uses: actions/checkout@v4\n \n       - name: Setup Node.js\n-        uses: actions/setup-node@v4\n+        uses: actions/setup-node@v6\n         with:\n           node-version: '20'\n ",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/f6857efe62deca49dbfa91bbc4cad30805af44da/.github%2Fworkflows%2Fsnapshot.yml",
+    "sha": "0bae42a961a6f2271a834a627a10bcb9cd1b3922",
+    "status": "modified"
+  }
+]

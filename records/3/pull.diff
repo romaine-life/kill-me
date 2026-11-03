@@ -1,0 +1,2158 @@
+diff --git a/.claude/settings.local.json b/.claude/settings.local.json
+new file mode 100644
+index 00000000..25df048b
+--- /dev/null
++++ b/.claude/settings.local.json
+@@ -0,0 +1,7 @@
++{
++  "permissions": {
++    "allow": [
++      "Bash(npm install:*)"
++    ]
++  }
++}
+diff --git a/.github/workflows/container-app-build.yml b/.github/workflows/container-app-build.yml
+index c7f633e2..9f9316e2 100644
+--- a/.github/workflows/container-app-build.yml
++++ b/.github/workflows/container-app-build.yml
+@@ -1,3 +1,4 @@
++# Test 5
+ name: Phase 1 - CI Build
+ 
+ permissions:
+diff --git a/.github/workflows/full-stack-deploy.yml b/.github/workflows/full-stack-deploy.yml
+index 9bcb6dbd..27651054 100644
+--- a/.github/workflows/full-stack-deploy.yml
++++ b/.github/workflows/full-stack-deploy.yml
+@@ -1,15 +1,19 @@
+-# .github/workflows/cd-caller.yml
+ name: Phase 3 - CD Deploy
+ 
+ on:
+-  repository_dispatch:
+-    types: [spacelift_infra_ready]
++  workflow_dispatch:
++    inputs:
++      commit_sha:
++        required: true
++        type: string
++
++permissions:
++  id-token: write
++  contents: read
+ 
+ jobs:
+   call-deployment-template:
+-    # Point this to wherever you store your centralized workflows
+     uses: nelsong6/pipeline-templates/.github/workflows/full-stack-deploy-template.yml@main
+     with:
+-      # Extract the SHA from the webhook and pass it as an input
+-      target_sha: ${{ github.event.client_payload.commit_sha }}
++      target_sha: ${{ inputs.commit_sha }}
+     secrets: inherit
+diff --git a/backend/middleware/auth.js b/backend/middleware/auth.js
+new file mode 100644
+index 00000000..9720d798
+--- /dev/null
++++ b/backend/middleware/auth.js
+@@ -0,0 +1,18 @@
++import { auth } from 'express-oauth2-jwt-bearer';
++
++/**
++ * Creates the Auth0 JWT validation middleware.
++ *
++ * Must be called after Azure App Configuration values are fetched,
++ * because auth() is a synchronous factory that reads its arguments immediately.
++ *
++ * @param {{ auth0Domain: string, auth0Audience: string }} config
++ * @returns {import('express').RequestHandler}
++ */
++export function createRequireAuth({ auth0Domain, auth0Audience }) {
++  return auth({
++    audience: auth0Audience,
++    issuerBaseURL: `https://${auth0Domain}/`,
++    tokenSigningAlg: 'RS256',
++  });
++}
+diff --git a/backend/package-lock.json b/backend/package-lock.json
+index 6d1e7b57..57d52f70 100644
+--- a/backend/package-lock.json
++++ b/backend/package-lock.json
+@@ -9,11 +9,13 @@
+       "version": "1.0.0",
+       "license": "MIT",
+       "dependencies": {
++        "@azure/app-configuration": "^1.11.0",
+         "@azure/cosmos": "^4.0.0",
+         "@azure/identity": "^4.0.0",
+         "cors": "^2.8.5",
+         "dotenv": "^16.4.0",
+         "express": "^4.18.2",
++        "express-oauth2-jwt-bearer": "^1.7.4",
+         "helmet": "^7.1.0",
+         "morgan": "^1.10.0"
+       },
+@@ -50,6 +52,28 @@
+         "node": ">=18.0.0"
+       }
+     },
++    "node_modules/@azure/app-configuration": {
++      "version": "1.11.0",
++      "resolved": "https://registry.npmjs.org/@azure/app-configuration/-/app-configuration-1.11.0.tgz",
++      "integrity": "sha512-ehfTNvVyr4lFKz1Nfynubqg/kEWMFMjCQs8lADDa+U1HG96QIoelMYFbfWIixw4KhOqoCAIOWEp4bAXIZ0/V/w==",
++      "license": "MIT",
++      "dependencies": {
++        "@azure/abort-controller": "^2.0.0",
++        "@azure/core-auth": "^1.3.0",
++        "@azure/core-client": "^1.5.0",
++        "@azure/core-http-compat": "^2.0.0",
++        "@azure/core-lro": "^2.5.1",
++        "@azure/core-paging": "^1.4.0",
++        "@azure/core-rest-pipeline": "^1.6.0",
++        "@azure/core-tracing": "^1.0.0",
++        "@azure/core-util": "^1.6.1",
++        "@azure/logger": "^1.0.0",
++        "tslib": "^2.2.0"
++      },
++      "engines": {
++        "node": ">=20.0.0"
++      }
++    },
+     "node_modules/@azure/core-auth": {
+       "version": "1.10.1",
+       "resolved": "https://registry.npmjs.org/@azure/core-auth/-/core-auth-1.10.1.tgz",
+@@ -708,6 +732,18 @@
+         "url": "https://opencollective.com/express"
+       }
+     },
++    "node_modules/express-oauth2-jwt-bearer": {
++      "version": "1.7.4",
++      "resolved": "https://registry.npmjs.org/express-oauth2-jwt-bearer/-/express-oauth2-jwt-bearer-1.7.4.tgz",
++      "integrity": "sha512-teO/eyvU8OkJXiP4cRuoJMrp31nNvjnL47MIkso0D/21AqUGv1O+VEiLisrDA8xjkaCBTufYnV1zepCOCLK4vg==",
++      "license": "MIT",
++      "dependencies": {
++        "jose": "^4.15.5"
++      },
++      "engines": {
++        "node": "^12.19.0 || ^14.15.0 || ^16.13.0 || ^18.12.0 || ^20.2.0 || ^22.1.0 || ^24.0.0"
++      }
++    },
+     "node_modules/fast-json-stable-stringify": {
+       "version": "2.1.0",
+       "resolved": "https://registry.npmjs.org/fast-json-stable-stringify/-/fast-json-stable-stringify-2.1.0.tgz",
+@@ -1008,6 +1044,15 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
++    "node_modules/jose": {
++      "version": "4.15.9",
++      "resolved": "https://registry.npmjs.org/jose/-/jose-4.15.9.tgz",
++      "integrity": "sha512-1vUQX+IdDMVPj4k8kOxgUqlcK518yluMuGZwqlr44FS1ppZB/5GWh4rZG89erpOBOJjU/OBsnCVFfapsRz6nEA==",
++      "license": "MIT",
++      "funding": {
++        "url": "https://github.com/sponsors/panva"
++      }
++    },
+     "node_modules/jsonwebtoken": {
+       "version": "9.0.3",
+       "resolved": "https://registry.npmjs.org/jsonwebtoken/-/jsonwebtoken-9.0.3.tgz",
+diff --git a/backend/package.json b/backend/package.json
+index 5305b578..6a8a627e 100644
+--- a/backend/package.json
++++ b/backend/package.json
+@@ -9,17 +9,23 @@
+     "dev": "node --watch server.js",
+     "test": "echo \"Error: no test specified\" && exit 1"
+   },
+-  "keywords": ["workout", "azure", "cosmosdb", "api"],
++  "keywords": [
++    "workout",
++    "azure",
++    "cosmosdb",
++    "api"
++  ],
+   "author": "",
+   "license": "MIT",
+   "dependencies": {
++    "@azure/app-configuration": "^1.11.0",
+     "@azure/cosmos": "^4.0.0",
+     "@azure/identity": "^4.0.0",
++    "dotenv": "^16.4.0",
+     "express": "^4.18.2",
+-    "cors": "^2.8.5",
++    "express-oauth2-jwt-bearer": "^1.7.4",
+     "helmet": "^7.1.0",
+-    "morgan": "^1.10.0",
+-    "dotenv": "^16.4.0"
++    "morgan": "^1.10.0"
+   },
+   "engines": {
+     "node": ">=20.0.0"
+diff --git a/backend/server.js b/backend/server.js
+index f5f173f3..16300084 100644
+--- a/backend/server.js
++++ b/backend/server.js
+@@ -1,78 +1,36 @@
+ import 'dotenv/config';
+ import express from 'express';
+-import cors from 'cors';
+ import helmet from 'helmet';
+ import morgan from 'morgan';
+ import { CosmosClient } from '@azure/cosmos';
+ import { DefaultAzureCredential } from '@azure/identity';
+ import { workoutDays, loggedWorkouts, exercises } from './seed-data.js';
++import { createRequireAuth } from './middleware/auth.js';
++import { fetchAppConfig } from './startup/appConfig.js';
+ 
+ const app = express();
+ const PORT = process.env.PORT || 3000;
+ 
+-// Middleware
++// Middleware that does NOT depend on async config — safe to register now
+ app.use(helmet());
+ 
+-// CORS Configuration
+-// Allow requests from the frontend Static Web App
+-const allowedOrigins = process.env.FRONTEND_URL 
+-  ? [process.env.FRONTEND_URL] 
+-  : ['http://localhost:5173']; // Fallback for local development
+-
+-app.use(cors({
+-  origin: function (origin, callback) {
+-    // Allow requests with no origin (like mobile apps, curl, Postman)
+-    if (!origin) return callback(null, true);
+-    
+-    if (allowedOrigins.indexOf(origin) !== -1) {
+-      callback(null, true);
+-    } else {
+-      console.warn(`⚠️ CORS blocked request from origin: ${origin}`);
+-      callback(new Error('Not allowed by CORS'));
+-    }
+-  },
+-  credentials: false,
+-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+-  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id']
+-}));
+-
+ app.use(express.json());
+ app.use(morgan('combined'));
+ 
+-// Environment variables
+-const COSMOS_ENDPOINT = process.env.COSMOS_DB_ENDPOINT;
+-const DATABASE_NAME = process.env.COSMOS_DB_DATABASE_NAME || 'WorkoutTrackerDB';
+-const CONTAINER_NAME = process.env.COSMOS_DB_CONTAINER_NAME || 'workouts';
+-
+-// Initialize Cosmos DB client with Azure Identity (passwordless!)
+-let container;
+-try {
+-  const credential = new DefaultAzureCredential();
+-  const client = new CosmosClient({
+-    endpoint: COSMOS_ENDPOINT,
+-    aadCredentials: credential
+-  });
+-  
+-  const database = client.database(DATABASE_NAME);
+-  container = database.container(CONTAINER_NAME);
+-  console.log('✅ Connected to Cosmos DB using Azure Identity');
+-} catch (error) {
+-  console.error('❌ Failed to connect to Cosmos DB:', error);
+-  process.exit(1);
+-}
++async function startServer() {
++  // Step 1: Fetch AUTH0_DOMAIN and AUTH0_AUDIENCE from Azure App Configuration.
++  // This must happen before createRequireAuth() is called.
++  const { auth0Domain, auth0Audience, cosmosDbEndpoint } = await fetchAppConfig();
+ 
+-// Health check endpoint
+-app.get('/health', (req, res) => {
+-  res.json({ 
+-    status: 'healthy', 
+-    timestamp: new Date().toISOString(),
+-    database: DATABASE_NAME,
+-    container: CONTAINER_NAME
+-  });
+-});
++  // Step 2: Build the Auth0 JWT middleware now that we have the values.
++  const requireAuth = createRequireAuth({ auth0Domain, auth0Audience });
+ 
+-// Database initialization endpoint (admin only)
+-app.post('/api/admin/init-database', async (req, res) => {
++  // Step 3: Initialize Cosmos DB client.
++  const COSMOS_ENDPOINT = cosmosDbEndpoint;
++  const DATABASE_NAME = process.env.COSMOS_DB_DATABASE_NAME || 'WorkoutTrackerDB';
++  const CONTAINER_NAME = process.env.COSMOS_DB_CONTAINER_NAME || 'workouts';
++
++  let container;
+   try {
+     const credential = new DefaultAzureCredential();
+     const client = new CosmosClient({
+@@ -80,433 +38,470 @@ app.post('/api/admin/init-database', async (req, res) => {
+       aadCredentials: credential
+     });
+ 
+-    // Create database if it doesn't exist
+-    const { database } = await client.databases.createIfNotExists({
+-      id: DATABASE_NAME
++    const database = client.database(DATABASE_NAME);
++    container = database.container(CONTAINER_NAME);
++    console.log('✅ Connected to Cosmos DB using Azure Identity');
++  } catch (error) {
++    console.error('❌ Failed to connect to Cosmos DB:', error);
++    process.exit(1);
++  }
++
++  // Step 4: Register all routes.
++  // requireAuth and container are in scope via closure.
++
++  // Health check endpoint
++  app.get('/health', (req, res) => {
++    res.json({
++      status: 'healthy',
++      timestamp: new Date().toISOString(),
++      database: DATABASE_NAME,
++      container: CONTAINER_NAME
+     });
++  });
++
++  // Database initialization endpoint (admin only)
++  app.post('/api/admin/init-database', requireAuth, async (req, res) => {
++    try {
++      const credential = new DefaultAzureCredential();
++      const client = new CosmosClient({
++        endpoint: COSMOS_ENDPOINT,
++        aadCredentials: credential
++      });
++
++      // Create database if it doesn't exist
++      const { database } = await client.databases.createIfNotExists({
++        id: DATABASE_NAME
++      });
+ 
+-    // Create container if it doesn't exist
+-    const { container: newContainer } = await database.containers.createIfNotExists({
+-      id: CONTAINER_NAME,
+-      partitionKey: {
+-        paths: ['/userId']
++      // Create container if it doesn't exist
++      const { container: newContainer } = await database.containers.createIfNotExists({
++        id: CONTAINER_NAME,
++        partitionKey: {
++          paths: ['/userId']
++        }
++      });
++
++      // Seed data
++      const seededData = {
++        workoutDays: 0,
++        loggedWorkouts: 0,
++        exercises: 0
++      };
++
++      // Seed workout day definitions
++      for (const day of workoutDays) {
++        try {
++          const dayDoc = {
++            id: `workout-day-${day.dayNumber}`,
++            type: 'workout-day-definition',
++            ...day,
++            createdAt: new Date().toISOString()
++          };
++          await newContainer.items.upsert(dayDoc);
++          seededData.workoutDays++;
++        } catch (err) {
++          console.error(`Failed to seed workout day ${day.dayNumber}:`, err.message);
++        }
+       }
+-    });
+ 
+-    // Seed data
+-    const seededData = {
+-      workoutDays: 0,
+-      loggedWorkouts: 0,
+-      exercises: 0
+-    };
+-
+-    // Seed workout day definitions
+-    for (const day of workoutDays) {
+-      try {
+-        const dayDoc = {
+-          id: `workout-day-${day.dayNumber}`,
+-          type: 'workout-day-definition',
+-          ...day,
+-          createdAt: new Date().toISOString()
+-        };
+-        await newContainer.items.upsert(dayDoc);
+-        seededData.workoutDays++;
+-      } catch (err) {
+-        console.error(`Failed to seed workout day ${day.dayNumber}:`, err.message);
++      // Seed logged workouts (historical data)
++      for (const workout of loggedWorkouts) {
++        try {
++          const workoutDoc = {
++            id: `logged-workout-${workout.date}-day${workout.dayNumber}`,
++            type: 'logged-workout',
++            userId: workout.userId,
++            dayNumber: workout.dayNumber,
++            dayName: workout.dayName,
++            date: workout.date,
++            timestamp: new Date(workout.date).toISOString(),
++            createdAt: new Date().toISOString()
++          };
++          await newContainer.items.upsert(workoutDoc);
++          seededData.loggedWorkouts++;
++        } catch (err) {
++          console.error(`Failed to seed logged workout for ${workout.date}:`, err.message);
++        }
+       }
+-    }
+ 
+-    // Seed logged workouts (historical data)
+-    for (const workout of loggedWorkouts) {
+-      try {
+-        const workoutDoc = {
+-          id: `logged-workout-${workout.date}-day${workout.dayNumber}`,
+-          type: 'logged-workout',
+-          userId: workout.userId,
+-          dayNumber: workout.dayNumber,
+-          dayName: workout.dayName,
+-          date: workout.date,
+-          timestamp: new Date(workout.date).toISOString(),
+-          createdAt: new Date().toISOString()
+-        };
+-        await newContainer.items.upsert(workoutDoc);
+-        seededData.loggedWorkouts++;
+-      } catch (err) {
+-        console.error(`Failed to seed logged workout for ${workout.date}:`, err.message);
++      // Seed exercise library
++      for (const exercise of exercises) {
++        try {
++          const exerciseDoc = {
++            id: `exercise-${exercise.dayNumber}-${exercise.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
++            type: 'exercise',
++            ...exercise,
++            createdAt: new Date().toISOString()
++          };
++          await newContainer.items.upsert(exerciseDoc);
++          seededData.exercises++;
++        } catch (err) {
++          console.error(`Failed to seed exercise ${exercise.name}:`, err.message);
++        }
+       }
++
++      res.json({
++        success: true,
++        message: 'Database initialized and seeded successfully',
++        database: DATABASE_NAME,
++        container: CONTAINER_NAME,
++        created: {
++          database: database ? true : false,
++          container: newContainer ? true : false
++        },
++        seeded: seededData
++      });
++    } catch (error) {
++      console.error('Error initializing database:', error);
++      res.status(500).json({
++        success: false,
++        error: 'Failed to initialize database',
++        message: error.message
++      });
+     }
++  });
++
++  // Get workout day definition by day number
++  app.get('/api/workout-days/:dayNumber', async (req, res) => {
++    try {
++      const dayNumber = parseInt(req.params.dayNumber);
++
++      if (isNaN(dayNumber) || dayNumber < 1 || dayNumber > 12) {
++        return res.status(400).json({ error: 'Invalid day number. Must be between 1 and 12.' });
++      }
+ 
+-    // Seed exercise library
+-    for (const exercise of exercises) {
+-      try {
+-        const exerciseDoc = {
+-          id: `exercise-${exercise.dayNumber}-${exercise.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
+-          type: 'exercise',
+-          ...exercise,
+-          createdAt: new Date().toISOString()
+-        };
+-        await newContainer.items.upsert(exerciseDoc);
+-        seededData.exercises++;
+-      } catch (err) {
+-        console.error(`Failed to seed exercise ${exercise.name}:`, err.message);
++      const querySpec = {
++        query: 'SELECT * FROM c WHERE c.type = @type AND c.dayNumber = @dayNumber',
++        parameters: [
++          { name: '@type', value: 'workout-day-definition' },
++          { name: '@dayNumber', value: dayNumber }
++        ]
++      };
++
++      const { resources } = await container.items.query(querySpec).fetchAll();
++
++      if (resources.length === 0) {
++        return res.status(404).json({ error: 'Workout day not found' });
+       }
++
++      res.json({ workoutDay: resources[0] });
++    } catch (error) {
++      console.error('Error fetching workout day:', error);
++      res.status(500).json({ error: 'Failed to fetch workout day', message: error.message });
+     }
++  });
+ 
+-    res.json({
+-      success: true,
+-      message: 'Database initialized and seeded successfully',
+-      database: DATABASE_NAME,
+-      container: CONTAINER_NAME,
+-      created: {
+-        database: database ? true : false,
+-        container: newContainer ? true : false
+-      },
+-      seeded: seededData
+-    });
+-  } catch (error) {
+-    console.error('Error initializing database:', error);
+-    res.status(500).json({
+-      success: false,
+-      error: 'Failed to initialize database',
+-      message: error.message
+-    });
+-  }
+-});
++  // Get exercises for a specific day
++  app.get('/api/exercises/day/:dayNumber', async (req, res) => {
++    try {
++      const dayNumber = parseInt(req.params.dayNumber);
+ 
+-// Get workout day definition by day number
+-app.get('/api/workout-days/:dayNumber', async (req, res) => {
+-  try {
+-    const dayNumber = parseInt(req.params.dayNumber);
+-    
+-    if (isNaN(dayNumber) || dayNumber < 1 || dayNumber > 12) {
+-      return res.status(400).json({ error: 'Invalid day number. Must be between 1 and 12.' });
++      if (isNaN(dayNumber) || dayNumber < 1 || dayNumber > 12) {
++        return res.status(400).json({ error: 'Invalid day number. Must be between 1 and 12.' });
++      }
++
++      const querySpec = {
++        query: 'SELECT * FROM c WHERE c.type = @type AND c.dayNumber = @dayNumber',
++        parameters: [
++          { name: '@type', value: 'exercise' },
++          { name: '@dayNumber', value: dayNumber }
++        ]
++      };
++
++      const { resources: exercises } = await container.items.query(querySpec).fetchAll();
++
++      res.json({ exercises });
++    } catch (error) {
++      console.error('Error fetching exercises:', error);
++      res.status(500).json({ error: 'Failed to fetch exercises', message: error.message });
+     }
+-    
+-    const querySpec = {
+-      query: 'SELECT * FROM c WHERE c.type = @type AND c.dayNumber = @dayNumber',
+-      parameters: [
+-        { name: '@type', value: 'workout-day-definition' },
+-        { name: '@dayNumber', value: dayNumber }
+-      ]
+-    };
+-    
+-    const { resources } = await container.items.query(querySpec).fetchAll();
+-    
+-    if (resources.length === 0) {
+-      return res.status(404).json({ error: 'Workout day not found' });
++  });
++
++  // Get logged workouts for a user
++  app.get('/api/logged-workouts', requireAuth, async (req, res) => {
++    try {
++      const userId = req.auth.payload.sub;
++
++      const querySpec = {
++        query: 'SELECT * FROM c WHERE c.type = @type AND c.userId = @userId ORDER BY c.date DESC',
++        parameters: [
++          { name: '@type', value: 'logged-workout' },
++          { name: '@userId', value: userId }
++        ]
++      };
++
++      const { resources: workouts } = await container.items.query(querySpec).fetchAll();
++
++      res.json({ workouts });
++    } catch (error) {
++      console.error('Error fetching logged workouts:', error);
++      res.status(500).json({ error: 'Failed to fetch logged workouts', message: error.message });
+     }
+-    
+-    res.json({ workoutDay: resources[0] });
+-  } catch (error) {
+-    console.error('Error fetching workout day:', error);
+-    res.status(500).json({ error: 'Failed to fetch workout day', message: error.message });
+-  }
+-});
++  });
+ 
+-// Get exercises for a specific day
+-app.get('/api/exercises/day/:dayNumber', async (req, res) => {
+-  try {
+-    const dayNumber = parseInt(req.params.dayNumber);
+-    
+-    if (isNaN(dayNumber) || dayNumber < 1 || dayNumber > 12) {
+-      return res.status(400).json({ error: 'Invalid day number. Must be between 1 and 12.' });
++  // Log a completed workout (quick mode)
++  app.post('/api/log-workout', requireAuth, async (req, res) => {
++    try {
++      const userId = req.auth.payload.sub;
++      const { dayNumber, dayName, mode, exercises: completedExercises } = req.body;
++
++      if (!dayNumber) {
++        return res.status(400).json({ error: 'Missing required field: dayNumber' });
++      }
++
++      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
++
++      const workoutDoc = {
++        id: `logged-workout-${today}-day${dayNumber}-${Date.now()}`,
++        type: 'logged-workout',
++        userId,
++        dayNumber,
++        dayName,
++        date: today,
++        mode: mode || 'quick', // 'quick' or 'detailed'
++        exercises: completedExercises || [],
++        timestamp: new Date().toISOString(),
++        createdAt: new Date().toISOString()
++      };
++
++      const { resource } = await container.items.create(workoutDoc);
++
++      res.status(201).json({ workout: resource });
++    } catch (error) {
++      console.error('Error logging workout:', error);
++      res.status(500).json({ error: 'Failed to log workout', message: error.message });
+     }
+-    
+-    const querySpec = {
+-      query: 'SELECT * FROM c WHERE c.type = @type AND c.dayNumber = @dayNumber',
+-      parameters: [
+-        { name: '@type', value: 'exercise' },
+-        { name: '@dayNumber', value: dayNumber }
+-      ]
+-    };
+-    
+-    const { resources: exercises } = await container.items.query(querySpec).fetchAll();
+-    
+-    res.json({ exercises });
+-  } catch (error) {
+-    console.error('Error fetching exercises:', error);
+-    res.status(500).json({ error: 'Failed to fetch exercises', message: error.message });
+-  }
+-});
++  });
+ 
+-// Get logged workouts for a user
+-app.get('/api/logged-workouts', async (req, res) => {
+-  try {
+-    const userId = req.headers['x-user-id'] || 'cf57d57d-1411-4f59-b517-e9a8600b140a';
+-    
+-    const querySpec = {
+-      query: 'SELECT * FROM c WHERE c.type = @type AND c.userId = @userId ORDER BY c.date DESC',
+-      parameters: [
+-        { name: '@type', value: 'logged-workout' },
+-        { name: '@userId', value: userId }
+-      ]
+-    };
+-    
+-    const { resources: workouts } = await container.items.query(querySpec).fetchAll();
+-    
+-    res.json({ workouts });
+-  } catch (error) {
+-    console.error('Error fetching logged workouts:', error);
+-    res.status(500).json({ error: 'Failed to fetch logged workouts', message: error.message });
+-  }
+-});
++  // Get all workouts for a user (legacy endpoint - returns old format)
++  app.get('/api/workouts', requireAuth, async (req, res) => {
++    try {
++      const userId = req.auth.payload.sub;
+ 
+-// Log a completed workout (quick mode)
+-app.post('/api/log-workout', async (req, res) => {
+-  try {
+-    const userId = req.headers['x-user-id'] || 'cf57d57d-1411-4f59-b517-e9a8600b140a';
+-    const { dayNumber, dayName, mode, exercises: completedExercises } = req.body;
+-    
+-    if (!dayNumber) {
+-      return res.status(400).json({ error: 'Missing required field: dayNumber' });
++      const querySpec = {
++        query: 'SELECT * FROM c WHERE c.type = @type AND c.userId = @userId ORDER BY c.date DESC',
++        parameters: [
++          { name: '@type', value: 'logged-workout' },
++          { name: '@userId', value: userId }
++        ]
++      };
++
++      const { resources: loggedWorkouts } = await container.items
++        .query(querySpec)
++        .fetchAll();
++
++      // Transform to old format for compatibility
++      const workouts = loggedWorkouts.map(lw => ({
++        id: lw.id,
++        day: lw.dayNumber,
++        dayName: lw.dayName,
++        date: lw.timestamp || lw.date,
++        exercises: lw.exercises || []
++      }));
++
++      res.json({ workouts });
++    } catch (error) {
++      console.error('Error fetching workouts:', error);
++      res.status(500).json({ error: 'Failed to fetch workouts', message: error.message });
+     }
+-    
+-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+-    
+-    const workoutDoc = {
+-      id: `logged-workout-${today}-day${dayNumber}-${Date.now()}`,
+-      type: 'logged-workout',
+-      userId,
+-      dayNumber,
+-      dayName,
+-      date: today,
+-      mode: mode || 'quick', // 'quick' or 'detailed'
+-      exercises: completedExercises || [],
+-      timestamp: new Date().toISOString(),
+-      createdAt: new Date().toISOString()
+-    };
+-    
+-    const { resource } = await container.items.create(workoutDoc);
+-    
+-    res.status(201).json({ workout: resource });
+-  } catch (error) {
+-    console.error('Error logging workout:', error);
+-    res.status(500).json({ error: 'Failed to log workout', message: error.message });
+-  }
+-});
++  });
+ 
+-// Get all workouts for a user (legacy endpoint - returns old format)
+-app.get('/api/workouts', async (req, res) => {
+-  try {
+-    const userId = req.headers['x-user-id'] || 'cf57d57d-1411-4f59-b517-e9a8600b140a';
+-    
+-    const querySpec = {
+-      query: 'SELECT * FROM c WHERE c.type = @type AND c.userId = @userId ORDER BY c.date DESC',
+-      parameters: [
+-        { name: '@type', value: 'logged-workout' },
+-        { name: '@userId', value: userId }
+-      ]
+-    };
+-    
+-    const { resources: loggedWorkouts } = await container.items
+-      .query(querySpec)
+-      .fetchAll();
+-    
+-    // Transform to old format for compatibility
+-    const workouts = loggedWorkouts.map(lw => ({
+-      id: lw.id,
+-      day: lw.dayNumber,
+-      dayName: lw.dayName,
+-      date: lw.timestamp || lw.date,
+-      exercises: lw.exercises || []
+-    }));
+-    
+-    res.json({ workouts });
+-  } catch (error) {
+-    console.error('Error fetching workouts:', error);
+-    res.status(500).json({ error: 'Failed to fetch workouts', message: error.message });
+-  }
+-});
++  // Get workouts by day
++  app.get('/api/workouts/day/:dayNumber', requireAuth, async (req, res) => {
++    try {
++      const userId = req.auth.payload.sub;
++      const dayNumber = parseInt(req.params.dayNumber);
+ 
+-// Get workouts by day
+-app.get('/api/workouts/day/:dayNumber', async (req, res) => {
+-  try {
+-    const userId = req.headers['x-user-id'] || 'anonymous';
+-    const dayNumber = parseInt(req.params.dayNumber);
+-    
+-    if (isNaN(dayNumber) || dayNumber < 1 || dayNumber > 12) {
+-      return res.status(400).json({ error: 'Invalid day number. Must be between 1 and 12.' });
++      if (isNaN(dayNumber) || dayNumber < 1 || dayNumber > 12) {
++        return res.status(400).json({ error: 'Invalid day number. Must be between 1 and 12.' });
++      }
++
++      const querySpec = {
++        query: 'SELECT * FROM c WHERE c.userId = @userId AND c.dayNumber = @dayNumber ORDER BY c.timestamp DESC',
++        parameters: [
++          { name: '@userId', value: userId },
++          { name: '@dayNumber', value: dayNumber }
++        ]
++      };
++
++      const { resources: workouts } = await container.items
++        .query(querySpec)
++        .fetchAll();
++
++      res.json({ workouts });
++    } catch (error) {
++      console.error('Error fetching workouts by day:', error);
++      res.status(500).json({ error: 'Failed to fetch workouts', message: error.message });
+     }
+-    
+-    const querySpec = {
+-      query: 'SELECT * FROM c WHERE c.userId = @userId AND c.dayNumber = @dayNumber ORDER BY c.timestamp DESC',
+-      parameters: [
+-        { name: '@userId', value: userId },
+-        { name: '@dayNumber', value: dayNumber }
+-      ]
+-    };
+-    
+-    const { resources: workouts } = await container.items
+-      .query(querySpec)
+-      .fetchAll();
+-    
+-    res.json({ workouts });
+-  } catch (error) {
+-    console.error('Error fetching workouts by day:', error);
+-    res.status(500).json({ error: 'Failed to fetch workouts', message: error.message });
+-  }
+-});
++  });
+ 
+-// Create a new workout
+-app.post('/api/workouts', async (req, res) => {
+-  try {
+-    const userId = req.headers['x-user-id'] || 'anonymous';
+-    const workout = req.body;
+-    
+-    // Validate required fields
+-    if (!workout.dayNumber || !workout.exercise) {
+-      return res.status(400).json({ error: 'Missing required fields: dayNumber and exercise' });
++  // Create a new workout
++  app.post('/api/workouts', requireAuth, async (req, res) => {
++    try {
++      const userId = req.auth.payload.sub;
++      const workout = req.body;
++
++      // Validate required fields
++      if (!workout.dayNumber || !workout.exercise) {
++        return res.status(400).json({ error: 'Missing required fields: dayNumber and exercise' });
++      }
++
++      // Prepare workout document
++      const workoutDoc = {
++        id: crypto.randomUUID(),
++        userId,
++        ...workout,
++        timestamp: workout.timestamp || new Date().toISOString(),
++        createdAt: new Date().toISOString()
++      };
++
++      const { resource: createdWorkout } = await container.items.create(workoutDoc);
++
++      res.status(201).json({ workout: createdWorkout });
++    } catch (error) {
++      console.error('Error creating workout:', error);
++      res.status(500).json({ error: 'Failed to create workout', message: error.message });
+     }
+-    
+-    // Prepare workout document
+-    const workoutDoc = {
+-      id: crypto.randomUUID(),
+-      userId,
+-      ...workout,
+-      timestamp: workout.timestamp || new Date().toISOString(),
+-      createdAt: new Date().toISOString()
+-    };
+-    
+-    const { resource: createdWorkout } = await container.items.create(workoutDoc);
+-    
+-    res.status(201).json({ workout: createdWorkout });
+-  } catch (error) {
+-    console.error('Error creating workout:', error);
+-    res.status(500).json({ error: 'Failed to create workout', message: error.message });
+-  }
+-});
++  });
+ 
+-// Bulk import workouts (for migration)
+-app.post('/api/workouts/bulk', async (req, res) => {
+-  try {
+-    const userId = req.headers['x-user-id'] || 'anonymous';
+-    const { workouts } = req.body;
+-    
+-    if (!Array.isArray(workouts)) {
+-      return res.status(400).json({ error: 'Request body must contain an array of workouts' });
++  // Bulk import workouts (for migration)
++  app.post('/api/workouts/bulk', requireAuth, async (req, res) => {
++    try {
++      const userId = req.auth.payload.sub;
++      const { workouts } = req.body;
++
++      if (!Array.isArray(workouts)) {
++        return res.status(400).json({ error: 'Request body must contain an array of workouts' });
++      }
++
++      const results = [];
++      const errors = [];
++
++      for (const workout of workouts) {
++        try {
++          const workoutDoc = {
++            id: workout.id || crypto.randomUUID(),
++            userId,
++            ...workout,
++            timestamp: workout.timestamp || new Date().toISOString(),
++            createdAt: new Date().toISOString()
++          };
++
++          const { resource } = await container.items.create(workoutDoc);
++          results.push(resource);
++        } catch (error) {
++          errors.push({ workout, error: error.message });
++        }
++      }
++
++      res.status(201).json({
++        success: results.length,
++        failed: errors.length,
++        workouts: results,
++        errors: errors.length > 0 ? errors : undefined
++      });
++    } catch (error) {
++      console.error('Error bulk importing workouts:', error);
++      res.status(500).json({ error: 'Failed to import workouts', message: error.message });
+     }
+-    
+-    const results = [];
+-    const errors = [];
+-    
+-    for (const workout of workouts) {
+-      try {
+-        const workoutDoc = {
+-          id: workout.id || crypto.randomUUID(),
+-          userId,
+-          ...workout,
+-          timestamp: workout.timestamp || new Date().toISOString(),
+-          createdAt: new Date().toISOString()
+-        };
+-        
+-        const { resource } = await container.items.create(workoutDoc);
+-        results.push(resource);
+-      } catch (error) {
+-        errors.push({ workout, error: error.message });
++  });
++
++  // Delete a workout
++  app.delete('/api/workouts/:id', requireAuth, async (req, res) => {
++    try {
++      const userId = req.auth.payload.sub;
++      const workoutId = req.params.id;
++
++      // Delete the workout
++      await container.item(workoutId, userId).delete();
++
++      res.json({ message: 'Workout deleted successfully', id: workoutId });
++    } catch (error) {
++      if (error.code === 404) {
++        return res.status(404).json({ error: 'Workout not found' });
+       }
++      console.error('Error deleting workout:', error);
++      res.status(500).json({ error: 'Failed to delete workout', message: error.message });
+     }
+-    
+-    res.status(201).json({
+-      success: results.length,
+-      failed: errors.length,
+-      workouts: results,
+-      errors: errors.length > 0 ? errors : undefined
+-    });
+-  } catch (error) {
+-    console.error('Error bulk importing workouts:', error);
+-    res.status(500).json({ error: 'Failed to import workouts', message: error.message });
+-  }
+-});
++  });
+ 
+-// Delete a workout
+-app.delete('/api/workouts/:id', async (req, res) => {
+-  try {
+-    const userId = req.headers['x-user-id'] || 'anonymous';
+-    const workoutId = req.params.id;
+-    
+-    // Delete the workout
+-    await container.item(workoutId, userId).delete();
+-    
+-    res.json({ message: 'Workout deleted successfully', id: workoutId });
+-  } catch (error) {
+-    if (error.code === 404) {
+-      return res.status(404).json({ error: 'Workout not found' });
++  // Get current day (user-specific)
++  app.get('/api/current-day', requireAuth, async (req, res) => {
++    try {
++      const userId = req.auth.payload.sub;
++
++      // Query for user settings document
++      const querySpec = {
++        query: 'SELECT * FROM c WHERE c.userId = @userId AND c.type = @type',
++        parameters: [
++          { name: '@userId', value: userId },
++          { name: '@type', value: 'settings' }
++        ]
++      };
++
++      const { resources: settings } = await container.items
++        .query(querySpec)
++        .fetchAll();
++
++      const currentDay = settings[0]?.currentDay || 1;
++      res.json({ currentDay });
++    } catch (error) {
++      console.error('Error fetching current day:', error);
++      res.status(500).json({ error: 'Failed to fetch current day', message: error.message });
+     }
+-    console.error('Error deleting workout:', error);
+-    res.status(500).json({ error: 'Failed to delete workout', message: error.message });
+-  }
+-});
++  });
+ 
+-// Get current day (user-specific)
+-app.get('/api/current-day', async (req, res) => {
+-  try {
+-    const userId = req.headers['x-user-id'] || 'anonymous';
+-    
+-    // Query for user settings document
+-    const querySpec = {
+-      query: 'SELECT * FROM c WHERE c.userId = @userId AND c.type = @type',
+-      parameters: [
+-        { name: '@userId', value: userId },
+-        { name: '@type', value: 'settings' }
+-      ]
+-    };
+-    
+-    const { resources: settings } = await container.items
+-      .query(querySpec)
+-      .fetchAll();
+-    
+-    const currentDay = settings[0]?.currentDay || 1;
+-    res.json({ currentDay });
+-  } catch (error) {
+-    console.error('Error fetching current day:', error);
+-    res.status(500).json({ error: 'Failed to fetch current day', message: error.message });
+-  }
+-});
++  // Update current day
++  app.put('/api/current-day', requireAuth, async (req, res) => {
++    try {
++      const userId = req.auth.payload.sub;
++      const { currentDay } = req.body;
+ 
+-// Update current day
+-app.put('/api/current-day', async (req, res) => {
+-  try {
+-    const userId = req.headers['x-user-id'] || 'anonymous';
+-    const { currentDay } = req.body;
+-    
+-    if (!currentDay || currentDay < 1 || currentDay > 12) {
+-      return res.status(400).json({ error: 'Invalid day number. Must be between 1 and 12.' });
++      if (!currentDay || currentDay < 1 || currentDay > 12) {
++        return res.status(400).json({ error: 'Invalid day number. Must be between 1 and 12.' });
++      }
++
++      // Upsert user settings
++      const settingsDoc = {
++        id: `settings_${userId}`,
++        userId,
++        type: 'settings',
++        currentDay,
++        updatedAt: new Date().toISOString()
++      };
++
++      const { resource } = await container.items.upsert(settingsDoc);
++      res.json({ currentDay: resource.currentDay });
++    } catch (error) {
++      console.error('Error updating current day:', error);
++      res.status(500).json({ error: 'Failed to update current day', message: error.message });
+     }
+-    
+-    // Upsert user settings
+-    const settingsDoc = {
+-      id: `settings_${userId}`,
+-      userId,
+-      type: 'settings',
+-      currentDay,
+-      updatedAt: new Date().toISOString()
+-    };
+-    
+-    const { resource } = await container.items.upsert(settingsDoc);
+-    res.json({ currentDay: resource.currentDay });
+-  } catch (error) {
+-    console.error('Error updating current day:', error);
+-    res.status(500).json({ error: 'Failed to update current day', message: error.message });
+-  }
+-});
++  });
+ 
+-// 404 handler
+-app.use((req, res) => {
+-  res.status(404).json({ error: 'Not found' });
+-});
++  // 404 handler
++  app.use((req, res) => {
++    res.status(404).json({ error: 'Not found' });
++  });
+ 
+-// Error handler
+-app.use((err, req, res, next) => {
+-  console.error('Unhandled error:', err);
+-  res.status(500).json({ error: 'Internal server error', message: err.message });
+-});
++  // Error handler
++  app.use((err, req, res, next) => {
++    console.error('Unhandled error:', err);
++    res.status(500).json({ error: 'Internal server error', message: err.message });
++  });
+ 
+-// Start server
+-app.listen(PORT, () => {
+-  console.log(`🚀 Server running on port ${PORT}`);
+-  console.log(`📊 Database: ${DATABASE_NAME}`);
+-  console.log(`📦 Container: ${CONTAINER_NAME}`);
+-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
++  // Step 5: Start listening only after all setup is complete.
++  app.listen(PORT, () => {
++    console.log(`🚀 Server running on port ${PORT}`);
++    console.log(`📊 Database: ${DATABASE_NAME}`);
++    console.log(`📦 Container: ${CONTAINER_NAME}`);
++    console.log(`🔒 Auth0 domain: ${auth0Domain}`);
++    console.log(`🔗 Health check: http://localhost:${PORT}/health`);
++  });
++}
++
++startServer().catch((error) => {
++  console.error('❌ Fatal startup error:', error);
++  process.exit(1);
+ });
+ 
+ export default app;
+diff --git a/backend/startup/appConfig.js b/backend/startup/appConfig.js
+new file mode 100644
+index 00000000..463b13ae
+--- /dev/null
++++ b/backend/startup/appConfig.js
+@@ -0,0 +1,53 @@
++import { AppConfigurationClient } from '@azure/app-configuration';
++import { DefaultAzureCredential } from '@azure/identity';
++
++/**
++ * Fetches application configuration from Azure App Configuration.
++ *
++ * AZURE_APP_CONFIG_ENDPOINT is infrastructure config (not a secret) and
++ * is injected as a plain environment variable on the Container App.
++ *
++ * @returns {Promise<{ auth0Domain: string, auth0Audience: string, cosmosDbEndpoint: string }>}
++ */
++export async function fetchAppConfig() {
++  const endpoint = process.env.AZURE_APP_CONFIG_ENDPOINT;
++
++  if (!endpoint) {
++    throw new Error(
++      'AZURE_APP_CONFIG_ENDPOINT environment variable is not set. ' +
++      'This must be provided as infra config on the Container App.'
++    );
++  }
++
++  const prefix = process.env.APP_CONFIG_PREFIX;
++
++  if (!prefix) {
++    throw new Error(
++      'APP_CONFIG_PREFIX environment variable is not set. ' +
++      'This must be provided as infra config on the Container App.'
++    );
++  }
++
++  const credential = new DefaultAzureCredential();
++  const client = new AppConfigurationClient(endpoint, credential);
++
++  const [domainSetting, audienceSetting, cosmosEndpointSetting] = await Promise.all([
++    client.getConfigurationSetting({ key: `${prefix}/AUTH0_DOMAIN` }),
++    client.getConfigurationSetting({ key: `${prefix}/AUTH0_AUDIENCE` }),
++    client.getConfigurationSetting({ key: `${prefix}/cosmos_db_endpoint` }),
++  ]);
++
++  const auth0Domain = domainSetting.value;
++  const auth0Audience = audienceSetting.value;
++  const cosmosDbEndpoint = cosmosEndpointSetting.value;
++
++  if (!auth0Domain || !auth0Audience || !cosmosDbEndpoint) {
++    throw new Error(
++      `Azure App Configuration is missing required keys. ` +
++      `Ensure ${prefix}/AUTH0_DOMAIN, ${prefix}/AUTH0_AUDIENCE, and ${prefix}/cosmos_db_endpoint are set in the store.`
++    );
++  }
++
++  console.log('[appConfig] Application config fetched from Azure App Configuration');
++  return { auth0Domain, auth0Audience, cosmosDbEndpoint };
++}
+diff --git a/frontend/Dockerfile b/frontend/Dockerfile
+deleted file mode 100644
+index d80eb572..00000000
+--- a/frontend/Dockerfile
++++ /dev/null
+@@ -1,20 +0,0 @@
+-# Multi-stage build for production
+-FROM node:20-alpine AS builder
+-
+-WORKDIR /app
+-
+-COPY package*.json ./
+-RUN npm ci
+-
+-COPY . .
+-RUN npm run build
+-
+-# Production stage with nginx
+-FROM nginx:alpine
+-
+-COPY --from=builder /app/dist /usr/share/nginx/html
+-COPY nginx.conf /etc/nginx/conf.d/default.conf
+-
+-EXPOSE 80
+-
+-CMD ["nginx", "-g", "daemon off;"]
+diff --git a/frontend/nginx.conf b/frontend/nginx.conf
+deleted file mode 100644
+index d0442d7a..00000000
+--- a/frontend/nginx.conf
++++ /dev/null
+@@ -1,26 +0,0 @@
+-server {
+-    listen 80;
+-    server_name _;
+-    root /usr/share/nginx/html;
+-    index index.html;
+-
+-    # Enable gzip compression
+-    gzip on;
+-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+-
+-    # SPA routing - serve index.html for all routes
+-    location / {
+-        try_files $uri $uri/ /index.html;
+-    }
+-
+-    # Cache static assets
+-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+-        expires 1y;
+-        add_header Cache-Control "public, immutable";
+-    }
+-
+-    # Security headers
+-    add_header X-Frame-Options "SAMEORIGIN" always;
+-    add_header X-Content-Type-Options "nosniff" always;
+-    add_header X-XSS-Protection "1; mode=block" always;
+-}
+diff --git a/frontend/package-lock.json b/frontend/package-lock.json
+index 879fde55..063e801f 100644
+--- a/frontend/package-lock.json
++++ b/frontend/package-lock.json
+@@ -8,6 +8,7 @@
+       "name": "frontend",
+       "version": "1.0.0",
+       "dependencies": {
++        "@auth0/auth0-react": "^2.15.0",
+         "clsx": "^2.1.1",
+         "framer-motion": "^12.34.0",
+         "lucide-react": "^0.564.0",
+@@ -44,6 +45,41 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
++    "node_modules/@auth0/auth0-auth-js": {
++      "version": "1.4.0",
++      "resolved": "https://registry.npmjs.org/@auth0/auth0-auth-js/-/auth0-auth-js-1.4.0.tgz",
++      "integrity": "sha512-ShA7KT4KvcBEtxsXZTcrmoNxai5q1JXhB2aEBFnZD1L6LNLzzmiUWiFTtGMsaaITCylr8TJ/onEQk6XZmUHXbg==",
++      "license": "MIT",
++      "dependencies": {
++        "jose": "^6.0.8",
++        "openid-client": "^6.8.0"
++      }
++    },
++    "node_modules/@auth0/auth0-react": {
++      "version": "2.15.0",
++      "resolved": "https://registry.npmjs.org/@auth0/auth0-react/-/auth0-react-2.15.0.tgz",
++      "integrity": "sha512-LbRU87U54/YW/N3UHtNVoj3mCBBz+iYAdAByQjbXOkpI6IYnjMBwIwDusW3N23XNXq9WnihD57Dyi2R3/Q9btw==",
++      "license": "MIT",
++      "dependencies": {
++        "@auth0/auth0-spa-js": "^2.16.0"
++      },
++      "peerDependencies": {
++        "react": "^16.11.0 || ^17 || ^18 || ~19.0.1 || ~19.1.2 || ^19.2.1",
++        "react-dom": "^16.11.0 || ^17 || ^18 || ~19.0.1 || ~19.1.2 || ^19.2.1"
++      }
++    },
++    "node_modules/@auth0/auth0-spa-js": {
++      "version": "2.16.0",
++      "resolved": "https://registry.npmjs.org/@auth0/auth0-spa-js/-/auth0-spa-js-2.16.0.tgz",
++      "integrity": "sha512-UTP45NqjC2jVc/WaWh+iYOZt6FajpTJc+3WzljbXBiv2f76wDw4Mt9hW/aShBovsRmvKEIHaCifD3c/Gxmo2ZQ==",
++      "license": "MIT",
++      "dependencies": {
++        "@auth0/auth0-auth-js": "^1.4.0",
++        "browser-tabs-lock": "^1.2.15",
++        "dpop": "^2.1.1",
++        "es-cookie": "~1.3.2"
++      }
++    },
+     "node_modules/@babel/code-frame": {
+       "version": "7.29.0",
+       "resolved": "https://registry.npmjs.org/@babel/code-frame/-/code-frame-7.29.0.tgz",
+@@ -1883,6 +1919,16 @@
+         "concat-map": "0.0.1"
+       }
+     },
++    "node_modules/browser-tabs-lock": {
++      "version": "1.3.0",
++      "resolved": "https://registry.npmjs.org/browser-tabs-lock/-/browser-tabs-lock-1.3.0.tgz",
++      "integrity": "sha512-g6nHaobTiT0eMZ7jh16YpD2kcjAp+PInbiVq3M1x6KKaEIVhT4v9oURNIpZLOZ3LQbQ3XYfNhMAb/9hzNLIWrw==",
++      "hasInstallScript": true,
++      "license": "MIT",
++      "dependencies": {
++        "lodash": ">=4.17.21"
++      }
++    },
+     "node_modules/browserslist": {
+       "version": "4.28.1",
+       "resolved": "https://registry.npmjs.org/browserslist/-/browserslist-4.28.1.tgz",
+@@ -2065,6 +2111,15 @@
+         "node": ">=8"
+       }
+     },
++    "node_modules/dpop": {
++      "version": "2.1.1",
++      "resolved": "https://registry.npmjs.org/dpop/-/dpop-2.1.1.tgz",
++      "integrity": "sha512-J0Of2JTiM4h5si0tlbPQ/lkqfZ5wAEVkKYBhkwyyANnPJfWH4VsR5uIkZ+T+OSPIwDYUg1fbd5Mmodd25HjY1w==",
++      "license": "MIT",
++      "funding": {
++        "url": "https://github.com/sponsors/panva"
++      }
++    },
+     "node_modules/electron-to-chromium": {
+       "version": "1.5.286",
+       "resolved": "https://registry.npmjs.org/electron-to-chromium/-/electron-to-chromium-1.5.286.tgz",
+@@ -2086,6 +2141,12 @@
+         "node": ">=10.13.0"
+       }
+     },
++    "node_modules/es-cookie": {
++      "version": "1.3.2",
++      "resolved": "https://registry.npmjs.org/es-cookie/-/es-cookie-1.3.2.tgz",
++      "integrity": "sha512-UTlYYhXGLOy05P/vKVT2Ui7WtC7NiRzGtJyAKKn32g5Gvcjn7KAClLPWlipCtxIus934dFg9o9jXiBL0nP+t9Q==",
++      "license": "MIT"
++    },
+     "node_modules/esbuild": {
+       "version": "0.27.3",
+       "resolved": "https://registry.npmjs.org/esbuild/-/esbuild-0.27.3.tgz",
+@@ -2628,6 +2689,15 @@
+         "jiti": "lib/jiti-cli.mjs"
+       }
+     },
++    "node_modules/jose": {
++      "version": "6.1.3",
++      "resolved": "https://registry.npmjs.org/jose/-/jose-6.1.3.tgz",
++      "integrity": "sha512-0TpaTfihd4QMNwrz/ob2Bp7X04yuxJkjRGi4aKmOqwhov54i6u79oCv7T+C7lo70MKH6BesI3vscD1yb/yzKXQ==",
++      "license": "MIT",
++      "funding": {
++        "url": "https://github.com/sponsors/panva"
++      }
++    },
+     "node_modules/js-tokens": {
+       "version": "4.0.0",
+       "resolved": "https://registry.npmjs.org/js-tokens/-/js-tokens-4.0.0.tgz",
+@@ -2996,6 +3066,12 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
++    "node_modules/lodash": {
++      "version": "4.17.23",
++      "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.23.tgz",
++      "integrity": "sha512-LgVTMpQtIopCi79SJeDiP0TfWi5CNEc/L/aRdTh3yIvmZXTnheWpKjSZhnvMl8iXbC1tFg9gdHHDMLoV7CnG+w==",
++      "license": "MIT"
++    },
+     "node_modules/lodash.merge": {
+       "version": "4.6.2",
+       "resolved": "https://registry.npmjs.org/lodash.merge/-/lodash.merge-4.6.2.tgz",
+@@ -3100,6 +3176,28 @@
+       "dev": true,
+       "license": "MIT"
+     },
++    "node_modules/oauth4webapi": {
++      "version": "3.8.5",
++      "resolved": "https://registry.npmjs.org/oauth4webapi/-/oauth4webapi-3.8.5.tgz",
++      "integrity": "sha512-A8jmyUckVhRJj5lspguklcl90Ydqk61H3dcU0oLhH3Yv13KpAliKTt5hknpGGPZSSfOwGyraNEFmofDYH+1kSg==",
++      "license": "MIT",
++      "funding": {
++        "url": "https://github.com/sponsors/panva"
++      }
++    },
++    "node_modules/openid-client": {
++      "version": "6.8.2",
++      "resolved": "https://registry.npmjs.org/openid-client/-/openid-client-6.8.2.tgz",
++      "integrity": "sha512-uOvTCndr4udZsKihJ68H9bUICrriHdUVJ6Az+4Ns6cW55rwM5h0bjVIzDz2SxgOI84LKjFyjOFvERLzdTUROGA==",
++      "license": "MIT",
++      "dependencies": {
++        "jose": "^6.1.3",
++        "oauth4webapi": "^3.8.4"
++      },
++      "funding": {
++        "url": "https://github.com/sponsors/panva"
++      }
++    },
+     "node_modules/optionator": {
+       "version": "0.9.4",
+       "resolved": "https://registry.npmjs.org/optionator/-/optionator-0.9.4.tgz",
+diff --git a/frontend/package.json b/frontend/package.json
+index a254824a..8df0fec4 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -10,6 +10,7 @@
+     "preview": "vite preview"
+   },
+   "dependencies": {
++    "@auth0/auth0-react": "^2.15.0",
+     "clsx": "^2.1.1",
+     "framer-motion": "^12.34.0",
+     "lucide-react": "^0.564.0",
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 4ba8e964..779b3dc4 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -1,15 +1,19 @@
+ import { useState } from 'react';
+ import { useWorkouts } from './hooks/useWorkouts';
++import { useAuth } from './hooks/useAuth';
+ import { TodayTab } from './components/TodayTab';
+ import { HistoryTab } from './components/HistoryTab';
+ import { MigrationPanel } from './components/MigrationPanel';
+ import { DatabaseInit } from './components/DatabaseInit';
+ import { WorkoutDrawer } from './components/WorkoutDrawer';
++import { AuthGuard } from './components/AuthGuard';
++import { UserProfile } from './components/UserProfile';
+ import { isAdminMode } from './utils/adminMode';
+ 
+ function App() {
+   const [activeTab, setActiveTab] = useState('history');
+-  const { currentDay, setDay } = useWorkouts();
++  const { getToken } = useAuth();
++  const { currentDay, setDay } = useWorkouts(getToken);
+   const [drawerOpen, setDrawerOpen] = useState(false);
+   const [drawerInitialDay, setDrawerInitialDay] = useState(null);
+   const [drawerInitialDate, setDrawerInitialDate] = useState(null);
+@@ -41,6 +45,7 @@ function App() {
+   ];
+ 
+   return (
++    <AuthGuard>
+     <div className="min-h-screen bg-gradient-to-br from-black via-slate-950 to-slate-900 overflow-x-hidden">
+       <div className="max-w-6xl mx-auto px-4 py-6">
+         {/* Minimal Header */}
+@@ -55,9 +60,12 @@ function App() {
+               </div>
+             )}
+           </div>
+-          <div className="text-right">
+-            <div className="text-xs text-slate-500 font-mono">
+-              Build: {__BUILD_NUMBER__}
++          <div className="flex items-center gap-4">
++            <UserProfile />
++            <div className="text-right">
++              <div className="text-xs text-slate-500 font-mono">
++                Build: {__BUILD_NUMBER__}
++              </div>
+             </div>
+           </div>
+         </div>
+@@ -88,13 +96,13 @@ function App() {
+         <div className="bg-slate-900/40 backdrop-blur-md rounded-b-2xl border border-t-0 border-slate-700/50 p-8 min-h-[600px]">
+           {activeTab === 'today' && (
+             <div className="animate-fadeIn">
+-              <TodayTab currentDay={currentDay} onDayChange={setDay} />
++              <TodayTab currentDay={currentDay} onDayChange={setDay} getToken={getToken} />
+             </div>
+           )}
+ 
+           {activeTab === 'history' && (
+             <div className="animate-fadeIn">
+-              <HistoryTab key={refreshKey} onDayClick={handleOpenDrawer} />
++              <HistoryTab key={refreshKey} onDayClick={handleOpenDrawer} getToken={getToken} />
+             </div>
+           )}
+ 
+@@ -118,8 +126,10 @@ function App() {
+         currentDay={currentDay}
+         onSuccess={handleWorkoutSuccess}
+         onOpenDrawer={handleOpenDrawer}
++        getToken={getToken}
+       />
+     </div>
++    </AuthGuard>
+   );
+ }
+ 
+diff --git a/frontend/src/components/AuthGuard.jsx b/frontend/src/components/AuthGuard.jsx
+new file mode 100644
+index 00000000..fa46b18d
+--- /dev/null
++++ b/frontend/src/components/AuthGuard.jsx
+@@ -0,0 +1,37 @@
++import { useAuth } from '../hooks/useAuth';
++
++export function AuthGuard({ children }) {
++  const { isAuthenticated, isLoading, login } = useAuth();
++
++  if (isLoading) {
++    return (
++      <div className="min-h-screen bg-gradient-to-br from-black via-slate-950 to-slate-900 flex items-center justify-center">
++        <div className="text-center">
++          <div className="text-6xl mb-4 animate-pulse">💪</div>
++          <p className="text-slate-400 font-bold uppercase tracking-widest">Loading...</p>
++        </div>
++      </div>
++    );
++  }
++
++  if (!isAuthenticated) {
++    return (
++      <div className="min-h-screen bg-gradient-to-br from-black via-slate-950 to-slate-900 flex items-center justify-center">
++        <div className="text-center max-w-md px-6">
++          <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 mb-4">
++            💪 SYNERGY 12
++          </h1>
++          <p className="text-slate-400 mb-8 text-lg">Sign in to access your workout tracker</p>
++          <button
++            onClick={login}
++            className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white px-12 py-4 rounded-xl font-black text-xl uppercase tracking-wider shadow-lg shadow-cyan-500/30 transition-all hover:scale-105"
++          >
++            Sign In
++          </button>
++        </div>
++      </div>
++    );
++  }
++
++  return children;
++}
+diff --git a/frontend/src/components/HistoryTab.jsx b/frontend/src/components/HistoryTab.jsx
+index d3404efc..ea4b9651 100644
+--- a/frontend/src/components/HistoryTab.jsx
++++ b/frontend/src/components/HistoryTab.jsx
+@@ -3,9 +3,8 @@ import { motion } from 'framer-motion';
+ import { DAY_CONFIG } from '../utils/dayConfig';
+ 
+ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+-const USER_ID = 'cf57d57d-1411-4f59-b517-e9a8600b140a';
+ 
+-export function HistoryTab({ onDayClick }) {
++export function HistoryTab({ onDayClick, getToken }) {
+   const [view, setView] = useState('calendar'); // 'calendar' or 'list'
+   const [calendarPeriod, setCalendarPeriod] = useState('month'); // 'week', 'month', or 'year'
+   const [workouts, setWorkouts] = useState([]);
+@@ -25,10 +24,11 @@ export function HistoryTab({ onDayClick }) {
+   const fetchWorkouts = async () => {
+     setLoading(true);
+     try {
++      const token = await getToken();
+       const response = await fetch(`${API_URL}/api/logged-workouts`, {
+         headers: {
+-          'X-User-ID': USER_ID
+-        }
++          'Authorization': `Bearer ${token}`,
++        },
+       });
+ 
+       if (response.ok) {
+diff --git a/frontend/src/components/MigrationPanel.jsx b/frontend/src/components/MigrationPanel.jsx
+index 97521a69..9c9f3e92 100644
+--- a/frontend/src/components/MigrationPanel.jsx
++++ b/frontend/src/components/MigrationPanel.jsx
+@@ -1,7 +1,9 @@
+ import { useState } from 'react';
+ import { migrateLocalStorageToAPI, hasLocalStorageData, checkMigrationStatus } from '../utils/migration';
++import { useAuth } from '../hooks/useAuth';
+ 
+ export function MigrationPanel() {
++  const { getToken } = useAuth();
+   const [status, setStatus] = useState('idle'); // idle, migrating, success, error
+   const [result, setResult] = useState(null);
+   const [error, setError] = useState(null);
+@@ -14,7 +16,7 @@ export function MigrationPanel() {
+     setError(null);
+ 
+     try {
+-      const migrationResult = await migrateLocalStorageToAPI();
++      const migrationResult = await migrateLocalStorageToAPI(getToken);
+       
+       if (migrationResult.success) {
+         setStatus('success');
+diff --git a/frontend/src/components/TodayTab.jsx b/frontend/src/components/TodayTab.jsx
+index c4893a1a..3abeb004 100644
+--- a/frontend/src/components/TodayTab.jsx
++++ b/frontend/src/components/TodayTab.jsx
+@@ -3,9 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
+ import { DAY_CONFIG } from '../utils/dayConfig';
+ 
+ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+-const USER_ID = 'cf57d57d-1411-4f59-b517-e9a8600b140a';
+ 
+-export function TodayTab({ currentDay, onDayChange }) {
++export function TodayTab({ currentDay, onDayChange, getToken }) {
+   const [mode, setMode] = useState('quick'); // 'quick' or 'detailed'
+   const [workoutDay, setWorkoutDay] = useState(null);
+   const [exercises, setExercises] = useState([]);
+@@ -66,11 +65,12 @@ export function TodayTab({ currentDay, onDayChange }) {
+   const handleQuickLog = async () => {
+     setLogging(true);
+     try {
++      const token = await getToken();
+       const response = await fetch(`${API_URL}/api/log-workout`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+-          'X-User-ID': USER_ID
++          'Authorization': `Bearer ${token}`,
+         },
+         body: JSON.stringify({
+           dayNumber: currentDay,
+@@ -100,11 +100,12 @@ export function TodayTab({ currentDay, onDayChange }) {
+ 
+     setLogging(true);
+     try {
++      const token = await getToken();
+       const response = await fetch(`${API_URL}/api/log-workout`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+-          'X-User-ID': USER_ID
++          'Authorization': `Bearer ${token}`,
+         },
+         body: JSON.stringify({
+           dayNumber: currentDay,
+diff --git a/frontend/src/components/UserProfile.jsx b/frontend/src/components/UserProfile.jsx
+new file mode 100644
+index 00000000..b480032f
+--- /dev/null
++++ b/frontend/src/components/UserProfile.jsx
+@@ -0,0 +1,26 @@
++import { useAuth } from '../hooks/useAuth';
++
++export function UserProfile() {
++  const { user, logout } = useAuth();
++
++  if (!user) return null;
++
++  return (
++    <div className="flex items-center gap-3">
++      {user.picture && (
++        <img
++          src={user.picture}
++          alt={user.name}
++          className="w-8 h-8 rounded-full border-2 border-cyan-500/50"
++        />
++      )}
++      <span className="text-slate-400 text-sm font-medium hidden md:block">{user.email}</span>
++      <button
++        onClick={logout}
++        className="text-xs font-bold uppercase tracking-wide text-slate-500 hover:text-slate-200 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 hover:border-slate-600 px-3 py-1.5 rounded-lg transition-all"
++      >
++        Sign Out
++      </button>
++    </div>
++  );
++}
+diff --git a/frontend/src/components/WorkoutDrawer.jsx b/frontend/src/components/WorkoutDrawer.jsx
+index 87ed354a..71eb3c37 100644
+--- a/frontend/src/components/WorkoutDrawer.jsx
++++ b/frontend/src/components/WorkoutDrawer.jsx
+@@ -3,9 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
+ import { getDayInfo, DAY_CONFIG } from '../utils/dayConfig';
+ 
+ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+-const USER_ID = 'cf57d57d-1411-4f59-b517-e9a8600b140a';
+ 
+-export function WorkoutDrawer({ isOpen, onClose, initialDay = null, initialDate = null, onSuccess, onOpenDrawer, currentDay = 1 }) {
++export function WorkoutDrawer({ isOpen, onClose, initialDay = null, initialDate = null, onSuccess, onOpenDrawer, currentDay = 1, getToken }) {
+   const [selectedDay, setSelectedDay] = useState(initialDay || currentDay);
+   const [selectedDate, setSelectedDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
+   const [mode, setMode] = useState('quick'); // 'quick' or 'detailed'
+@@ -114,11 +113,12 @@ export function WorkoutDrawer({ isOpen, onClose, initialDay = null, initialDate
+   const handleQuickLog = async () => {
+     setLogging(true);
+     try {
++      const token = await getToken();
+       const response = await fetch(`${API_URL}/api/log-workout`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+-          'X-User-ID': USER_ID
++          'Authorization': `Bearer ${token}`,
+         },
+         body: JSON.stringify({
+           dayNumber: selectedDay,
+@@ -150,11 +150,12 @@ export function WorkoutDrawer({ isOpen, onClose, initialDay = null, initialDate
+ 
+     setLogging(true);
+     try {
++      const token = await getToken();
+       const response = await fetch(`${API_URL}/api/log-workout`, {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+-          'X-User-ID': USER_ID
++          'Authorization': `Bearer ${token}`,
+         },
+         body: JSON.stringify({
+           dayNumber: selectedDay,
+diff --git a/frontend/src/hooks/useAuth.js b/frontend/src/hooks/useAuth.js
+new file mode 100644
+index 00000000..c067cb7b
+--- /dev/null
++++ b/frontend/src/hooks/useAuth.js
+@@ -0,0 +1,25 @@
++import { useAuth0 } from '@auth0/auth0-react';
++
++const AUDIENCE = import.meta.env.VITE_AUTH0_AUDIENCE;
++
++export const useAuth = () => {
++  const {
++    isAuthenticated,
++    isLoading,
++    user,
++    loginWithRedirect,
++    logout,
++    getAccessTokenSilently,
++  } = useAuth0();
++
++  const getToken = async () =>
++    getAccessTokenSilently({ authorizationParams: { audience: AUDIENCE } });
++
++  const login = () =>
++    loginWithRedirect({ authorizationParams: { audience: AUDIENCE } });
++
++  const logoutUser = () =>
++    logout({ logoutParams: { returnTo: window.location.origin } });
++
++  return { isAuthenticated, isLoading, user, login, logout: logoutUser, getToken };
++};
+diff --git a/frontend/src/hooks/useWorkouts.js b/frontend/src/hooks/useWorkouts.js
+index 7e588293..294af839 100644
+--- a/frontend/src/hooks/useWorkouts.js
++++ b/frontend/src/hooks/useWorkouts.js
+@@ -1,22 +1,24 @@
+ import { useState, useEffect } from 'react';
+ 
+ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+-const USER_ID = 'cf57d57d-1411-4f59-b517-e9a8600b140a'; // Your Azure AD Object ID
+ 
+-export const useWorkouts = () => {
++export const useWorkouts = (getToken) => {
+   const [currentDay, setCurrentDay] = useState(1);
+   const [workouts, setWorkouts] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState(null);
+ 
++  const authHeaders = async () => ({
++    'Authorization': `Bearer ${await getToken()}`,
++    'Content-Type': 'application/json',
++  });
++
+   // Fetch current day from API
+   useEffect(() => {
+     const fetchCurrentDay = async () => {
+       try {
+         const response = await fetch(`${API_URL}/api/current-day`, {
+-          headers: {
+-            'X-User-ID': USER_ID
+-          }
++          headers: await authHeaders(),
+         });
+         if (response.ok) {
+           const data = await response.json();
+@@ -36,9 +38,7 @@ export const useWorkouts = () => {
+       setError(null);
+       try {
+         const response = await fetch(`${API_URL}/api/workouts`, {
+-          headers: {
+-            'X-User-ID': USER_ID
+-          }
++          headers: await authHeaders(),
+         });
+         
+         if (!response.ok) {
+@@ -62,10 +62,7 @@ export const useWorkouts = () => {
+     try {
+       const response = await fetch(`${API_URL}/api/workouts`, {
+         method: 'POST',
+-        headers: {
+-          'Content-Type': 'application/json',
+-          'X-User-ID': USER_ID
+-        },
++        headers: await authHeaders(),
+         body: JSON.stringify(workout)
+       });
+ 
+@@ -87,9 +84,7 @@ export const useWorkouts = () => {
+     try {
+       const response = await fetch(`${API_URL}/api/workouts/${id}`, {
+         method: 'DELETE',
+-        headers: {
+-          'X-User-ID': USER_ID
+-        }
++        headers: await authHeaders(),
+       });
+ 
+       if (!response.ok) {
+@@ -113,10 +108,7 @@ export const useWorkouts = () => {
+     try {
+       const response = await fetch(`${API_URL}/api/current-day`, {
+         method: 'PUT',
+-        headers: {
+-          'Content-Type': 'application/json',
+-          'X-User-ID': USER_ID
+-        },
++        headers: await authHeaders(),
+         body: JSON.stringify({ currentDay: day })
+       });
+ 
+diff --git a/frontend/src/main.jsx b/frontend/src/main.jsx
+index b9a1a6de..64b1ed8b 100644
+--- a/frontend/src/main.jsx
++++ b/frontend/src/main.jsx
+@@ -1,10 +1,20 @@
+ import { StrictMode } from 'react'
+ import { createRoot } from 'react-dom/client'
++import { Auth0Provider } from '@auth0/auth0-react'
+ import './index.css'
+ import App from './App.jsx'
+ 
+ createRoot(document.getElementById('root')).render(
+   <StrictMode>
+-    <App />
++    <Auth0Provider
++      domain={import.meta.env.VITE_AUTH0_DOMAIN}
++      clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
++      authorizationParams={{
++        redirect_uri: window.location.origin,
++        audience: import.meta.env.VITE_AUTH0_AUDIENCE,
++      }}
++    >
++      <App />
++    </Auth0Provider>
+   </StrictMode>,
+ )
+diff --git a/frontend/src/utils/migration.js b/frontend/src/utils/migration.js
+index f8afb82c..e889dc61 100644
+--- a/frontend/src/utils/migration.js
++++ b/frontend/src/utils/migration.js
+@@ -1,7 +1,6 @@
+ // Migration utility to move data from LocalStorage to Cosmos DB
+ 
+ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+-const USER_ID = 'anonymous'; // TODO: Replace with actual user ID from auth
+ 
+ const MIGRATION_KEY = 'workout-migration-completed';
+ const WORKOUTS_KEY = 'workouts';
+@@ -16,7 +15,7 @@ export const hasLocalStorageData = () => {
+   return workouts && workouts !== '[]';
+ };
+ 
+-export const migrateLocalStorageToAPI = async () => {
++export const migrateLocalStorageToAPI = async (getToken) => {
+   try {
+     // Check if already migrated
+     if (checkMigrationStatus()) {
+@@ -39,14 +38,17 @@ export const migrateLocalStorageToAPI = async () => {
+     console.log(`📦 Found ${workouts.length} workouts in LocalStorage`);
+ 
+     // Migrate workouts
++    const token = await getToken();
++    const authHeaders = {
++      'Content-Type': 'application/json',
++      'Authorization': `Bearer ${token}`,
++    };
++
+     let migratedCount = 0;
+     if (workouts.length > 0) {
+       const response = await fetch(`${API_URL}/api/workouts/bulk`, {
+         method: 'POST',
+-        headers: {
+-          'Content-Type': 'application/json',
+-          'X-User-ID': USER_ID
+-        },
++        headers: authHeaders,
+         body: JSON.stringify({ workouts })
+       });
+ 
+@@ -67,10 +69,7 @@ export const migrateLocalStorageToAPI = async () => {
+     if (currentDay) {
+       const dayResponse = await fetch(`${API_URL}/api/current-day`, {
+         method: 'PUT',
+-        headers: {
+-          'Content-Type': 'application/json',
+-          'X-User-ID': USER_ID
+-        },
++        headers: authHeaders,
+         body: JSON.stringify({ currentDay: parseInt(currentDay) })
+       });
+ 
+diff --git a/tofu/appconfig.tf b/tofu/appconfig.tf
+new file mode 100644
+index 00000000..f05add04
+--- /dev/null
++++ b/tofu/appconfig.tf
+@@ -0,0 +1,29 @@
++# ============================================================================
++# Azure App Configuration Key-Values
++# ============================================================================
++# These keys are read at runtime by the backend via fetchAppConfig() in
++# backend/startup/appConfig.js. The Container App's managed identity has the
++# "App Configuration Data Reader" role assigned in backend.tf.
++
++locals {
++  # Must match the domain hardcoded in provider.tf
++  auth0_domain = "dev-gtdi5x5p0nmticqd.us.auth0.com"
++}
++
++resource "azurerm_app_configuration_key" "auth0_domain" {
++  configuration_store_id = var.azure_app_config_resource_id
++  key                    = "${local.front_app_dns_name}/AUTH0_DOMAIN"
++  value                  = local.auth0_domain
++}
++
++resource "azurerm_app_configuration_key" "auth0_audience" {
++  configuration_store_id = var.azure_app_config_resource_id
++  key                    = "${local.front_app_dns_name}/AUTH0_AUDIENCE"
++  value                  = auth0_resource_server.backend_api.identifier
++}
++
++resource "azurerm_app_configuration_key" "cosmos_db_endpoint" {
++  configuration_store_id = var.azure_app_config_resource_id
++  key                    = "${local.front_app_dns_name}/cosmos_db_endpoint"
++  value                  = "https://${var.cosmos_db_account_name}.documents.azure.com:443/"
++}
+diff --git a/tofu/backend.tf b/tofu/backend.tf
+index aeb73cfc..6dc1faae 100644
+--- a/tofu/backend.tf
++++ b/tofu/backend.tf
+@@ -2,6 +2,10 @@
+ # Azure Container Apps (Serverless Container Hosting)
+ # ============================================================================
+ 
++locals {
++  back_app_dns_name = "${local.front_app_dns_name}.api"
++}
++
+ # Container App for the backend API
+ resource "azurerm_container_app" "workout_api" {
+   name                         = "workout-api"
+@@ -23,29 +27,22 @@ resource "azurerm_container_app" "workout_api" {
+       cpu    = 0.25
+       memory = "0.5Gi"
+ 
+-      # Environment variables
+-      env {
+-        name  = "COSMOS_DB_ENDPOINT"
+-        value = var.cosmos_db_endpoint
+-      }
+-
+       env {
+-        name  = "COSMOS_DB_DATABASE_NAME"
+-        value = azurerm_cosmosdb_sql_database.workout.name
++        name  = "PORT"
++        value = "3000"
+       }
+ 
+       env {
+-        name  = "COSMOS_DB_CONTAINER_NAME"
+-        value = azurerm_cosmosdb_sql_container.workouts.name
++        name  = "AZURE_APP_CONFIG_ENDPOINT"
++        value = var.azure_app_config_endpoint
+       }
+ 
+       env {
+-        name  = "PORT"
+-        value = "3000"
++        name  = "APP_CONFIG_PREFIX"
++        value = local.front_app_dns_name
+       }
+ 
+       # Frontend URL will be set via environment variable or app config
+-      # Custom domain configuration is managed by core infrastructure repo
+     }
+ 
+     min_replicas = 0 # Scale to zero when not in use
+@@ -93,11 +90,58 @@ resource "azurerm_cosmosdb_sql_role_assignment" "container_app_cosmos" {
+   scope               = var.cosmos_db_account_id
+ }
+ 
++# Grant Container App managed identity read access to Azure App Configuration
++resource "azurerm_role_assignment" "container_app_appconfig_reader" {
++  scope                = var.azure_app_config_resource_id
++  role_definition_name = "App Configuration Data Reader"
++  principal_id         = azurerm_container_app.workout_api.identity[0].principal_id
++}
++
++# 1. The Verification Record (Proves to Azure you own the domain)
++resource "azurerm_dns_txt_record" "workout_api_verification" {
++  name                = "asuid.${local.back_app_dns_name}"
++  zone_name           = var.dns_zone_name
++  resource_group_name = var.resource_group_name
++  ttl                 = 3600
++
++  record {
++    value = azurerm_container_app.workout_api.custom_domain_verification_id
++  }
++}
++
++# 2. The Routing Record (Points to the container ingress)
++resource "azurerm_dns_cname_record" "workout_api" {
++  name                = local.back_app_dns_name
++  zone_name           = var.dns_zone_name
++  resource_group_name = var.resource_group_name
++  ttl                 = 3600
++  record              = azurerm_container_app.workout_api.ingress[0].fqdn
++}
++
++# 3. The Custom Domain (Unsecured initially)
++resource "azurerm_container_app_custom_domain" "workout_api" {
++  name             = "${local.back_app_dns_name}.${var.dns_zone_name}"
++  container_app_id = azurerm_container_app.workout_api.id
++
++  # We must completely omit the certificate binding fields and tell Terraform 
++  # to ignore them, so it doesn't destroy the cert once Azure generates it.
++  lifecycle {
++    ignore_changes = [
++      certificate_binding_type,
++      container_app_environment_certificate_id
++    ]
++  }
++
++  depends_on = [
++    azurerm_dns_txt_record.workout_api_verification,
++    azurerm_dns_cname_record.workout_api
++  ]
++}
++
++# 4. The Auth0 Resource Server
+ resource "auth0_resource_server" "backend_api" {
+-  name = "WorkoutTracker Backend API"
+-  # The audience identifier doesn't have to be a publicly routable URL, 
+-  # but using your domain is best practice to guarantee uniqueness.
+-  identifier  = "https://api.${var.dns_zone_name}"
++  name        = "WorkoutTracker Backend API"
++  identifier  = "https://${local.back_app_dns_name}.${var.dns_zone_name}"
+   signing_alg = "RS256"
+ 
+   # Allows the frontend to request refresh tokens so users stay logged in
+diff --git a/tofu/db.tf b/tofu/db.tf
+index ee3df770..e9f185db 100644
+--- a/tofu/db.tf
++++ b/tofu/db.tf
+@@ -3,6 +3,10 @@ resource "azurerm_cosmosdb_sql_database" "workout" {
+   name                = "WorkoutTrackerDB"
+   resource_group_name = var.resource_group_name
+   account_name        = var.cosmos_db_account_name
++  # throughput          = 400 # I tried setting this but azurerm didn't like it, and it's already 400 in the
++  lifecycle {
++    ignore_changes = [throughput]
++  }
+ }
+ 
+ resource "azurerm_cosmosdb_sql_container" "workouts" {
+diff --git a/tofu/frontend.tf b/tofu/frontend.tf
+index ec8c672f..bec9cb11 100644
+--- a/tofu/frontend.tf
++++ b/tofu/frontend.tf
+@@ -28,7 +28,7 @@ resource "azurerm_static_web_app_custom_domain" "workout" {
+   static_web_app_id = azurerm_static_web_app.workout.id
+   domain_name       = "${local.front_app_dns_name}.${var.dns_zone_name}"
+   validation_type   = "cname-delegation"
+-  depends_on = [azurerm_dns_cname_record.workout]
++  depends_on        = [azurerm_dns_cname_record.workout]
+ }
+ 
+ resource "auth0_client" "frontend_spa" {
+diff --git a/tofu/outputs.tf b/tofu/outputs.tf
+index 8e1c5f13..658a530d 100644
+--- a/tofu/outputs.tf
++++ b/tofu/outputs.tf
+@@ -14,11 +14,6 @@ output "static_web_app_default_hostname" {
+   description = "Default hostname of the Static Web App"
+ }
+ 
+-output "cosmos_db_endpoint" {
+-  value       = var.cosmos_db_endpoint
+-  description = "Cosmos DB account endpoint"
+-}
+-
+ output "cosmos_db_name" {
+   value       = var.cosmos_db_account_name
+   description = "Cosmos DB account name"
+@@ -33,3 +28,13 @@ output "cosmos_db_container_name" {
+   value       = azurerm_cosmosdb_sql_container.workouts.name
+   description = "Cosmos DB container name for workouts"
+ }
++
++output "backend_api_url" {
++  value       = "https://${local.back_app_dns_name}.${var.dns_zone_name}"
++  description = "The URL of the backend Container App API"
++}
++
++output "container_app_name" {
++  value       = azurerm_container_app.workout_api.name
++  description = "Name of the backend Container App, picked up by github actions to handle custom dns for container app."
++}
+diff --git a/tofu/variables.tf b/tofu/variables.tf
+index 4410a5db..99f3b319 100644
+--- a/tofu/variables.tf
++++ b/tofu/variables.tf
+@@ -67,11 +67,6 @@ variable "cosmos_db_account_id" {
+   type        = string
+ }
+ 
+-variable "cosmos_db_endpoint" {
+-  description = "Endpoint URL of the Cosmos DB account"
+-  type        = string
+-}
+-
+ variable "azure_subscription_id" {
+   description = "Azure subscription ID"
+   type        = string
+@@ -86,3 +81,13 @@ variable "spacelift_commit_sha" {
+   description = "The Git SHA passed dynamically from Spacelift to force an apply"
+   type        = string
+ }
++
++variable "azure_app_config_endpoint" {
++  description = "Endpoint URL of the Azure App Configuration store (e.g. https://<store>.azconfig.io)"
++  type        = string
++}
++
++variable "azure_app_config_resource_id" {
++  description = "Resource ID of the Azure App Configuration store (used for RBAC role assignment)"
++  type        = string
++}
+diff --git a/workout doc 2025.xlsx b/workout doc 2025.xlsx
+deleted file mode 100644
+index 29b120f6..00000000
+Binary files a/workout doc 2025.xlsx and /dev/null differ

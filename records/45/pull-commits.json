@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/2f2dcb014b43c77d8aaaed232eb1c1a80c7c45af/comments",
+    "commit": {
+      "author": {
+        "date": "2026-06-02T21:39:08Z",
+        "email": "tank-operator-claude@romaine.life",
+        "name": "tank-operator-claude[bot]"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-06-02T21:39:08Z",
+        "email": "tank-operator-claude@romaine.life",
+        "name": "tank-operator-claude[bot]"
+      },
+      "message": "Use org pipeline templates\n\nRepoint reusable-workflow uses: refs from nelsong6/pipeline-templates to romaine-life/pipeline-templates following the org migration.\n\nCo-Authored-By: Claude Opus 4.8 \u003cnoreply@anthropic.com\u003e",
+      "tree": {
+        "sha": "5dc7c9addd545c4d2bc13645c331323816529dd1",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/5dc7c9addd545c4d2bc13645c331323816529dd1"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/2f2dcb014b43c77d8aaaed232eb1c1a80c7c45af",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/2f2dcb014b43c77d8aaaed232eb1c1a80c7c45af",
+    "node_id": "C_kwDORV0mMdoAKDJmMmRjYjAxNGI0M2M3N2Q4YWFhZWQyMzJlYjFjMWE4MGM3YzQ1YWY",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/faef6d8238a3779024c2d715faff9b05337ba2d6",
+        "sha": "faef6d8238a3779024c2d715faff9b05337ba2d6",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/faef6d8238a3779024c2d715faff9b05337ba2d6"
+      }
+    ],
+    "sha": "2f2dcb014b43c77d8aaaed232eb1c1a80c7c45af",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/2f2dcb014b43c77d8aaaed232eb1c1a80c7c45af"
+  }
+]

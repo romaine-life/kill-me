@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 63,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/3a74ed9cecea45da4c92a7eabf443eea04ab34ec/.github%2Fworkflows%2Fdocker-build-check.yaml",
+    "changes": 63,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fdocker-build-check.yaml?ref=3a74ed9cecea45da4c92a7eabf443eea04ab34ec",
+    "deletions": 0,
+    "filename": ".github/workflows/docker-build-check.yaml",
+    "patch": "@@ -0,0 +1,63 @@\n+name: Docker Build Check\n+\n+on:\n+  pull_request:\n+  workflow_dispatch:\n+    inputs:\n+      git_ref:\n+        description: \"Git ref or commit SHA to build. Leave blank to build the dispatch revision.\"\n+        required: false\n+        type: string\n+\n+permissions:\n+  contents: read\n+\n+concurrency:\n+  group: docker-build-check-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.git_ref || '' }}\n+  cancel-in-progress: true\n+\n+jobs:\n+  build:\n+    name: Build app image\n+    runs-on: ubuntu-latest\n+    steps:\n+      - name: Checkout\n+        uses: actions/checkout@v4\n+        with:\n+          fetch-depth: 0\n+\n+      - name: Resolve requested ref\n+        if: github.event_name == 'workflow_dispatch' \u0026\u0026 inputs.git_ref != ''\n+        env:\n+          INPUT_REF: ${{ inputs.git_ref }}\n+        run: |\n+          set -euo pipefail\n+          git fetch --force --tags origin '+refs/heads/*:refs/remotes/origin/*'\n+          if full_sha=\"$(git rev-parse --verify \"${INPUT_REF}^{commit}\" 2\u003e/dev/null)\"; then\n+            :\n+          elif git show-ref --verify --quiet \"refs/remotes/origin/${INPUT_REF}\"; then\n+            full_sha=\"$(git rev-parse \"refs/remotes/origin/${INPUT_REF}^{commit}\")\"\n+          elif git show-ref --verify --quiet \"refs/tags/${INPUT_REF}\"; then\n+            full_sha=\"$(git rev-parse \"refs/tags/${INPUT_REF}^{commit}\")\"\n+          else\n+            echo \"::error::Unable to resolve git_ref '${INPUT_REF}' to a commit.\"\n+            exit 1\n+          fi\n+          git checkout --detach \"$full_sha\"\n+          echo \"Resolved ${INPUT_REF} -\u003e ${full_sha}\"\n+\n+      - name: Set up Buildx\n+        uses: docker/setup-buildx-action@v3\n+\n+      - name: Build image without pushing\n+        uses: docker/build-push-action@v6\n+        with:\n+          context: .\n+          file: Dockerfile\n+          push: false\n+          load: false\n+          build-args: |\n+            BUILD_NUMBER=docker-build-check\n+            VITE_MICROSOFT_CLIENT_ID=docker-build-check\n+          cache-from: type=gha\n+          cache-to: type=gha,mode=max",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/3a74ed9cecea45da4c92a7eabf443eea04ab34ec/.github%2Fworkflows%2Fdocker-build-check.yaml",
+    "sha": "8e8273e1b2f9927a68c17b72ddb484b1c0315294",
+    "status": "added"
+  },
+  {
+    "additions": 12,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/3a74ed9cecea45da4c92a7eabf443eea04ab34ec/AGENTS.md",
+    "changes": 12,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/AGENTS.md?ref=3a74ed9cecea45da4c92a7eabf443eea04ab34ec",
+    "deletions": 0,
+    "filename": "AGENTS.md",
+    "patch": "@@ -0,0 +1,12 @@\n+# kill-me\n+\n+Read `CLAUDE.md` for the project architecture and domain notes.\n+\n+## Container Build Verification\n+\n+Agent pods are not expected to have Docker. Do not report missing local Docker\n+as a blocker. Run available repo checks first, then use PR CI as the normal\n+container build gate: `.github/workflows/docker-build-check.yml` performs a\n+throwaway Docker build with `push: false`. If image-packaging feedback is\n+needed before a PR is ready, manually dispatch that workflow with `git_ref`.\n+Release/deploy workflows are the only path that publishes images.",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/3a74ed9cecea45da4c92a7eabf443eea04ab34ec/AGENTS.md",
+    "sha": "329b26cf2c429ff624d92d3c98077cd6e827a347",
+    "status": "added"
+  },
+  {
+    "additions": 9,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/3a74ed9cecea45da4c92a7eabf443eea04ab34ec/CLAUDE.md",
+    "changes": 9,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/CLAUDE.md?ref=3a74ed9cecea45da4c92a7eabf443eea04ab34ec",
+    "deletions": 0,
+    "filename": "CLAUDE.md",
+    "patch": "@@ -5,6 +5,15 @@ Personal workout tracker built around a custom 12-day training cycle called **Sy\n The repo name comes from a Tom Platz video where he screams \"KILL ME\" during an\n agonizing set of leg extensions under hypnotherapy coaching.\n \n+## Container Build Verification\n+\n+Agent pods are not expected to have Docker. Do not report missing local Docker\n+as a blocker. Run available repo checks first, then use PR CI as the normal\n+container build gate: `.github/workflows/docker-build-check.yml` performs a\n+throwaway Docker build with `push: false`. If image-packaging feedback is\n+needed before a PR is ready, manually dispatch that workflow with `git_ref`.\n+Release/deploy workflows are the only path that publishes images.\n+\n ## The 12-Day Synergy System\n \n The cycle is Nelson's own design, optimized for **consistent daily activity** rather",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/3a74ed9cecea45da4c92a7eabf443eea04ab34ec/CLAUDE.md",
+    "sha": "18de62073681685c7ad956175099c6d360a3f5d7",
+    "status": "modified"
+  }
+]

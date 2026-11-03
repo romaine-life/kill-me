@@ -1,0 +1,8 @@
+diff --git a/SMOKE_TEST.md b/SMOKE_TEST.md
+new file mode 100644
+index 00000000..64e8e5ef
+--- /dev/null
++++ b/SMOKE_TEST.md
+@@ -0,0 +1,2 @@
++webhook wake smoke test
++round 2

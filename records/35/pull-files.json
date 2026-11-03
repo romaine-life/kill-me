@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/f3e39f7a08789f6753c3e68649237e93240838ba/tofu%2Fmain.tf",
+    "changes": 8,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/tofu%2Fmain.tf?ref=f3e39f7a08789f6753c3e68649237e93240838ba",
+    "deletions": 8,
+    "filename": "tofu/main.tf",
+    "patch": "@@ -2,11 +2,3 @@ resource \"azurerm_resource_group\" \"workout\" {\n   name     = \"workout-rg\"\n   location = var.location\n }\n-\n-# Used as the App Configuration key prefix and the DNS hostname.\n-# Previously also named the SWA + DNS CNAME; now that the app runs on AKS,\n-# the remaining users are the App Config key prefix and the redirect URI\n-# in oauth.tf.\n-locals {\n-  front_app_dns_name = \"workout\"\n-}",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/f3e39f7a08789f6753c3e68649237e93240838ba/tofu%2Fmain.tf",
+    "sha": "6608f5a8c1503970c88983ff38b57c27e30078ab",
+    "status": "modified"
+  },
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/f3e39f7a08789f6753c3e68649237e93240838ba/tofu%2Foutputs.tf",
+    "changes": 10,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/tofu%2Foutputs.tf?ref=f3e39f7a08789f6753c3e68649237e93240838ba",
+    "deletions": 10,
+    "filename": "tofu/outputs.tf",
+    "patch": "@@ -18,16 +18,6 @@ output \"cosmos_db_container_name\" {\n   description = \"Cosmos DB container name for workouts\"\n }\n \n-output \"app_config_prefix\" {\n-  value       = local.front_app_dns_name\n-  description = \"App Configuration key prefix, derived from the frontend DNS name\"\n-}\n-\n-output \"microsoft_login_client_id\" {\n-  value       = azuread_application.microsoft_login.client_id\n-  description = \"Client ID of the Microsoft sign-in app registration\"\n-}\n-\n output \"cosmos_db_endpoint\" {\n   value       = data.azurerm_cosmosdb_account.infra.endpoint\n   description = \"Cosmos DB account endpoint URL\"",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/f3e39f7a08789f6753c3e68649237e93240838ba/tofu%2Foutputs.tf",
+    "sha": "fee527956342f6ceb179f8eace312b5a8a3522ca",
+    "status": "modified"
+  }
+]

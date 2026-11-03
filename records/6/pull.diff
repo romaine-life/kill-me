@@ -1,0 +1,26 @@
+diff --git a/.github/workflows/build-and-deploy.yml b/.github/workflows/build-and-deploy.yml
+index c3d5757c..8b60ced5 100644
+--- a/.github/workflows/build-and-deploy.yml
++++ b/.github/workflows/build-and-deploy.yml
+@@ -27,7 +27,7 @@ jobs:
+     runs-on: ubuntu-latest
+     steps:
+       - name: Checkout
+-        uses: actions/checkout@v4
++        uses: actions/checkout@v6
+         with:
+           fetch-depth: 0
+ 
+diff --git a/.github/workflows/snapshot.yml b/.github/workflows/snapshot.yml
+index 0bae42a9..9375e65f 100644
+--- a/.github/workflows/snapshot.yml
++++ b/.github/workflows/snapshot.yml
+@@ -23,7 +23,7 @@ jobs:
+     runs-on: ubuntu-latest
+     steps:
+       - name: Checkout code
+-        uses: actions/checkout@v4
++        uses: actions/checkout@v6
+ 
+       - name: Setup Node.js
+         uses: actions/setup-node@v6

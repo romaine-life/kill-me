@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/5f2cbec592abef8503f200cb3e62bd6aeb454fcf/.github%2Fworkflows%2Fbuild-and-deploy.yaml",
+    "changes": 24,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fbuild-and-deploy.yaml?ref=5f2cbec592abef8503f200cb3e62bd6aeb454fcf",
+    "deletions": 24,
+    "filename": ".github/workflows/build-and-deploy.yaml",
+    "patch": "@@ -117,30 +117,6 @@ jobs:\n           cache-from: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app\n           cache-to: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app,mode=max\n \n-      - name: Compute ACR lookup tag\n-        id: lookup\n-        shell: bash\n-        env:\n-          REF_NAME: ${{ inputs.git_ref || github.ref_name || github.ref }}\n-        run: |\n-          set -euo pipefail\n-          ref_hash=\"$(printf '%s' \"${REF_NAME:-unknown}\" | sha256sum | cut -c1-16)\"\n-          lookup_tag=\"ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}\"\n-          echo \"tag=${lookup_tag}\" \u003e\u003e\"${GITHUB_OUTPUT}\"\n-          echo \"Computed lookup tag ${lookup_tag}\"\n-\n-      - name: Create ACR lookup tag\n-        shell: bash\n-        run: |\n-          set -euo pipefail\n-          canonical=\"${ALIAS_TAG}\"\n-          lookup='${{ steps.lookup.outputs.tag }}'\n-          az acr import --name romainecr \\\n-            --source \"romainecr.azurecr.io/kill-me:${canonical}\" \\\n-            --image \"kill-me:${lookup}\" \\\n-            --force\n-          echo \"Tagged romainecr.azurecr.io/kill-me:${lookup} -\u003e ${canonical}\"\n-\n       - name: Bump image tag in k8s/values.yaml\n         if: github.event_name == 'push' \u0026\u0026 github.ref == 'refs/heads/main'\n         run: |",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/5f2cbec592abef8503f200cb3e62bd6aeb454fcf/.github%2Fworkflows%2Fbuild-and-deploy.yaml",
+    "sha": "e6130f1848b1de402cc2df904b751a27463a02af",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/5f2cbec592abef8503f200cb3e62bd6aeb454fcf/scripts%2Fcheck-image-fingerprint-config.mjs",
+    "changes": 3,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/scripts%2Fcheck-image-fingerprint-config.mjs?ref=5f2cbec592abef8503f200cb3e62bd6aeb454fcf",
+    "deletions": 2,
+    "filename": "scripts/check-image-fingerprint-config.mjs",
+    "patch": "@@ -31,8 +31,7 @@ assertNotIncludes(dockerBuildCheck, \"romainecr.azurecr.io/kill-me:${{ env.IMAGE_\n assertIncludes(buildAndDeploy, \"scripts/image-fingerprint.sh\", \"build-and-deploy\");\n assertIncludes(buildAndDeploy, \"ALIAS_TAG=app-${fingerprint}\", \"build-and-deploy\");\n assertIncludes(buildAndDeploy, \"romainecr.azurecr.io/kill-me:${{ env.ALIAS_TAG }}\", \"build-and-deploy\");\n-assertIncludes(buildAndDeploy, \"ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}\", \"build-and-deploy\");\n-assertIncludes(buildAndDeploy, \"az acr import --name romainecr\", \"build-and-deploy\");\n+assertNotIncludes(buildAndDeploy, \"ci-ref-\", \"build-and-deploy\");\n assertNotIncludes(buildAndDeploy, 'TAG=\"${GITHUB_SHA::7}\"', \"build-and-deploy\");\n assertNotIncludes(buildAndDeploy, '--build-arg BUILD_NUMBER=\"${TAG}\"', \"build-and-deploy\");\n assertNotIncludes(buildAndDeploy, \"tag: \\\\\\\"${{ env.TAG }}\\\\\\\"\", \"build-and-deploy\");",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/5f2cbec592abef8503f200cb3e62bd6aeb454fcf/scripts%2Fcheck-image-fingerprint-config.mjs",
+    "sha": "d0cf00d4a12c960668f842baa28b6d28aa32c512",
+    "status": "modified"
+  }
+]

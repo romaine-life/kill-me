@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/870cabd7604e81d9a6e6f04a84279e730a357b65/comments",
+    "commit": {
+      "author": {
+        "date": "2026-05-16T05:25:29Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-05-16T05:25:29Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "message": "Migrate auth to auth.romaine.life delegation (drop MSAL + per-app allowlist)\n\nReplaces kill-me's bespoke Microsoft sign-in (MSAL frontend → /auth/microsoft/login\nbackend → shared HS256 JWT signed with `api-jwt-signing-secret`) with delegated\nauth to auth.romaine.life. Microsoft sign-in happens upstream; this app verifies\nthe upstream RS256 JWT against auth.romaine.life's JWKS, gates on the role claim,\nand mints its own HS256 session JWT for downstream API calls.\n\nCloses the kill-me side of nelsong6/auth#16. Mirrors the canonical template\nestablished by nelsong6/tank-operator#472.\n\nPattern\n-------\n- Frontend (frontend/src/auth/index.js): bootstrapAuth → startLogin → logout.\n  Silent exchange on boot via `auth.romaine.life/api/auth/token` cookie (the\n  .romaine.life session cookie is auto-attached cross-origin). startLogin redirects\n  to `${auth_url}/sign-in/microsoft?callbackURL=...` — the GET wrapper, not the\n  POST-only Better Auth route (per tank-operator PR #474).\n- Backend (backend/auth-routes.js + backend/auth.js): POST /api/auth/exchange with\n  `{auth_jwt}` body. exchangeRomaineLifeToken verifies RS256 against\n  https://auth.romaine.life/api/auth/jwks (jose's createRemoteJWKSet handles\n  caching), pins issuer = https://auth.romaine.life, accepts role ∈ {admin,\n  user} only — `pending` gets 403. No per-app email allowlist.\n- Local session JWT: HS256, signed with `kill-me-jwt-signing-secret` (already\n  provisioned in tofu/keyvault.tf, just newly wired in config.js). Carries the\n  upstream role claim through so requireAuth/requireAdmin gate locally without\n  re-hitting auth.romaine.life on every request.\n\nEnd-to-end deletions (per tank-operator/docs/migration-policy.md)\n----------------------------------------------------------------\n- backend/microsoft-routes.js (entire file)\n- frontend/src/auth/msal.js (entire file)\n- @azure/msal-browser from frontend/package.json\n- jwks-rsa from backend/package.json (only used for Microsoft JWKS); jose added\n- ALLOWED_EMAIL constant + nelson-devops-project@outlook.com hardcoded address\n- config.js's listConfigurationSettings() enumeration of `*/microsoft_oauth_client_id`\n- config.js read of shared `api-jwt-signing-secret` → per-app `kill-me-jwt-signing-secret`\n- Dockerfile VITE_MICROSOFT_CLIENT_ID build arg\n- docker-build-check.yaml VITE_MICROSOFT_CLIENT_ID build arg\n- build-and-deploy.yaml \"Fetch MICROSOFT_CLIENT_ID from App Configuration\" step\n- tofu/oauth.tf (entire file — the per-app Entra app registration)\n- tofu/appconfig.tf (entire file — only had the microsoft_oauth_client_id key)\n- tofu/identity.tf KV scope flipped to kill-me-jwt-signing-secret\n- CLAUDE.md auth model + data flow + .env docs rewritten\n\nGuard\n-----\nscripts/check-removed-msal.mjs greps every committed file for the retired\npatterns (MSAL imports, /auth/microsoft/login route, ALLOWED_EMAILS,\napi-jwt-signing-secret, VITE_MICROSOFT_CLIENT_ID, microsoft_oauth_client_id key,\njwks-rsa, etc.) and exits non-zero. Wired as `check-removed-msal` job in\n.github/workflows/lint.yaml so reintroduction breaks CI at PR time.\n\nSupersedes PR #32, which predated the canonical template (it fetched\n/api/auth/token client-side and POSTed to /api/auth/sign-in/social/microsoft —\nboth wrong). #32 to be closed.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) \u003cnoreply@anthropic.com\u003e",
+      "tree": {
+        "sha": "602a280eeb8cfa506db6661776567d94a8e93c63",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/602a280eeb8cfa506db6661776567d94a8e93c63"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/870cabd7604e81d9a6e6f04a84279e730a357b65",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/870cabd7604e81d9a6e6f04a84279e730a357b65",
+    "node_id": "C_kwDORV0mMdoAKDg3MGNhYmQ3NjA0ZTgxZDlhNmU2ZjA0YTg0Mjc5ZTczMGEzNTdiNjU",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/fa2893969aa76bdf573171a255b675639480c78c",
+        "sha": "fa2893969aa76bdf573171a255b675639480c78c",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/fa2893969aa76bdf573171a255b675639480c78c"
+      }
+    ],
+    "sha": "870cabd7604e81d9a6e6f04a84279e730a357b65",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/870cabd7604e81d9a6e6f04a84279e730a357b65"
+  }
+]

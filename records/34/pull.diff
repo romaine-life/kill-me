@@ -1,0 +1,1104 @@
+diff --git a/.github/workflows/build-and-deploy.yaml b/.github/workflows/build-and-deploy.yaml
+index bf8f8fc6..6795e299 100644
+--- a/.github/workflows/build-and-deploy.yaml
++++ b/.github/workflows/build-and-deploy.yaml
+@@ -37,17 +37,6 @@ jobs:
+           tenant-id: ${{ vars.ARM_TENANT_ID }}
+           subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
+ 
+-      - name: Fetch MICROSOFT_CLIENT_ID from App Configuration
+-        # This repo's tofu/oauth.tf publishes the key
+-        # `workout/microsoft_oauth_client_id` — fetched here so the tofu-managed
+-        # value is the source of truth for the build.
+-        run: |
+-          MICROSOFT_CLIENT_ID=$(az appconfig kv show \
+-            --name infra-appconfig \
+-            --key workout/microsoft_oauth_client_id \
+-            --query value -o tsv)
+-          echo "MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}" >> $GITHUB_ENV
+-
+       - name: ACR login
+         run: az acr login --name romainecr
+ 
+@@ -57,7 +46,6 @@ jobs:
+           IMAGE="romainecr.azurecr.io/kill-me:${TAG}"
+           docker build \
+             --build-arg BUILD_NUMBER="${TAG}" \
+-            --build-arg VITE_MICROSOFT_CLIENT_ID="${MICROSOFT_CLIENT_ID}" \
+             -t "$IMAGE" .
+           docker push "$IMAGE"
+           echo "TAG=${TAG}" >> $GITHUB_ENV
+diff --git a/.github/workflows/docker-build-check.yaml b/.github/workflows/docker-build-check.yaml
+index 820ec04e..782b6d1f 100644
+--- a/.github/workflows/docker-build-check.yaml
++++ b/.github/workflows/docker-build-check.yaml
+@@ -58,6 +58,5 @@ jobs:
+           load: false
+           build-args: |
+             BUILD_NUMBER=docker-build-check
+-            VITE_MICROSOFT_CLIENT_ID=docker-build-check
+           cache-from: type=gha
+           cache-to: type=gha,mode=max
+diff --git a/.github/workflows/lint.yaml b/.github/workflows/lint.yaml
+index 89d65b0a..a6a48b1e 100644
+--- a/.github/workflows/lint.yaml
++++ b/.github/workflows/lint.yaml
+@@ -14,3 +14,14 @@ jobs:
+     uses: nelsong6/pipeline-templates/.github/workflows/lint-template.yml@main
+     with:
+       working_directory: '.'
++
++  check-removed-msal:
++    name: Removed MSAL surface
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v4
++      - uses: actions/setup-node@v4
++        with:
++          node-version: '20'
++      - name: Guard against MSAL/legacy-auth reintroduction
++        run: node scripts/check-removed-msal.mjs
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 18de6207..cb2faff8 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -55,7 +55,7 @@ frontend/          React 19 SPA (Vite + Tailwind CSS 4)
+   ├── Left sidebar tab navigation (inline styles, collapsible, lucide-react icons)
+   ├── Client-side URL routing via History API (pushState/popstate, no library)
+   ├── Centralized color palette (src/colors.js)
+-  ├── Microsoft sign-in via MSAL.js (redirect flow)
++  ├── Sign-in delegated to auth.romaine.life (no MSAL in-app)
+   ├── Public viewing, admin-only editing
+   ├── In-browser SQLite via sql.js/WASM for anonymous visitors (instant loads)
+   ├── Deployed to Azure Static Web App
+@@ -76,11 +76,13 @@ tofu/              OpenTofu infrastructure-as-code
+ 
+ ### Auth model
+ 
+-"Everyone can view, only Nelson can edit." Anonymous visitors get instant page
++"Everyone can view, only admins can edit." Anonymous visitors get instant page
+ loads from an in-browser SQLite snapshot (sql.js/WASM) — no backend cold start.
+-Authenticated users switch to the live API. Logging workouts, changing the current
+-day, and admin actions require signing in with the whitelisted Microsoft account
+-(`nelson-devops-project@outlook.com`).
++Authenticated users switch to the live API. Logging workouts, changing the
++current day, and admin actions require signing in via auth.romaine.life — the
++central identity service that owns the user table and the role claim
++(`admin`/`user`/`pending`). Admins are promoted manually via
++https://auth.romaine.life/admin.
+ 
+ ### Data flow
+ 
+@@ -88,13 +90,13 @@ day, and admin actions require signing in with the whitelisted Microsoft account
+ 2. On sign-in, snapshot is discarded and all reads switch to the live backend API
+ 
+ **Critical `useDataSource()` contract:** Every consumer of `useDataSource()` MUST check `isReady` before calling any fetch function. The snapshot loads asynchronously (WASM init + network fetch). Until it's ready, `db` is null, `isLive` evaluates to true, and fetches silently hit the live API — which doesn't exist for anonymous visitors, causing a permanent loading spinner. Pattern: `const { fetchFoo, isReady } = useDataSource(); useEffect(() => { if (!isReady) return; fetchFoo()... }, [isReady]);`
+-3. To edit, user signs in with Microsoft via MSAL.js redirect flow
+-4. Frontend sends Microsoft ID token to backend `/auth/microsoft/login`
+-5. Backend verifies ID token against Microsoft JWKS, assigns admin/viewer role
+-6. Backend issues self-signed 7-day JWT; frontend stores it in localStorage
+-7. Frontend attaches JWT as Bearer token on write requests
+-8. Backend validates JWT, extracts `sub` claim as userId
+-9. Backend queries/writes Cosmos DB, partitioned by userId
++3. To edit, user clicks Sign in → redirects to `auth.romaine.life/sign-in/microsoft?callbackURL=...`
++4. After Microsoft completes, auth.romaine.life sets a `.romaine.life` session cookie and bounces back here
++5. Frontend's `bootstrapAuth()` (frontend/src/auth/index.js) fetches an RS256 JWT from `auth.romaine.life/api/auth/token` (cookie auto-attached cross-origin)
++6. Frontend POSTs that JWT to `/api/auth/exchange`; backend verifies it against the auth.romaine.life JWKS, checks `role ∈ {admin, user}` (403 for `pending`), and mints a kill-me-signed HS256 JWT
++7. Frontend stores the kill-me JWT in localStorage, attaches it as `Bearer` on writes
++8. Backend's `requireAuth` middleware verifies the local JWT, exposes `req.user = { sub, email, name, role }`; `requireAdmin` gates admin-only routes on `role === 'admin'`
++9. Backend queries/writes Cosmos DB, partitioned by userId (= JWT `sub`)
+ 
+ ### Shared infrastructure
+ 
+@@ -108,12 +110,12 @@ This repo builds on shared resources provisioned by **infra-bootstrap**:
+ - Key Vault (`romaine-kv`)
+ 
+ App-specific resources created by this repo: the Cosmos DB database and container,
+-JWT signing secret in Key Vault, the Microsoft sign-in app registration, and a
+-per-app App Config key (`workout:microsoft_client_id`). The frontend + backend
+-run as a single Node+Express pod in the `kill-me` namespace, served from
+-`workout.romaine.life` via HTTPRoute on the shared Envoy Gateway. The prior
+-shared-API-at-`api.romaine.life/workout` mount was retired when the api repo
+-was archived and deleted on 2026-04-20.
++and the per-app HS256 signing secret in Key Vault (`kill-me-jwt-signing-secret`).
++Microsoft sign-in is delegated to **auth.romaine.life** — kill-me holds no Entra
++app registration of its own. The frontend + backend run as a single Node+Express
++pod in the `kill-me` namespace, served from `workout.romaine.life` via HTTPRoute
++on the shared Envoy Gateway. The prior shared-API-at-`api.romaine.life/workout`
++mount was retired when the api repo was archived and deleted on 2026-04-20.
+ 
+ See also: **pipeline-templates** for reusable GitHub Actions workflows, and
+ **shell-config** for the global Claude config chain and DevOps tooling.
+@@ -157,8 +159,8 @@ All workflows delegate to **nelsong6/pipeline-templates** reusable templates:
+ 
+ - Node 20+
+ - Azure CLI (`az login` for local Cosmos DB and Key Vault access)
+-- Backend `.env` with `AZURE_APP_CONFIG_ENDPOINT`, `APP_CONFIG_PREFIX`, and `KEY_VAULT_URL`
+-- Frontend `.env` with `VITE_MICROSOFT_CLIENT_ID` and `VITE_API_URL`
++- Backend `.env` with `AZURE_APP_CONFIG_ENDPOINT` and `KEY_VAULT_URL`
++- Frontend `.env` with `VITE_API_URL` (Microsoft sign-in is delegated upstream to auth.romaine.life)
+ 
+ ### Running locally
+ 
+@@ -168,7 +170,7 @@ cd backend && npm run dev   # Backend only (Express :3000)
+ cd frontend && npm run dev  # Frontend only (Vite :5173)
+ ```
+ 
+-The frontend reads `VITE_MICROSOFT_CLIENT_ID` and `VITE_API_URL` environment variables.
++The frontend reads `VITE_API_URL`. The auth service URL is fetched at runtime from the backend's `/api/config` endpoint.
+ 
+ Admin mode (database init, data migration) is available only on localhost in dev
+ mode when signed in as admin.
+diff --git a/Dockerfile b/Dockerfile
+index 7668e961..701ce235 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -10,17 +10,15 @@ RUN npm ci
+ # Copy frontend source, then build.
+ COPY frontend/ ./
+ 
+-# Build-time env: Vite inlines VITE_* vars into the bundle.
+-# BUILD_NUMBER overrides vite.config.js's `execSync('git rev-parse')` fallback
+-# — git isn't available in this stage, and that's fine.
++# Build-time env: Vite inlines VITE_* vars into the bundle. BUILD_NUMBER
++# overrides vite.config.js's `execSync('git rev-parse')` fallback — git isn't
++# available in this stage, and that's fine.
+ ARG BUILD_NUMBER=dev
+-ARG VITE_MICROSOFT_CLIENT_ID=
+ ENV BUILD_NUMBER=$BUILD_NUMBER
+-ENV VITE_MICROSOFT_CLIENT_ID=$VITE_MICROSOFT_CLIENT_ID
+ 
+ RUN npm run build
+ 
+-# ── Stage 2: runtime — Node + Express serves frontend/dist + /api + /auth ─
++# ── Stage 2: runtime — Node + Express serves frontend/dist + /api ────────
+ FROM node:20-alpine
+ 
+ WORKDIR /app
+diff --git a/backend/auth-routes.js b/backend/auth-routes.js
+new file mode 100644
+index 00000000..5862f69b
+--- /dev/null
++++ b/backend/auth-routes.js
+@@ -0,0 +1,61 @@
++import { Router } from 'express';
++import jwt from 'jsonwebtoken';
++import { exchangeRomaineLifeToken } from './auth.js';
++
++const AUTH_URL = 'https://auth.romaine.life';
++const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days, same as the legacy issueToken default
++
++// Routes for the auth.romaine.life delegation flow. Microsoft sign-in itself
++// happens upstream at auth.romaine.life; the SPA pulls a JWT from that
++// service's /api/auth/token (the `.romaine.life` session cookie is auto-
++// attached on cross-origin fetches because the auth service mounts CORS
++// with credentials enabled for this origin) and POSTs it here to be
++// exchanged for a kill-me-signed session JWT. We do not maintain any
++// per-app email allowlist — the role claim from auth.romaine.life is
++// the single gate.
++export function createAuthRoutes({ jwtSecret, requireAuth }) {
++  const router = Router();
++
++  function issueToken(user) {
++    return jwt.sign(
++      { sub: user.sub, email: user.email, name: user.name, role: user.role },
++      jwtSecret,
++      { expiresIn: SESSION_TTL_SECONDS },
++    );
++  }
++
++  // Frontend reads this on bootstrap to learn where the auth service lives.
++  // Returning it from the backend (vs hardcoding the URL into the bundle)
++  // keeps the SPA build environment-agnostic.
++  router.get('/api/config', (_req, res) => {
++    res.json({ auth_url: AUTH_URL });
++  });
++
++  router.post('/api/auth/exchange', async (req, res) => {
++    const { auth_jwt: authJWT } = req.body ?? {};
++    if (!authJWT || typeof authJWT !== 'string') {
++      return res.status(400).json({ error: 'missing auth_jwt' });
++    }
++    try {
++      const user = await exchangeRomaineLifeToken(authJWT);
++      const token = issueToken(user);
++      res.json({ token, user });
++    } catch (err) {
++      const status = typeof err?.status === 'number' ? err.status : 500;
++      res.status(status).json({ error: err.message || 'exchange failed' });
++    }
++  });
++
++  router.get('/api/auth/me', requireAuth, (req, res) => {
++    res.json(req.user);
++  });
++
++  // Bearer + localStorage is the primary session carrier; we also clear the
++  // auth_token cookie for symmetry with anything that prefers cookies.
++  router.post('/api/auth/logout', (_req, res) => {
++    res.clearCookie('auth_token', { httpOnly: true, secure: true, sameSite: 'lax', path: '/' });
++    res.json({ status: 'ok' });
++  });
++
++  return router;
++}
+diff --git a/backend/auth.js b/backend/auth.js
+index c6d3587d..47398ce1 100644
+--- a/backend/auth.js
++++ b/backend/auth.js
+@@ -1,8 +1,65 @@
+ import jwt from 'jsonwebtoken';
++import { createRemoteJWKSet, jwtVerify, errors as joseErrors } from 'jose';
++
++// Single upstream identity provider. auth.romaine.life's Better Auth JWT
++// plugin publishes RS256 keys at /api/auth/jwks; the issuer claim is the
++// service's baseURL. jose's createRemoteJWKSet caches per-kid with a 5min
++// stale-while-revalidate window — good enough that we don't roll our own.
++const AUTH_ROMAINE_LIFE_JWKS = createRemoteJWKSet(
++  new URL('https://auth.romaine.life/api/auth/jwks'),
++);
++const AUTH_ROMAINE_LIFE_ISSUER = 'https://auth.romaine.life';
++const ALLOWED_ROLES = new Set(['admin', 'user']);
++
++/**
++ * Verify a JWT issued by auth.romaine.life and return the user identity
++ * plus role. Throws an Error with `status` (401|403) set so the caller can
++ * surface the right HTTP code. Gating is solely on the role claim:
++ * `pending` (auth.romaine.life's default for fresh Microsoft sign-ups)
++ * gets a 403; an admin must promote the user via auth.romaine.life/admin
++ * before they're useful here. No per-app email allowlist.
++ */
++export async function exchangeRomaineLifeToken(authJWT) {
++  let payload;
++  try {
++    ({ payload } = await jwtVerify(authJWT, AUTH_ROMAINE_LIFE_JWKS, {
++      issuer: AUTH_ROMAINE_LIFE_ISSUER,
++      algorithms: ['RS256'],
++      clockTolerance: '60s',
++    }));
++  } catch (err) {
++    const reason = err instanceof joseErrors.JOSEError ? err.message : 'invalid token';
++    const e = new Error(`invalid auth.romaine.life token: ${reason}`);
++    e.status = 401;
++    throw e;
++  }
++
++  const role = typeof payload.role === 'string' ? payload.role : '';
++  if (!ALLOWED_ROLES.has(role)) {
++    const e = new Error(`role not approved by auth.romaine.life: ${role || '(missing)'}`);
++    e.status = 403;
++    throw e;
++  }
++
++  const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
++  if (!email) {
++    const e = new Error('token missing email claim');
++    e.status = 401;
++    throw e;
++  }
++
++  return {
++    sub: typeof payload.sub === 'string' ? payload.sub : '',
++    email,
++    name: typeof payload.name === 'string' ? payload.name : '',
++    role,
++  };
++}
+ 
+ /**
+- * Creates Express middleware that verifies self-signed JWTs.
+- * Populates `req.user` with `{ sub, email, name, role }`.
++ * Creates Express middleware that verifies kill-me's own HS256 session JWTs
++ * (minted by /api/auth/exchange). Populates `req.user` with
++ * `{ sub, email, name, role }`.
+  */
+ export function createRequireAuth({ jwtSecret }) {
+   return (req, res, next) => {
+@@ -26,7 +83,7 @@ export function createRequireAuth({ jwtSecret }) {
+         sub: payload.sub,
+         email: payload.email,
+         name: payload.name,
+-        role: payload.role || 'member',
++        role: payload.role,
+       };
+       next();
+     } catch {
+diff --git a/backend/config.js b/backend/config.js
+index 939428e6..eff915b1 100644
+--- a/backend/config.js
++++ b/backend/config.js
+@@ -1,7 +1,6 @@
+ // Loads runtime config from Azure App Configuration + Key Vault at startup.
+-// Workload identity: the pod's ServiceAccount is federated to the shared
+-// managed identity (infra-shared-identity) which has App Config Data Reader,
+-// Key Vault Secrets User, and Cosmos DB Data Contributor roles.
++// Workload identity: the pod's ServiceAccount is federated to kill-me-identity
++// (tofu/identity.tf) which has narrow Cosmos + KV + App Config grants.
+ import { AppConfigurationClient } from '@azure/app-configuration';
+ import { SecretClient } from '@azure/keyvault-secrets';
+ import { DefaultAzureCredential } from '@azure/identity';
+@@ -18,31 +17,13 @@ export async function fetchConfig() {
+ 
+   const cosmosEndpoint = await appConfig.getConfigurationSetting({ key: 'cosmos_db_endpoint' });
+ 
+-  // Accept tokens from every Microsoft OAuth app registration — same
+-  // enumeration logic as the shared api. Filter for `*/microsoft_oauth_client_id`.
+-  const microsoftClientIds = [];
+-  const sharedMs = await appConfig
+-    .getConfigurationSetting({ key: 'microsoft_oauth_client_id_plain' })
+-    .catch(() => null);
+-  if (sharedMs?.value) microsoftClientIds.push(sharedMs.value);
+-  for await (const setting of appConfig.listConfigurationSettings()) {
+-    if (
+-      setting.key?.endsWith('/microsoft_oauth_client_id') &&
+-      setting.value &&
+-      !microsoftClientIds.includes(setting.value)
+-    ) {
+-      microsoftClientIds.push(setting.value);
+-    }
+-  }
+-  if (!microsoftClientIds.length) {
+-    throw new Error('No Microsoft OAuth client IDs found in App Configuration.');
+-  }
+-
+-  const jwtSigningSecret = (await kv.getSecret('api-jwt-signing-secret')).value;
++  // Per-app signing secret. Microsoft sign-in happens upstream at
++  // auth.romaine.life — this secret only signs kill-me's own session JWTs
++  // (minted at /api/auth/exchange after we've verified the upstream JWT).
++  const jwtSigningSecret = (await kv.getSecret('kill-me-jwt-signing-secret')).value;
+ 
+   return {
+     cosmosDbEndpoint: cosmosEndpoint.value,
+     jwtSigningSecret,
+-    microsoftClientIds,
+   };
+ }
+diff --git a/backend/microsoft-routes.js b/backend/microsoft-routes.js
+deleted file mode 100644
+index f8dca785..00000000
+--- a/backend/microsoft-routes.js
++++ /dev/null
+@@ -1,83 +0,0 @@
+-import { Router } from 'express';
+-import jwt from 'jsonwebtoken';
+-import jwksClient from 'jwks-rsa';
+-
+-const ALLOWED_EMAIL = 'nelson-devops-project@outlook.com';
+-
+-const client = jwksClient({
+-  jwksUri: 'https://login.microsoftonline.com/common/discovery/v2.0/keys',
+-  cache: true,
+-  rateLimit: true,
+-});
+-
+-function getSigningKey(header) {
+-  return new Promise((resolve, reject) => {
+-    client.getSigningKey(header.kid, (err, key) => {
+-      if (err) return reject(err);
+-      resolve(key.getPublicKey());
+-    });
+-  });
+-}
+-
+-function verifyMicrosoftToken(idToken, audience) {
+-  return new Promise((resolve, reject) => {
+-    jwt.verify(
+-      idToken,
+-      (header, callback) => {
+-        getSigningKey(header).then((key) => callback(null, key)).catch(callback);
+-      },
+-      { audience, issuer: /^https:\/\/login\.microsoftonline\.com\/.*\/v2\.0$/ },
+-      (err, decoded) => {
+-        if (err) return reject(err);
+-        resolve(decoded);
+-      },
+-    );
+-  });
+-}
+-
+-export function createMicrosoftRoutes({ jwtSecret, microsoftClientIds, accountContainer }) {
+-  const router = Router();
+-
+-  function issueToken(user) {
+-    return jwt.sign(
+-      { sub: user.id, email: user.email, name: user.name, role: user.role },
+-      jwtSecret,
+-      { expiresIn: '7d' },
+-    );
+-  }
+-
+-  router.post('/auth/microsoft/login', async (req, res) => {
+-    const { credential } = req.body;
+-    if (!credential) {
+-      return res.status(400).json({ error: 'credential required' });
+-    }
+-
+-    try {
+-      const payload = await verifyMicrosoftToken(credential, microsoftClientIds);
+-      const email = payload.email || payload.preferred_username;
+-
+-      const id = `microsoft|${payload.sub}`;
+-      const role = email?.toLowerCase() === ALLOWED_EMAIL ? 'admin' : 'viewer';
+-      const account = {
+-        id,
+-        userId: id,
+-        type: 'account',
+-        provider: 'microsoft',
+-        name: payload.name,
+-        email,
+-        role,
+-        updatedAt: new Date().toISOString(),
+-      };
+-
+-      await accountContainer.items.upsert(account);
+-
+-      const token = issueToken(account);
+-      res.json({ token, user: { id, name: account.name, email: account.email, role: account.role } });
+-    } catch (error) {
+-      console.error('Microsoft auth error:', error);
+-      res.status(401).json({ error: 'Invalid Microsoft credential' });
+-    }
+-  });
+-
+-  return router;
+-}
+diff --git a/backend/package.json b/backend/package.json
+index 2b0c6a1b..1dc2b09c 100644
+--- a/backend/package.json
++++ b/backend/package.json
+@@ -19,8 +19,8 @@
+     "dotenv": "^17.4.2",
+     "express": "^5.2.1",
+     "helmet": "^8.1.0",
++    "jose": "^5.9.6",
+     "jsonwebtoken": "^9.0.3",
+-    "jwks-rsa": "^4.0.1",
+     "morgan": "^1.10.0"
+   },
+   "engines": {
+diff --git a/backend/server.js b/backend/server.js
+index 44ab715f..f799a35d 100644
+--- a/backend/server.js
++++ b/backend/server.js
+@@ -1,6 +1,6 @@
+ // Per-app backend for workout.romaine.life. Serves the Vite-built React frontend,
+-// the kill-me route package under /*, and Microsoft OAuth under /auth/* on the
+-// same origin. Replaces the shared `api` mount at /workout.
++// the kill-me route package under /*, and the auth.romaine.life delegation
++// exchange under /api/auth/* on the same origin.
+ import 'dotenv/config';
+ import express from 'express';
+ import helmet from 'helmet';
+@@ -17,7 +17,7 @@ import {
+   createAdminRoutes,
+ } from './routes/index.js';
+ import { createRequireAuth, requireAdmin } from './auth.js';
+-import { createMicrosoftRoutes } from './microsoft-routes.js';
++import { createAuthRoutes } from './auth-routes.js';
+ import { fetchConfig } from './config.js';
+ 
+ const __dirname = path.dirname(fileURLToPath(import.meta.url));
+@@ -55,13 +55,8 @@ async function start() {
+   const workoutContainer = cosmosClient.database('WorkoutTrackerDB').container('workouts');
+ 
+   const requireAuth = createRequireAuth({ jwtSecret: config.jwtSigningSecret });
+-  const msAuth = createMicrosoftRoutes({
+-    jwtSecret: config.jwtSigningSecret,
+-    microsoftClientIds: config.microsoftClientIds,
+-    accountContainer: workoutContainer,
+-  });
+ 
+-  app.use(msAuth);
++  app.use(createAuthRoutes({ jwtSecret: config.jwtSigningSecret, requireAuth }));
+   app.use(createWorkoutRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
+   app.use(createSorenessRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
+   app.use(createCardioRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
+diff --git a/frontend/package-lock.json b/frontend/package-lock.json
+index f4b3646b..e67e02cf 100644
+--- a/frontend/package-lock.json
++++ b/frontend/package-lock.json
+@@ -8,7 +8,6 @@
+       "name": "frontend",
+       "version": "1.0.0",
+       "dependencies": {
+-        "@azure/msal-browser": "^4.12.0",
+         "clsx": "^2.1.1",
+         "framer-motion": "^12.34.0",
+         "lucide-react": "^0.564.0",
+@@ -46,27 +45,6 @@
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
+     },
+-    "node_modules/@azure/msal-browser": {
+-      "version": "4.29.1",
+-      "resolved": "https://registry.npmjs.org/@azure/msal-browser/-/msal-browser-4.29.1.tgz",
+-      "integrity": "sha512-1Vrt27du1cl4QHkzLc6L4aeXqliPIDIs5l/1I4hWWMXkXccY/EznJT1+pBdoVze0azTAI8sCyq5B4cBVYG1t9w==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure/msal-common": "15.16.1"
+-      },
+-      "engines": {
+-        "node": ">=0.8.0"
+-      }
+-    },
+-    "node_modules/@azure/msal-common": {
+-      "version": "15.16.1",
+-      "resolved": "https://registry.npmjs.org/@azure/msal-common/-/msal-common-15.16.1.tgz",
+-      "integrity": "sha512-qxUG9TCl+TVSSX58onVDHDWrvT5CE0+NeeUAbkQqaESpSm79u5IePLnPWMMjCUnUR2zJd4+Bt9vioVRzLmJb2g==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=0.8.0"
+-      }
+-    },
+     "node_modules/@babel/code-frame": {
+       "version": "7.29.0",
+       "resolved": "https://registry.npmjs.org/@babel/code-frame/-/code-frame-7.29.0.tgz",
+diff --git a/frontend/package.json b/frontend/package.json
+index 0ce05633..075c4f13 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -10,7 +10,6 @@
+     "preview": "vite preview"
+   },
+   "dependencies": {
+-    "@azure/msal-browser": "^4.12.0",
+     "clsx": "^2.1.1",
+     "framer-motion": "^12.34.0",
+     "lucide-react": "^0.564.0",
+diff --git a/frontend/src/api/client.js b/frontend/src/api/client.js
+index 75f547ec..c401f4eb 100644
+--- a/frontend/src/api/client.js
++++ b/frontend/src/api/client.js
+@@ -24,7 +24,8 @@ export async function apiFetch(path, options = {}) {
+     localStorage.removeItem('token');
+     // Only redirect for authenticated actions, not public reads
+     if (options.method && options.method !== 'GET') {
+-      import('../auth/msal.js').then(({ loginWithMicrosoft }) => loginWithMicrosoft());
++      const { startLogin } = await import('../auth/index.js');
++      await startLogin();
+     }
+     throw new Error('Unauthorized');
+   }
+diff --git a/frontend/src/auth/AuthContext.jsx b/frontend/src/auth/AuthContext.jsx
+index bce13e6d..db51b818 100644
+--- a/frontend/src/auth/AuthContext.jsx
++++ b/frontend/src/auth/AuthContext.jsx
+@@ -1,85 +1,34 @@
+-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+-import { msalInstance, msalReady } from './msal';
+-
+-/** Retry fetch with exponential backoff (handles cold-start 503s). */
+-async function fetchWithRetry(url, options, retries = 2) {
+-  for (let i = 0; i <= retries; i++) {
+-    try {
+-      return await fetch(url, options);
+-    } catch (err) {
+-      if (i === retries) throw err;
+-      await new Promise((r) => setTimeout(r, 1000 * 2 ** i));
+-    }
+-  }
+-  throw new Error('unreachable');
+-}
++import { createContext, useContext, useState, useEffect } from 'react';
++import { bootstrapAuth, logout as authLogout, getStoredToken, clearStoredToken } from './index.js';
+ 
+ const AuthContext = createContext(null);
+ 
+ export function AuthProvider({ children }) {
+   const [user, setUser] = useState(null);
+-  const [token, setToken] = useState(() => localStorage.getItem('token'));
++  const [token, setToken] = useState(() => getStoredToken());
+   const [loading, setLoading] = useState(true);
+ 
+-  // Parse existing JWT on mount
++  // Boot-time auth check: try stored session → silent exchange via
++  // .romaine.life cookie → fall through unauthenticated. Mirrors the
++  // canonical pattern in tank-operator's frontend/src/auth.ts (the
++  // template for all .romaine.life apps' delegation).
+   useEffect(() => {
+-    if (token) {
+-      try {
+-        const payload = JSON.parse(atob(token.split('.')[1]));
+-        setUser({ id: payload.sub, name: payload.name, email: payload.email, role: payload.role });
+-      } catch {
+-        setToken(null);
+-        localStorage.removeItem('token');
+-      }
+-    }
+-  }, [token]);
+-
+-  // Handle MSAL redirect response (runs on any page after Microsoft redirects back).
+-  // Guard with a ref to prevent StrictMode double-fire from calling
+-  // handleRedirectPromise() twice — concurrent calls cause MSAL to hang.
+-  const redirectHandled = useRef(false);
+-  useEffect(() => {
+-    if (redirectHandled.current) return;
+-    redirectHandled.current = true;
+-
+-    // Timeout fallback — if MSAL hangs (token exchange stall, network issue),
+-    // force past the loading screen so the app is still usable as a viewer.
+-    const timeout = setTimeout(() => {
+-      console.warn('Auth initialization timed out — continuing without auth');
+-      setLoading(false);
+-    }, 8000);
+-
++    let cancelled = false;
+     (async () => {
+       try {
+-        await msalReady;
+-        const response = await msalInstance.handleRedirectPromise();
+-
+-        if (response?.idToken) {
+-          try {
+-            const res = await fetchWithRetry('/auth/microsoft/login', {
+-              method: 'POST',
+-              headers: { 'Content-Type': 'application/json' },
+-              body: JSON.stringify({ credential: response.idToken }),
+-            });
+-
+-            if (!res.ok) {
+-              const body = await res.json().catch(() => ({}));
+-              console.error('Login failed:', res.status, body.error);
+-            } else {
+-              const data = await res.json();
+-              setSession(data.token, data.user);
+-            }
+-          } catch (err) {
+-            console.error('Login failed:', err);
+-          }
++        const u = await bootstrapAuth();
++        if (cancelled) return;
++        if (u) {
++          setUser(u);
++          setToken(getStoredToken());
+         }
+       } catch (err) {
+-        console.error('MSAL initialization failed:', err);
++        console.error('bootstrapAuth threw:', err);
+       } finally {
+-        clearTimeout(timeout);
+-        setLoading(false);
++        if (!cancelled) setLoading(false);
+       }
+     })();
++    return () => { cancelled = true; };
+   }, []);
+ 
+   function setSession(newToken, newUser) {
+@@ -88,8 +37,9 @@ export function AuthProvider({ children }) {
+     setUser(newUser);
+   }
+ 
+-  function logout() {
+-    localStorage.removeItem('token');
++  async function logout() {
++    await authLogout();
++    clearStoredToken();
+     setToken(null);
+     setUser(null);
+   }
+diff --git a/frontend/src/auth/index.js b/frontend/src/auth/index.js
+new file mode 100644
+index 00000000..5736aacb
+--- /dev/null
++++ b/frontend/src/auth/index.js
+@@ -0,0 +1,132 @@
++// Microsoft sign-in happens upstream at auth.romaine.life. This SPA:
++//   1. On boot, checks for a stored kill-me session JWT and validates it
++//      via /api/auth/me.
++//   2. If no valid session, tries to fetch an auth.romaine.life JWT from
++//      that service's /api/auth/token endpoint — the auth-service session
++//      cookie is on `.romaine.life` so it's auto-attached. If the user is
++//      already signed into auth.romaine.life from another app, this is the
++//      seamless path that lands them signed in here without any redirect.
++//      The JWT is then exchanged at /api/auth/exchange for a kill-me-
++//      signed session JWT.
++//   3. If both fail, render the Sign-in button. Clicking it redirects to
++//      auth.romaine.life's Microsoft sign-in flow, which sets the
++//      .romaine.life session cookie and returns the user here. Step 2 then
++//      runs again on bootstrap and succeeds.
++
++const TOKEN_KEY = 'token';
++
++let cachedConfig = null;
++
++async function fetchConfig() {
++  if (cachedConfig) return cachedConfig;
++  const res = await fetch('/api/config');
++  if (!res.ok) throw new Error(`config fetch failed: ${res.status}`);
++  cachedConfig = await res.json();
++  return cachedConfig;
++}
++
++async function fetchUpstreamJWT(authURL) {
++  try {
++    const res = await fetch(`${authURL}/api/auth/token`, { credentials: 'include' });
++    if (!res.ok) return null;
++    const data = await res.json();
++    return data.token ?? null;
++  } catch {
++    return null;
++  }
++}
++
++async function exchange(upstreamJWT) {
++  const res = await fetch('/api/auth/exchange', {
++    method: 'POST',
++    headers: { 'Content-Type': 'application/json' },
++    body: JSON.stringify({ auth_jwt: upstreamJWT }),
++  });
++  if (!res.ok) {
++    const text = await res.text();
++    const err = new Error(`Sign-in exchange failed (${res.status}): ${text}`);
++    err.status = res.status;
++    throw err;
++  }
++  const body = await res.json();
++  storeToken(body.token);
++  return body.user;
++}
++
++function storeToken(token) {
++  localStorage.setItem(TOKEN_KEY, token);
++}
++
++export function getStoredToken() {
++  return localStorage.getItem(TOKEN_KEY);
++}
++
++export function clearStoredToken() {
++  localStorage.removeItem(TOKEN_KEY);
++}
++
++/**
++ * Boot-time auth check. Resolves to the signed-in user, or null. Does NOT
++ * trigger a redirect on its own — the SPA shows a Sign-in button for that.
++ * Auto-redirecting on boot would silently re-SSO users who just signed out.
++ */
++export async function bootstrapAuth() {
++  const existing = getStoredToken();
++  if (existing) {
++    const res = await fetch('/api/auth/me', {
++      headers: { Authorization: `Bearer ${existing}` },
++    });
++    if (res.ok) return await res.json();
++    clearStoredToken();
++  }
++
++  let config;
++  try {
++    config = await fetchConfig();
++  } catch (e) {
++    console.info('auth config unavailable; rendering unauthenticated', e);
++    return null;
++  }
++  const upstreamJWT = await fetchUpstreamJWT(config.auth_url);
++  if (upstreamJWT) {
++    try {
++      return await exchange(upstreamJWT);
++    } catch (e) {
++      console.warn('silent exchange failed; user must click Sign-in', e);
++    }
++  }
++
++  return null;
++}
++
++/** User-initiated sign-in: redirect to auth.romaine.life's Microsoft flow. */
++export async function startLogin() {
++  const config = await fetchConfig();
++  const callbackURL = encodeURIComponent(window.location.origin + window.location.pathname);
++  // auth.romaine.life exposes a GET endpoint at /sign-in/microsoft that
++  // takes callbackURL as a query param, kicks off Better Auth's social
++  // flow, and 302s back to the callback once Microsoft completes. The
++  // Better Auth routes under /api/auth/* are POST-only, so a top-level
++  // GET redirect there 404s.
++  window.location.href = `${config.auth_url}/sign-in/microsoft?callbackURL=${callbackURL}`;
++}
++
++export async function logout() {
++  clearStoredToken();
++  try {
++    await fetch('/api/auth/logout', { method: 'POST' });
++  } catch {
++    // best-effort
++  }
++  // Also clear the auth.romaine.life session cookie so the next page load
++  // doesn't silently re-SSO via fetchUpstreamJWT.
++  try {
++    const config = await fetchConfig();
++    await fetch(`${config.auth_url}/api/auth/sign-out`, {
++      method: 'POST',
++      credentials: 'include',
++    });
++  } catch {
++    // best-effort
++  }
++}
+diff --git a/frontend/src/auth/msal.js b/frontend/src/auth/msal.js
+deleted file mode 100644
+index 6df7ad99..00000000
+--- a/frontend/src/auth/msal.js
++++ /dev/null
+@@ -1,18 +0,0 @@
+-import { PublicClientApplication } from '@azure/msal-browser';
+-
+-export const msalInstance = new PublicClientApplication({
+-  auth: {
+-    clientId: import.meta.env.VITE_MICROSOFT_CLIENT_ID,
+-    authority: 'https://login.microsoftonline.com/common',
+-    redirectUri: window.location.origin,
+-  },
+-});
+-
+-export const msalReady = msalInstance.initialize();
+-
+-export async function loginWithMicrosoft() {
+-  await msalReady;
+-  await msalInstance.loginRedirect({
+-    scopes: ['openid', 'profile', 'email'],
+-  });
+-}
+diff --git a/frontend/src/components/UserProfile.jsx b/frontend/src/components/UserProfile.jsx
+index 21751834..f5a72274 100644
+--- a/frontend/src/components/UserProfile.jsx
++++ b/frontend/src/components/UserProfile.jsx
+@@ -1,5 +1,5 @@
+ import { useAuth } from '../auth/AuthContext.jsx';
+-import { loginWithMicrosoft } from '../auth/msal.js';
++import { startLogin } from '../auth/index.js';
+ import { colors } from '../colors';
+ 
+ export function UserProfile() {
+@@ -8,7 +8,7 @@ export function UserProfile() {
+   if (!user) {
+     return (
+       <button
+-        onClick={loginWithMicrosoft}
++        onClick={startLogin}
+         style={styles.signInButton}
+         onMouseEnter={e => { e.currentTarget.style.backgroundColor = colors.bg.overlay; }}
+         onMouseLeave={e => { e.currentTarget.style.backgroundColor = colors.bg.surface; }}
+diff --git a/k8s/templates/serviceaccount.yaml b/k8s/templates/serviceaccount.yaml
+index ac48561a..eee4fdf8 100644
+--- a/k8s/templates/serviceaccount.yaml
++++ b/k8s/templates/serviceaccount.yaml
+@@ -1,8 +1,8 @@
+ # Federated to kill-me-identity (tofu/identity.tf::azurerm_federated_identity_credential.kill_me)
+ # instead of the shared infra-shared-identity. New identity is scoped to
+ # kill-me's actual surface: Cosmos data on dbs/WorkoutTrackerDB, KV
+-# narrowed to api-jwt-signing-secret, App Config Data Reader at store
+-# level (config.js calls listConfigurationSettings).
++# narrowed to kill-me-jwt-signing-secret, App Config Data Reader at store
++# level for the single cosmos_db_endpoint key config.js reads.
+ apiVersion: v1
+ kind: ServiceAccount
+ metadata:
+diff --git a/scripts/check-removed-msal.mjs b/scripts/check-removed-msal.mjs
+new file mode 100644
+index 00000000..cd9be48e
+--- /dev/null
++++ b/scripts/check-removed-msal.mjs
+@@ -0,0 +1,110 @@
++#!/usr/bin/env node
++// Migration guard for the auth.romaine.life delegation cutover.
++// Per tank-operator/docs/migration-policy.md: the old MSAL path is deleted
++// end-to-end and must not creep back via copy-paste or new code. If any of
++// these patterns appears in source after the migration, fail CI so the
++// reintroduction is caught at PR time.
++//
++// To add an exception (e.g. a doc that describes the historical pattern),
++// add the file's repo-relative path to `ignoredRelativePaths`.
++
++import fs from 'node:fs/promises';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
++
++const ignoredDirs = new Set([
++  '.claude',
++  '.git',
++  '.terraform',
++  '.vite',
++  '.venv',
++  '__pycache__',
++  'build',
++  'coverage',
++  'dist',
++  'node_modules',
++  'snapshot',
++  'venv',
++]);
++
++const ignoredFiles = new Set([
++  'package-lock.json',
++  'pnpm-lock.yaml',
++  'yarn.lock',
++  // .env is gitignored and per-developer; the guard only checks committed
++  // surface. A stale local .env is the developer's problem, not CI's.
++  '.env',
++  '.env.local',
++]);
++
++const ignoredRelativePaths = new Set([
++  'scripts/check-removed-msal.mjs',
++]);
++
++const blocked = [
++  { name: 'MSAL browser package', pattern: /@azure\/msal-browser/ },
++  { name: 'MSAL PublicClientApplication', pattern: /\bPublicClientApplication\b/ },
++  { name: 'loginRedirect MSAL flow', pattern: /\bloginRedirect\b/ },
++  { name: 'handleRedirectPromise MSAL flow', pattern: /\bhandleRedirectPromise\b/ },
++  { name: 'legacy microsoft login route', pattern: /\/auth\/microsoft\/login\b/ },
++  { name: 'legacy createMicrosoftRoutes', pattern: /\bcreateMicrosoftRoutes\b/ },
++  { name: 'per-app email allowlist', pattern: /\bALLOWED_EMAILS?\b/ },
++  { name: 'shared api JWT secret', pattern: /\bapi-jwt-signing-secret\b/ },
++  { name: 'Microsoft client ID build arg', pattern: /\bVITE_MICROSOFT_CLIENT_ID\b/ },
++  { name: 'App Config microsoft client ID key', pattern: /microsoft_oauth_client_id/ },
++  { name: 'jwks-rsa Microsoft JWKS client', pattern: /\bjwks-rsa\b/ },
++  { name: 'Microsoft login JWKS URL', pattern: /login\.microsoftonline\.com.*discovery/ },
++];
++
++const failures = [];
++
++for await (const filePath of walk(repoRoot)) {
++  const relativePath = toRepoPath(filePath);
++  if (ignoredRelativePaths.has(relativePath)) continue;
++  const bytes = await fs.readFile(filePath);
++  if (bytes.includes(0)) continue;
++  const text = bytes.toString('utf8');
++  for (const rule of blocked) {
++    const match = rule.pattern.exec(text);
++    if (!match) continue;
++    const { line, column } = lineAndColumn(text, match.index);
++    failures.push(`${relativePath}:${line}:${column} ${rule.name}: ${JSON.stringify(match[0])}`);
++  }
++}
++
++if (failures.length > 0) {
++  console.error('Retired MSAL/auth surface detected:');
++  for (const failure of failures) console.error(`- ${failure}`);
++  process.exit(1);
++}
++
++console.log('No retired MSAL/auth surfaces found.');
++
++async function* walk(dir) {
++  const entries = await fs.readdir(dir, { withFileTypes: true });
++  for (const entry of entries) {
++    const absolutePath = path.join(dir, entry.name);
++    if (entry.isDirectory()) {
++      if (!ignoredDirs.has(entry.name)) yield* walk(absolutePath);
++      continue;
++    }
++    if (!entry.isFile()) continue;
++    if (ignoredFiles.has(entry.name)) continue;
++    yield absolutePath;
++  }
++}
++
++function toRepoPath(filePath) {
++  return path.relative(repoRoot, filePath).split(path.sep).join('/');
++}
++
++function lineAndColumn(text, index) {
++  const before = text.slice(0, index);
++  const lines = before.split(/\r\n|\r|\n/);
++  return {
++    line: lines.length,
++    column: lines[lines.length - 1].length + 1,
++  };
++}
+diff --git a/tofu/appconfig.tf b/tofu/appconfig.tf
+deleted file mode 100644
+index d686f03b..00000000
+--- a/tofu/appconfig.tf
++++ /dev/null
+@@ -1,9 +0,0 @@
+-# Per-app Microsoft OAuth client ID published under the convention key
+-# `<app>/microsoft_oauth_client_id` — matches the `*/microsoft_oauth_client_id`
+-# filter used by the shared api middleware and this app's backend to discover
+-# accepted audiences across all per-app registrations.
+-resource "azurerm_app_configuration_key" "microsoft_oauth_client_id" {
+-  configuration_store_id = data.azurerm_app_configuration.infra.id
+-  key                    = "${local.front_app_dns_name}/microsoft_oauth_client_id"
+-  value                  = azuread_application.microsoft_login.client_id
+-}
+diff --git a/tofu/identity.tf b/tofu/identity.tf
+index 89bb4825..f11d9fc2 100644
+--- a/tofu/identity.tf
++++ b/tofu/identity.tf
+@@ -9,10 +9,9 @@
+ #
+ #   - Cosmos DB Data Contributor on dbs/WorkoutTrackerDB
+ #   - Key Vault Secrets User on the one secret config.js reads
+-#     (api-jwt-signing-secret) — narrow, not vault-wide
+-#   - App Configuration Data Reader at the store level — necessary
+-#     because config.js calls listConfigurationSettings() to enumerate
+-#     `*/microsoft_oauth_client_id` keys and there's no per-key RBAC
++#     (kill-me-jwt-signing-secret) — narrow, not vault-wide
++#   - App Configuration Data Reader at the store level — config.js reads
++#     `cosmos_db_endpoint` from there
+ #
+ # Pattern mirrors tank-operator/infra/{api_proxy,credential_refresher}.tf
+ # and glimmung/tofu/identity.tf.
+@@ -45,15 +44,14 @@ resource "azurerm_cosmosdb_sql_role_assignment" "kill_me_cosmos" {
+ # reads another secret, add a sibling role assignment here rather than
+ # widening to vault scope.
+ resource "azurerm_role_assignment" "kill_me_kv_jwt_secret" {
+-  scope                = "${data.azurerm_key_vault.main.id}/secrets/api-jwt-signing-secret"
++  scope                = "${data.azurerm_key_vault.main.id}/secrets/kill-me-jwt-signing-secret"
+   role_definition_name = "Key Vault Secrets User"
+   principal_id         = azurerm_user_assigned_identity.kill_me.principal_id
+ }
+ 
+-# App Config: store-level Data Reader. Narrowing isn't possible because
+-# config.js enumerates keys via listConfigurationSettings() to discover
+-# every `*/microsoft_oauth_client_id` registration — App Configuration
+-# RBAC doesn't have a "read keys matching prefix" primitive.
++# App Config: store-level Data Reader for the single `cosmos_db_endpoint`
++# key config.js reads. (Microsoft sign-in moved to auth.romaine.life;
++# config.js no longer enumerates per-app OAuth client keys.)
+ resource "azurerm_role_assignment" "kill_me_appconfig" {
+   scope                = data.azurerm_app_configuration.infra.id
+   role_definition_name = "App Configuration Data Reader"
+diff --git a/tofu/oauth.tf b/tofu/oauth.tf
+deleted file mode 100644
+index 21394111..00000000
+--- a/tofu/oauth.tf
++++ /dev/null
+@@ -1,33 +0,0 @@
+-# ============================================================================
+-# Microsoft "Sign in with Microsoft" — kill-me only
+-# ============================================================================
+-# Per-app app registration (separate from the shared infra-bootstrap registration)
+-# so redirect URIs live with this repo. The shared api middleware and this
+-# app's own backend both load every `*/microsoft_oauth_client_id` key from
+-# App Configuration and accept tokens against the union of audiences.
+-
+-data "azuread_client_config" "current" {}
+-
+-resource "azuread_application" "microsoft_login" {
+-  display_name     = "kill-me - Social Login"
+-  sign_in_audience = "AzureADandPersonalMicrosoftAccount"
+-
+-  # The azuread provider does NOT auto-add the creating SP as an owner, so
+-  # `Application.ReadWrite.OwnedBy` (this repo's Graph permission) returns
+-  # 403 on any subsequent tofu update. Declared explicitly so owners match
+-  # the tofu-run principal.
+-  owners = [data.azuread_client_config.current.object_id]
+-
+-  api {
+-    requested_access_token_version = 2
+-  }
+-
+-  single_page_application {
+-    redirect_uris = [
+-      "https://${local.front_app_dns_name}.${local.infra.dns_zone_name}/",
+-      # Local dev — Vite dev server (:5173) + backend-served frontend (:3000).
+-      "http://localhost:5173/",
+-      "http://localhost:3000/",
+-    ]
+-  }
+-}

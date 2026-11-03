@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/69beb2a4274ab7bf9ffd189c8b78f06b349f353a/comments",
+    "commit": {
+      "author": {
+        "date": "2026-09-16T06:36:38Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-09-16T06:36:38Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "feat: log a steady walk as a treadmill workout\n\nA walk is done on the treadmill, so it is a treadmill workout rather than a\nnew cardio activity: same machine, same color, same history lane. It differs\nfrom the interval templates only in that its single `walk` interval is entered\nper session instead of fixed.\n\nIt lives in the template library for the same reason exercise defaults live on\nthe exercise definition — the document IS the default. Logging a walk with\n\"this is the new default\" ticked writes the entered pace and duration back to\nthe template, so the next walk prefills from it. The promotion runs before the\nsession is logged and aborts the log if it fails, mirroring the strength flow\nso the two can never disagree.\n\nA logged treadmill session with one interval is a steady one: the detail view\nshows it as a pace instead of a one-row interval list, and the summary line\nreads \"3.4 mph\" rather than \"0 jog intervals\".",
+      "tree": {
+        "sha": "38886dd3484e18b06b985f5ebf1494bb857a7c44",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/38886dd3484e18b06b985f5ebf1494bb857a7c44"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/69beb2a4274ab7bf9ffd189c8b78f06b349f353a",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/69beb2a4274ab7bf9ffd189c8b78f06b349f353a",
+    "node_id": "C_kwDORV0mMdoAKDY5YmViMmE0Mjc0YWI3YmY5ZmZkMTg5YzhiNzhmMDZiMzQ5ZjM1M2E",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/60d8b3c33e59ab79db3c9a090876bd339cbe681f",
+        "sha": "60d8b3c33e59ab79db3c9a090876bd339cbe681f",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/60d8b3c33e59ab79db3c9a090876bd339cbe681f"
+      }
+    ],
+    "sha": "69beb2a4274ab7bf9ffd189c8b78f06b349f353a",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/69beb2a4274ab7bf9ffd189c8b78f06b349f353a"
+  }
+]

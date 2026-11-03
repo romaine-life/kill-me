@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/3ffe730739739300f0e4683a5f70a47b488b3ded/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-02T02:54:27Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-02T02:54:27Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "feat: nav restructure + account-menu cleanup\n\nRestructure: remove the Workout (/today) page; Log is now a Strength/Cardio picker that opens the logging sub-form with a Back button (day-description prose kept in the strength header); List + History merged into one History tab with a List/Calendar toggle.\n\nAccount UI: header avatar is now a gravatar (SHA-256 of the email) opening a click popup with name/email/Sign Out; removed the decorative 'live' pill; removed the redundant hardcoded sidebar profile footer so the header is the single account control; moved the build hash into the popup footer.\n\nDev: DEV_AUTH_EMAIL -\u003e nelson@romaine.life (real account). Docs: add the visual-verification (headless screenshot) method to CLAUDE.md.",
+      "tree": {
+        "sha": "b64922480169799ac227206a8337b7f3465b24c5",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/b64922480169799ac227206a8337b7f3465b24c5"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/3ffe730739739300f0e4683a5f70a47b488b3ded",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/3ffe730739739300f0e4683a5f70a47b488b3ded",
+    "node_id": "C_kwDORV0mMdoAKDNmZmU3MzA3Mzk3MzkzMDBmMGU0NjgzYTVmNzBhNDdiNDg4YjNkZWQ",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/04b5a6429cc943e1b03b8847a508134330b3bcac",
+        "sha": "04b5a6429cc943e1b03b8847a508134330b3bcac",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/04b5a6429cc943e1b03b8847a508134330b3bcac"
+      }
+    ],
+    "sha": "3ffe730739739300f0e4683a5f70a47b488b3ded",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/3ffe730739739300f0e4683a5f70a47b488b3ded"
+  }
+]

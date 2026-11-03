@@ -1,0 +1,446 @@
+diff --git a/backend/routes/routes/exercise-defaults.js b/backend/routes/routes/exercise-defaults.js
+new file mode 100644
+index 00000000..406f3b04
+--- /dev/null
++++ b/backend/routes/routes/exercise-defaults.js
+@@ -0,0 +1,89 @@
++export class ExerciseDefaultError extends Error {}
++
++function nullableNumber(value, fieldName) {
++  if (value === null || value === '') return null;
++
++  const number = Number(value);
++  if (!Number.isFinite(number)) {
++    throw new ExerciseDefaultError(`${fieldName} must be a number or blank`);
++  }
++  return number;
++}
++
++function nullableText(value) {
++  if (value === null || value === '') return null;
++  return String(value);
++}
++
++/**
++ * Replace the prefill values for one exercise variation and make that
++ * variation the exercise's default. The exercise definition is copied so a
++ * failed persistence attempt cannot mutate the object returned by Cosmos.
++ */
++export function withNewExerciseDefault(exercise, variationName, values) {
++  if (!variationName || typeof variationName !== 'string') {
++    throw new ExerciseDefaultError('variationName is required');
++  }
++  if (!values || typeof values !== 'object' || Array.isArray(values)) {
++    throw new ExerciseDefaultError('values must be an object');
++  }
++
++  // A few old documents may still carry their targets directly on the exercise.
++  // Promoting a default also upgrades that shape to the current variations model.
++  const variations = Array.isArray(exercise.variations) && exercise.variations.length > 0
++    ? exercise.variations
++    : [{
++        name: 'Standard',
++        default: true,
++        targetWeight: exercise.targetWeight ?? null,
++        targetReps: exercise.targetReps ?? null,
++        targetSets: exercise.targetSets ?? null,
++      }];
++  if (!variations.some((variation) => variation.name === variationName)) {
++    throw new ExerciseDefaultError(`Unknown variation "${variationName}"`);
++  }
++
++  const updatedVariations = variations.map((variation) => {
++    const selected = variation.name === variationName;
++    const updated = { ...variation, default: selected };
++    if (!selected) return updated;
++
++    if (Array.isArray(variation.weightFields) && variation.weightFields.length > 0) {
++      if (values.weights !== undefined) {
++        if (!Array.isArray(values.weights)) {
++          throw new ExerciseDefaultError('weights must be an array');
++        }
++        const weightsByKey = new Map(values.weights.map((entry) => [entry.key, entry.value]));
++        updated.weightFields = variation.weightFields.map((field) => ({
++          ...field,
++          ...(weightsByKey.has(field.key) && {
++            targetWeight: nullableNumber(weightsByKey.get(field.key), `${field.label || field.key} weight`),
++          }),
++        }));
++      }
++    } else if (values.weight !== undefined) {
++      updated.targetWeight = nullableNumber(values.weight, 'weight');
++    }
++
++    if (values.inclineDegrees !== undefined && Object.hasOwn(variation, 'targetInclineDegrees')) {
++      updated.targetInclineDegrees = nullableNumber(values.inclineDegrees, 'inclineDegrees');
++    }
++    if (values.reps !== undefined) {
++      updated.targetReps = nullableText(values.reps);
++    }
++    if (values.sets !== undefined) {
++      updated.targetSets = nullableNumber(values.sets, 'sets');
++    }
++    if (values.cableSetting !== undefined && Object.hasOwn(variation, 'cableSetting')) {
++      updated.cableSetting = values.cableSetting === null ? '' : String(values.cableSetting);
++    }
++
++    return updated;
++  });
++
++  return {
++    ...exercise,
++    variations: updatedVariations,
++    updatedAt: new Date().toISOString(),
++  };
++}
+diff --git a/backend/routes/routes/exercise-defaults.test.js b/backend/routes/routes/exercise-defaults.test.js
+new file mode 100644
+index 00000000..81b9ffbc
+--- /dev/null
++++ b/backend/routes/routes/exercise-defaults.test.js
+@@ -0,0 +1,104 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { ExerciseDefaultError, withNewExerciseDefault } from './exercise-defaults.js';
++
++test('stores entered values and makes the selected variation the default', () => {
++  const exercise = {
++    id: 'exercise-press',
++    variations: [
++      { name: 'Flat', default: true, targetWeight: 100, targetReps: 8, targetSets: 3 },
++      {
++        name: 'Incline',
++        targetWeight: 80,
++        targetInclineDegrees: 30,
++        targetReps: '8-10',
++        targetSets: 3,
++      },
++    ],
++  };
++
++  const updated = withNewExerciseDefault(exercise, 'Incline', {
++    weight: '85.5',
++    inclineDegrees: '35',
++    reps: '10-12',
++    sets: '4',
++  });
++
++  assert.equal(updated.variations[0].default, false);
++  assert.deepEqual(updated.variations[1], {
++    name: 'Incline',
++    default: true,
++    targetWeight: 85.5,
++    targetInclineDegrees: 35,
++    targetReps: '10-12',
++    targetSets: 4,
++  });
++  assert.equal(exercise.variations[0].default, true, 'does not mutate the source document');
++});
++
++test('updates labelled weights and preserves their definition metadata', () => {
++  const exercise = {
++    variations: [{
++      name: 'Standard',
++      default: true,
++      weightFields: [
++        { key: 'dumbbell', label: 'Dumbbell', targetWeight: 20 },
++        { key: 'cable', label: 'Cable', targetWeight: 30 },
++      ],
++      targetReps: 12,
++      targetSets: 3,
++    }],
++  };
++
++  const updated = withNewExerciseDefault(exercise, 'Standard', {
++    weights: [
++      { key: 'dumbbell', label: 'Changed label is ignored', value: '25' },
++      { key: 'cable', value: '' },
++    ],
++    reps: '15',
++    sets: '4',
++  });
++
++  assert.deepEqual(updated.variations[0].weightFields, [
++    { key: 'dumbbell', label: 'Dumbbell', targetWeight: 25 },
++    { key: 'cable', label: 'Cable', targetWeight: null },
++  ]);
++  assert.equal(updated.variations[0].targetReps, '15');
++  assert.equal(updated.variations[0].targetSets, 4);
++});
++
++test('rejects an unknown variation and non-numeric number fields', () => {
++  const exercise = { variations: [{ name: 'Standard', default: true }] };
++
++  assert.throws(
++    () => withNewExerciseDefault(exercise, 'Missing', {}),
++    ExerciseDefaultError,
++  );
++  assert.throws(
++    () => withNewExerciseDefault(exercise, 'Standard', { weight: 'heavy' }),
++    /weight must be a number or blank/,
++  );
++});
++
++test('promotes defaults on a legacy flat exercise definition', () => {
++  const exercise = {
++    name: 'Legacy Curl',
++    targetWeight: 20,
++    targetReps: 10,
++    targetSets: 3,
++  };
++
++  const updated = withNewExerciseDefault(exercise, 'Standard', {
++    weight: '25',
++    reps: '12',
++    sets: '4',
++  });
++
++  assert.deepEqual(updated.variations, [{
++    name: 'Standard',
++    default: true,
++    targetWeight: 25,
++    targetReps: '12',
++    targetSets: 4,
++  }]);
++});
+diff --git a/backend/routes/routes/workouts.js b/backend/routes/routes/workouts.js
+index b63effed..83f82b1d 100644
+--- a/backend/routes/routes/workouts.js
++++ b/backend/routes/routes/workouts.js
+@@ -1,4 +1,5 @@
+ import { Router } from 'express';
++import { ExerciseDefaultError, withNewExerciseDefault } from './exercise-defaults.js';
+ 
+ /**
+  * The workout model, exercises, logged workouts, and current-day tracking.
+@@ -21,6 +22,7 @@ import { Router } from 'express';
+  *   DELETE /api/logged-workouts/:id
+  *   PUT    /api/current-day
+  *   POST   /api/exercises
++ *   PUT    /api/exercises/:id/default
+  */
+ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
+   const router = Router();
+@@ -370,5 +372,43 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
+     }
+   });
+ 
++  // Promote one variation and its just-entered workout values to the defaults
++  // used the next time this exercise is logged. Historical workouts are separate
++  // documents and are deliberately untouched.
++  router.put('/api/exercises/:id/default', requireAuth, requireAdmin, async (req, res) => {
++    try {
++      const { resources } = await container.items
++        .query({
++          query: 'SELECT * FROM c WHERE c.id = @id AND c.type = @type',
++          parameters: [
++            { name: '@id', value: req.params.id },
++            { name: '@type', value: 'exercise' },
++          ],
++        })
++        .fetchAll();
++
++      if (resources.length === 0) {
++        return res.status(404).json({ error: 'Exercise not found' });
++      }
++
++      const updated = withNewExerciseDefault(
++        resources[0],
++        req.body.variationName,
++        req.body.values,
++      );
++      const { resource } = await container
++        .item(updated.id, updated.userId)
++        .replace(updated);
++
++      res.json({ exercise: resource });
++    } catch (error) {
++      if (error instanceof ExerciseDefaultError) {
++        return res.status(400).json({ error: error.message });
++      }
++      console.error('Error updating exercise default:', error);
++      res.status(500).json({ error: 'Failed to update exercise default', message: error.message });
++    }
++  });
++
+   return router;
+ }
+diff --git a/frontend/src/components/WorkoutDrawer.jsx b/frontend/src/components/WorkoutDrawer.jsx
+index 66722124..59c1eed0 100644
+--- a/frontend/src/components/WorkoutDrawer.jsx
++++ b/frontend/src/components/WorkoutDrawer.jsx
+@@ -78,6 +78,7 @@ export function LogTab({
+   const [loading, setLoading] = useState(false);
+   const [submitting, setSubmitting] = useState(false);
+   const [useNextWorkout, setUseNextWorkout] = useState(true);
++  const exerciseRequestRef = useRef(0);
+   // The picker lists every day in the cycle (see the cycle dial — the list has to
+   // line up with it), so it starts on the current day rather than an arbitrary one.
+   const [dropdownDay, setDropdownDay] = useState(currentDay);
+@@ -224,9 +225,14 @@ export function LogTab({
+   // ─────────────────────────────────────────────
+ 
+   const fetchExercises = useCallback(async () => {
++    const requestId = ++exerciseRequestRef.current;
+     setLoading(true);
+     try {
+       const data = await apiFetch(`/api/exercises/day/${selectedDay}`);
++      // The current day arrives asynchronously during app startup. A response for
++      // the former day must not overwrite a newer selection's exercise list.
++      if (requestId !== exerciseRequestRef.current) return;
++
+       const defs = data.exercises || [];
+       setExercises(defs);
+ 
+@@ -246,6 +252,7 @@ export function LogTab({
+           const vars = ex.variations || [];
+           const matchedVar = vars.find(v => v.name === savedVarName) || dv;
+           return {
++            definitionId: ex.id,
+             name: ex.name,
+             variation: savedVarName,
+             completed: true,
+@@ -255,9 +262,11 @@ export function LogTab({
+             reps: saved.reps ?? matchedVar.targetReps ?? '',
+             sets: saved.sets ?? matchedVar.targetSets ?? '',
+             cableSetting: saved.cableSetting ?? matchedVar.cableSetting ?? '',
++            useAsDefault: false,
+           };
+         }
+         return {
++          definitionId: ex.id,
+           name: ex.name,
+           variation: dv.name,
+           completed: false,
+@@ -267,6 +276,7 @@ export function LogTab({
+           reps: dv.targetReps ?? '',
+           sets: dv.targetSets ?? '',
+           cableSetting: dv.cableSetting ?? '',
++          useAsDefault: false,
+         };
+       });
+ 
+@@ -282,14 +292,19 @@ export function LogTab({
+           reps: ex.reps ?? '',
+           sets: ex.sets ?? '',
+           cableSetting: ex.cableSetting ?? '',
++          useAsDefault: false,
+         });
+       }
+ 
+       setCompletedExercises(checklist);
+     } catch (error) {
+-      console.error('Error fetching exercises:', error);
++      if (requestId === exerciseRequestRef.current) {
++        console.error('Error fetching exercises:', error);
++      }
+     } finally {
+-      setLoading(false);
++      if (requestId === exerciseRequestRef.current) {
++        setLoading(false);
++      }
+     }
+   }, [selectedDay, viewWorkout]);
+ 
+@@ -314,6 +329,40 @@ export function LogTab({
+ 
+     setSubmitting(true);
+     try {
++      const defaultUpdates = completed.filter(ex => ex.useAsDefault && ex.definitionId);
++      try {
++        await Promise.all(defaultUpdates.map(ex =>
++          apiFetch(`/api/exercises/${encodeURIComponent(ex.definitionId)}/default`, {
++            method: 'PUT',
++            body: JSON.stringify({
++              variationName: ex.variation,
++              values: {
++                weight: ex.weight,
++                weights: ex.weights,
++                inclineDegrees: ex.inclineDegrees,
++                reps: ex.reps,
++                sets: ex.sets,
++                cableSetting: ex.cableSetting,
++              },
++            }),
++          })
++        ));
++      } catch (error) {
++        console.error('Error updating exercise defaults:', error);
++        alert(
++          'The new defaults could not be updated, so the workout was not saved. Please try again.'
++        );
++        return;
++      }
++
++      // UI-only state controls default promotion and must not become part of the
++      // immutable workout record.
++      const loggedExercises = completed.map(({
++        definitionId: _definitionId,
++        useAsDefault: _useAsDefault,
++        ...exercise
++      }) => exercise);
++
+       if (isEditMode) {
+         // PUT — update existing
+         await apiFetch(`/api/logged-workouts/${viewWorkout.id}`, {
+@@ -323,7 +372,7 @@ export function LogTab({
+             time: selectedTime || null,
+             daySlug: selectedDay,
+             mode,
+-            exercises: mode === 'detailed' ? completed : [],
++            exercises: mode === 'detailed' ? loggedExercises : [],
+           })
+         });
+         onWorkoutChanged?.();
+@@ -336,7 +385,7 @@ export function LogTab({
+             mode,
+             date: selectedDate,
+             time: selectedTime || null,
+-            ...(mode === 'detailed' ? { exercises: completed } : {}),
++            ...(mode === 'detailed' ? { exercises: loggedExercises } : {}),
+           })
+         });
+         onSuccess?.(result.advancedTo);
+@@ -810,7 +859,7 @@ export function LogTab({
+                           </h4>
+ 
+                           {(() => {
+-                            const exDef = exercises[idx];
++                            const exDef = exercises.find(definition => definition.id === exercise.definitionId);
+                             const vars = exDef?.variations || [];
+                             const hasMultipleVars = vars.length > 1;
+                             const selectedVar = vars.find(v => v.name === exercise.variation) || getDefaultVariation(exDef || {});
+@@ -876,7 +925,7 @@ export function LogTab({
+                           })()}
+ 
+                           {exercise.completed && (() => {
+-                            const exDef = exercises[idx];
++                            const exDef = exercises.find(definition => definition.id === exercise.definitionId);
+                             const vars = exDef?.variations || [];
+                             const selectedVar = vars.find(v => v.name === exercise.variation) || getDefaultVariation(exDef || {});
+                             return (
+@@ -955,6 +1004,24 @@ export function LogTab({
+                                   />
+                                 </label>
+                               </div>
++                              <label className={`flex items-start gap-3 rounded-lg border px-3 py-3 cursor-pointer transition-colors ${
++                                exercise.useAsDefault
++                                  ? 'border-cyan-400/60 bg-cyan-500/10'
++                                  : 'border-slate-600/60 bg-slate-800/40 hover:border-slate-500'
++                              }`}>
++                                <input
++                                  type="checkbox"
++                                  checked={exercise.useAsDefault}
++                                  onChange={(e) => updateExercise(idx, 'useAsDefault', e.target.checked)}
++                                  className="mt-0.5 w-5 h-5 rounded bg-slate-800 border-slate-600 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 cursor-pointer"
++                                />
++                                <span>
++                                  <span className="block text-sm font-bold text-slate-200">This is the new default</span>
++                                  <span className="block mt-0.5 text-xs text-slate-400">
++                                    Prefill this variation and these values next time.
++                                  </span>
++                                </span>
++                              </label>
+                             </div>
+                             );
+                           })()}

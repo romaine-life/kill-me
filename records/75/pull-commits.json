@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/7a54a94a9df30b9591caab888bd1f37864c3fca0/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-16T23:51:55Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-16T23:51:55Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "fix: make the day picker and cycle dial agree\n\nThe log-workout day picker filtered out the current day (it's covered by the\n\"Use Next\" card), so it listed 11 of 12 days and every entry below today's slot\nsat one position off from its day number. It now lists all 12 in cycle order,\nlabelled \"Day 5 · Compound: Pulls\", with \"(today)\" on the current one, and\ndefaults to the current day instead of an arbitrary other one — which also fixes\na stale default, since the old value was computed once at mount from a\ncurrentDay that arrives asynchronously.\n\nThe dial had a second problem: it rendered DAY_DESIGN.group, a short muscle-label\nvocabulary used in exactly one place, so day 5 read BACK on the dial and\n\"Compound: Pulls\" everywhere else. Only days 2 and 10 agreed, and days 8 and 9\nboth read PECS — hiding the mobility/heavy-push distinction the cycle depends on.\nThe dial now renders DAY_CONFIG.name, and `group`/`dayGroup()` are gone.",
+      "tree": {
+        "sha": "758cfc8c825676eaa0af0063748324aab2ae2de0",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/758cfc8c825676eaa0af0063748324aab2ae2de0"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/7a54a94a9df30b9591caab888bd1f37864c3fca0",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/7a54a94a9df30b9591caab888bd1f37864c3fca0",
+    "node_id": "C_kwDORV0mMdoAKDdhNTRhOTRhOWRmMzBiOTU5MWNhYWI4ODhiZDFmMzc4NjRjM2ZjYTA",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/549c56138d267beca7fd82cfdff461fdee42a900",
+        "sha": "549c56138d267beca7fd82cfdff461fdee42a900",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/549c56138d267beca7fd82cfdff461fdee42a900"
+      }
+    ],
+    "sha": "7a54a94a9df30b9591caab888bd1f37864c3fca0",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/7a54a94a9df30b9591caab888bd1f37864c3fca0"
+  }
+]

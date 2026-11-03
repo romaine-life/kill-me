@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 17,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/511a8e3987700a91907bd72b2c8626fcfe5014d3/.github%2Fworkflows%2Fdocker-build-check.yaml",
+    "changes": 17,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fdocker-build-check.yaml?ref=511a8e3987700a91907bd72b2c8626fcfe5014d3",
+    "deletions": 0,
+    "filename": ".github/workflows/docker-build-check.yaml",
+    "patch": "@@ -158,6 +158,23 @@ jobs:\n             --force\n           echo \"Tagged romainecr.azurecr.io/kill-me:${lookup} -\u003e ${canonical}\"\n \n+      - name: Tag app image by commit\n+        # Commit-addressed alias of the fingerprint manifest so Glimmung's\n+        # deploy-image resolver looks the image up by the verified commit SHA.\n+        # Additive alongside the ACR lookup tag during the sha-alias migration;\n+        # the run-scoped lookup tag is removed once the resolver reads sha-\u003ccommit\u003e.\n+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository\n+        shell: bash\n+        run: |\n+          set -euo pipefail\n+          canonical='${{ steps.fingerprint.outputs.proof_tag }}'\n+          commit_tag=\"sha-${{ steps.source.outputs.sha }}\"\n+          az acr import --name romainecr \\\n+            --source \"romainecr.azurecr.io/kill-me:${canonical}\" \\\n+            --image \"kill-me:${commit_tag}\" \\\n+            --force\n+          echo \"Tagged romainecr.azurecr.io/kill-me:${commit_tag} -\u003e ${canonical}\"\n+\n       - name: Build image without pushing\n         if: github.event_name == 'pull_request' \u0026\u0026 github.event.pull_request.head.repo.full_name != github.repository\n         uses: docker/build-push-action@v7",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/511a8e3987700a91907bd72b2c8626fcfe5014d3/.github%2Fworkflows%2Fdocker-build-check.yaml",
+    "sha": "175695e442bb9c1b539ab51e36a4df4f5314b777",
+    "status": "modified"
+  }
+]

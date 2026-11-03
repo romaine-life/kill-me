@@ -1,0 +1,2422 @@
+diff --git a/backend/routes/admin/admin-routes.js b/backend/routes/admin/admin-routes.js
+index 8640372e..5e1df246 100644
+--- a/backend/routes/admin/admin-routes.js
++++ b/backend/routes/admin/admin-routes.js
+@@ -208,6 +208,10 @@ export function createAdminRoutes({ container, cosmosDbEndpoint, databaseName, c
+             userId,
+             date: entry.date,
+             muscles: entry.muscles,
++            // Historical spreadsheet data predates workout attribution.
++            sourceWorkoutId: null,
++            sourceWorkoutDay: null,
++            sourceWorkoutDate: null,
+             updatedAt: new Date().toISOString(),
+           };
+           await container.items.upsert(doc);
+diff --git a/backend/routes/routes/soreness.js b/backend/routes/routes/soreness.js
+index 690d9986..7a3ea198 100644
+--- a/backend/routes/routes/soreness.js
++++ b/backend/routes/routes/soreness.js
+@@ -3,13 +3,34 @@ import { Router } from 'express';
+ /**
+  * Soreness journal routes.
+  *
++ * A soreness entry is anchored to an *originating workout* rather than to a
++ * date alone: you log soreness repeatedly against the same workout as it
++ * decays (squat on the 19th → level 7 on the 20th, 5 on the 21st, 2 on the
++ * 22nd), and a single date can hold several entries when two workouts'
++ * soreness overlap.
++ *
++ * The document id encodes that pair, so an upsert naturally means "the
++ * soreness from workout W recorded on date D":
++ *
++ *   attributed   → soreness-<date>-<sourceWorkoutId>
++ *   unattributed → soreness-<date>
++ *
++ * The unattributed form is byte-identical to the pre-workout-link id scheme,
++ * so historical entries keep working as-is with no migration.
++ *
+  * Public:
+  *   GET    /api/soreness
+  *
+  * Admin:
+  *   POST   /api/soreness
+- *   DELETE /api/soreness/:date
++ *   DELETE /api/soreness/:id
+  */
++
++// Build the deterministic document id for a (date, sourceWorkoutId) pair.
++export function sorenessDocId(date, sourceWorkoutId) {
++  return sourceWorkoutId ? `soreness-${date}-${sourceWorkoutId}` : `soreness-${date}`;
++}
++
+ export function createSorenessRoutes({ container, requireAuth, requireAdmin }) {
+   const router = Router();
+ 
+@@ -31,11 +52,22 @@ export function createSorenessRoutes({ container, requireAuth, requireAdmin }) {
+     }
+   });
+ 
+-  // Create or update a soreness entry for a given date (admin only).
++  // Create or update a soreness entry (admin only).
++  //
++  // Identified by (date, sourceWorkoutId). Pass sourceWorkoutId to attribute the
++  // entry to a logged workout; omit it for a free-floating entry. The workout's
++  // day number and date are denormalised onto the entry so the timeline view can
++  // render without joining against the workout list.
+   router.post('/api/soreness', requireAuth, requireAdmin, async (req, res) => {
+     try {
+       const userId = req.user.sub;
+-      const { date, muscles } = req.body;
++      const {
++        date,
++        muscles,
++        sourceWorkoutId = null,
++        sourceWorkoutDay = null,
++        sourceWorkoutDate = null,
++      } = req.body;
+ 
+       if (!date) {
+         return res.status(400).json({ error: 'Missing required field: date' });
+@@ -53,12 +85,24 @@ export function createSorenessRoutes({ container, requireAuth, requireAdmin }) {
+         }
+       }
+ 
++      if (sourceWorkoutId) {
++        if (!sourceWorkoutDate) {
++          return res.status(400).json({ error: 'sourceWorkoutDate is required when sourceWorkoutId is set' });
++        }
++        if (sourceWorkoutDate > date) {
++          return res.status(400).json({ error: 'Soreness cannot predate the workout that caused it' });
++        }
++      }
++
+       const doc = {
+-        id: `soreness-${date}`,
++        id: sorenessDocId(date, sourceWorkoutId),
+         type: 'soreness-entry',
+         userId,
+         date,
+         muscles,
++        sourceWorkoutId,
++        sourceWorkoutDay,
++        sourceWorkoutDate,
+         updatedAt: new Date().toISOString()
+       };
+ 
+@@ -70,12 +114,15 @@ export function createSorenessRoutes({ container, requireAuth, requireAdmin }) {
+     }
+   });
+ 
+-  // Delete a soreness entry by date (admin only).
+-  router.delete('/api/soreness/:date', requireAuth, requireAdmin, async (req, res) => {
++  // Delete a soreness entry by document id (admin only).
++  //
++  // Historical entries use the bare `soreness-<date>` id, so a plain date still
++  // resolves to the unattributed entry for that date.
++  router.delete('/api/soreness/:id', requireAuth, requireAdmin, async (req, res) => {
+     try {
+       const userId = req.user.sub;
+-      const { date } = req.params;
+-      const id = `soreness-${date}`;
++      const { id: rawId } = req.params;
++      const id = rawId.startsWith('soreness-') ? rawId : `soreness-${rawId}`;
+ 
+       await container.item(id, userId).delete();
+       res.status(204).send();
+diff --git a/frontend/public/snapshot.db b/frontend/public/snapshot.db
+index 8bbfc66a..382a2b8b 100644
+Binary files a/frontend/public/snapshot.db and b/frontend/public/snapshot.db differ
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 0086c02a..2cbf5c7c 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -45,6 +45,9 @@ function App() {
+   const [refreshKey, setRefreshKey] = useState(0);
+   const [logViewWorkout, setLogViewWorkout] = useState(null);
+   const [logViewCardio, setLogViewCardio] = useState(null);
++  // Workout handed to the Soreness tab by a "Log soreness" action elsewhere,
++  // so the editor opens already attributed to it. Cleared once consumed.
++  const [sorenessSource, setSorenessSource] = useState(null);
+   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 760);
+   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+   const [activityView, setActivityView] = useState('list'); // History tab: 'list' | 'calendar'
+@@ -96,6 +99,12 @@ function App() {
+     navigateTab('log');
+   };
+ 
++  // Navigate to the Soreness tab with the editor pre-attributed to a workout
++  const handleLogSoreness = (workout) => {
++    setSorenessSource(workout);
++    navigateTab('soreness');
++  };
++
+   // Navigate to Log tab showing an existing cardio session
+   const handleViewCardio = (session) => {
+     if (session === null) {
+@@ -211,6 +220,7 @@ function App() {
+                 viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
+                 onWorkoutClick={isAdmin ? handleViewWorkout : undefined}
+                 onCardioClick={isAdmin ? handleViewCardio : undefined}
++                onLogSoreness={isAdmin ? handleLogSoreness : undefined}
+               />
+             )
+           )}
+@@ -220,7 +230,11 @@ function App() {
+           )}
+ 
+           {activeTab === 'soreness' && (
+-            <SorenessTab isAdmin={isAdmin} />
++            <SorenessTab
++              isAdmin={isAdmin}
++              initialSource={sorenessSource}
++              onSourceConsumed={() => setSorenessSource(null)}
++            />
+           )}
+ 
+           {activeTab === 'log' && isAdmin && (
+@@ -231,6 +245,7 @@ function App() {
+               onSuccess={handleWorkoutSuccess}
+               viewWorkout={logViewWorkout}
+               onViewWorkout={handleViewWorkout}
++              onLogSoreness={handleLogSoreness}
+               onWorkoutChanged={() => {
+                 setLogViewWorkout(null);
+                 setRefreshKey(prev => prev + 1);
+diff --git a/frontend/src/api/snapshot.js b/frontend/src/api/snapshot.js
+index c35706c3..bbb909d4 100644
+--- a/frontend/src/api/snapshot.js
++++ b/frontend/src/api/snapshot.js
+@@ -110,19 +110,26 @@ export function getLoggedWorkouts(db) {
+   return { workouts };
+ }
+ 
+-// Get all soreness entries, sorted by date descending
++// Get all soreness entries, sorted by date descending.
++// Several entries can share a date — one per originating workout — so `id` is
++// the identity, not `date`. Entries predating workout attribution have a null
++// source_workout_id and read as unattributed.
+ export function getSorenessEntries(db) {
+   const result = db.exec(
+-    'SELECT date, muscles FROM soreness_entries ORDER BY date DESC'
++    'SELECT id, date, muscles, source_workout_id, source_workout_day, source_workout_date FROM soreness_entries ORDER BY date DESC'
+   );
+ 
+   if (result.length === 0) {
+     return { entries: [] };
+   }
+ 
+-  const entries = result[0].values.map(([date, muscles]) => ({
++  const entries = result[0].values.map(([id, date, muscles, sourceWorkoutId, sourceWorkoutDay, sourceWorkoutDate]) => ({
++    id,
+     date,
+     muscles: JSON.parse(muscles),
++    sourceWorkoutId,
++    sourceWorkoutDay,
++    sourceWorkoutDate,
+   }));
+ 
+   return { entries };
+diff --git a/frontend/src/components/HistoryTab.jsx b/frontend/src/components/HistoryTab.jsx
+index d7505c73..c708be45 100644
+--- a/frontend/src/components/HistoryTab.jsx
++++ b/frontend/src/components/HistoryTab.jsx
+@@ -193,7 +193,10 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
+     }
+     if (item._kind === 'soreness') {
+       const muscleNames = item.muscles.map(m => m.muscle || m.group).join(', ');
+-      return `Soreness: ${muscleNames}`;
++      const source = item.sourceWorkoutDay != null
++        ? ` (from Day ${item.sourceWorkoutDay})`
++        : '';
++      return `Soreness${source}: ${muscleNames}`;
+     }
+     return `Day ${item.dayNumber}: ${item.dayName}`;
+   };
+diff --git a/frontend/src/components/ListTab.jsx b/frontend/src/components/ListTab.jsx
+index 8c856d49..749d592a 100644
+--- a/frontend/src/components/ListTab.jsx
++++ b/frontend/src/components/ListTab.jsx
+@@ -17,6 +17,7 @@ import {
+   pad2,
+   sorenessTierColor,
+ } from '../utils/dayDesign';
++import { daysBetween } from '../utils/sorenessLink';
+ import {
+   Plus,
+   Check,
+@@ -37,7 +38,7 @@ const daysSince = (iso) => {
+   return Math.round((b - a) / (1000 * 60 * 60 * 24));
+ };
+ 
+-export function ListTab({ onWorkoutClick, onCardioClick, viewToggle }) {
++export function ListTab({ onWorkoutClick, onCardioClick, onLogSoreness, viewToggle }) {
+   const [workouts, setWorkouts] = useState([]);
+   const [cardioSessions, setCardioSessions] = useState([]);
+   const [sorenessEntries, setSorenessEntries] = useState([]);
+@@ -175,7 +176,7 @@ export function ListTab({ onWorkoutClick, onCardioClick, viewToggle }) {
+           </div>
+         ) : (
+           groups.map(([date, dayItems]) => (
+-            <DateGroup key={date} date={date} items={dayItems} onWorkoutClick={onWorkoutClick} onCardioClick={onCardioClick} />
++            <DateGroup key={date} date={date} items={dayItems} onWorkoutClick={onWorkoutClick} onCardioClick={onCardioClick} onLogSoreness={onLogSoreness} />
+           ))
+         )}
+       </div>
+@@ -217,7 +218,7 @@ function StatsStrip({ workouts, cardio, cycles, activeDays }) {
+ }
+ 
+ // ── Date group ─────────────────────────────────────────────────────────
+-function DateGroup({ date, items, onWorkoutClick, onCardioClick }) {
++function DateGroup({ date, items, onWorkoutClick, onCardioClick, onLogSoreness }) {
+   const ds = daysSince(date);
+   const rel = ds === 0 ? 'today' : ds === 1 ? 'yesterday' : `${ds} days ago`;
+   return (
+@@ -228,9 +229,9 @@ function DateGroup({ date, items, onWorkoutClick, onCardioClick }) {
+       </div>
+       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+         {items.map((it) => {
+-          if (it._kind === 'workout') return <WorkoutCard key={it.id} w={it} onClick={onWorkoutClick} />;
++          if (it._kind === 'workout') return <WorkoutCard key={it.id} w={it} onClick={onWorkoutClick} onLogSoreness={onLogSoreness} />;
+           if (it._kind === 'cardio') return <CardioCard key={it.id} c={it} onClick={onCardioClick} />;
+-          if (it._kind === 'soreness') return <SorenessCard key={`s-${it.date}`} s={it} />;
++          if (it._kind === 'soreness') return <SorenessCard key={it.id || `s-${it.date}`} s={it} />;
+           return null;
+         })}
+       </div>
+@@ -268,7 +269,7 @@ function DayChip({ n, size = 'md' }) {
+ }
+ 
+ // ── Workout card ───────────────────────────────────────────────────────
+-function WorkoutCard({ w, onClick }) {
++function WorkoutCard({ w, onClick, onLogSoreness }) {
+   const [open, setOpen] = useState(false);
+   const design = DAY_DESIGN[w.dayNumber] || {};
+   const dayInfo = DAY_CONFIG[w.dayNumber];
+@@ -401,25 +402,23 @@ function WorkoutCard({ w, onClick }) {
+               </div>
+             </div>
+           ))}
+-          {onClick && (
+-            <button
+-              onClick={() => onClick(w)}
+-              style={{
+-                alignSelf: 'flex-start',
+-                marginTop: 6,
+-                padding: '6px 10px',
+-                fontSize: 11,
+-                fontFamily: 'var(--font-primary)',
+-                fontWeight: 600,
+-                color: 'var(--fg-muted)',
+-                background: 'transparent',
+-                border: '1px solid var(--border-subtle)',
+-                borderRadius: 9999,
+-                cursor: 'pointer',
+-              }}
+-            >
+-              Open in editor →
+-            </button>
++          {(onClick || onLogSoreness) && (
++            <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
++              {onClick && (
++                <button onClick={() => onClick(w)} style={cardActionStyle()}>
++                  Open in editor →
++                </button>
++              )}
++              {onLogSoreness && (
++                <button
++                  onClick={() => onLogSoreness(w)}
++                  style={cardActionStyle('#f59e6f')}
++                  title="Record the soreness this workout caused"
++                >
++                  Log soreness →
++                </button>
++              )}
++            </div>
+           )}
+         </div>
+       )}
+@@ -427,6 +426,21 @@ function WorkoutCard({ w, onClick }) {
+   );
+ }
+ 
++// Pill button used for the actions revealed inside an expanded workout card.
++function cardActionStyle(color) {
++  return {
++    padding: '6px 10px',
++    fontSize: 11,
++    fontFamily: 'var(--font-primary)',
++    fontWeight: 600,
++    color: color || 'var(--fg-muted)',
++    background: 'transparent',
++    border: `1px solid ${color ? 'rgba(245,158,111,0.35)' : 'var(--border-subtle)'}`,
++    borderRadius: 9999,
++    cursor: 'pointer',
++  };
++}
++
+ // ── Cardio card ────────────────────────────────────────────────────────
+ function CardioCard({ c, onClick }) {
+   const isBike = c.activity === 'bike';
+@@ -535,6 +549,51 @@ function SorenessCard({ s }) {
+           {s.muscles.length} muscle{s.muscles.length !== 1 ? 's' : ''} logged
+         </span>
+       </div>
++
++      {/* Which workout caused this.
++          The feed groups by the date soreness was *felt*, so this card often sits
++          directly beneath a workout from the same date that did NOT cause it —
++          e.g. Aug 14 leg day above soreness carried over from Aug 13 abs day.
++          The attribution therefore has to name the day and its date outright;
++          a bare "from D04" reads as a footnote on the card above it. */}
++      {s.sourceWorkoutDay != null && (
++        <div
++          style={{
++            display: 'inline-flex',
++            alignItems: 'center',
++            gap: 8,
++            alignSelf: 'flex-start',
++            flexWrap: 'wrap',
++            padding: '5px 10px',
++            borderRadius: 8,
++            background: 'rgba(255,255,255,0.03)',
++            borderLeft: `3px solid ${dayColor(s.sourceWorkoutDay)}`,
++          }}
++        >
++          <span style={{ fontSize: 10, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--fg-faint)', fontFamily: 'var(--font-primary)', fontWeight: 700 }}>
++            Caused by
++          </span>
++          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
++            <span style={{ width: 7, height: 7, borderRadius: '50%', background: dayColor(s.sourceWorkoutDay) }} />
++            <span className="tnum" style={{ fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--fg-body)' }}>
++              D{pad2(s.sourceWorkoutDay)}
++            </span>
++            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg-primary)' }}>
++              {DAY_CONFIG[s.sourceWorkoutDay]?.name}
++            </span>
++          </span>
++          {s.sourceWorkoutDate && (
++            <span style={{ fontSize: 11, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
++              {fmtDate(s.sourceWorkoutDate)}
++              {' · '}
++              {(() => {
++                const d = daysBetween(s.sourceWorkoutDate, s.date);
++                return d === 0 ? 'same day' : `${d} day${d === 1 ? '' : 's'} later`;
++              })()}
++            </span>
++          )}
++        </div>
++      )}
+       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+         {s.muscles.map((m, i) => (
+           <span
+diff --git a/frontend/src/components/SorenessLanes.jsx b/frontend/src/components/SorenessLanes.jsx
+new file mode 100644
+index 00000000..65829486
+--- /dev/null
++++ b/frontend/src/components/SorenessLanes.jsx
+@@ -0,0 +1,556 @@
++// Lanes view — a vertical date rail where each workout spawns a stripe that
++// runs for as long as its soreness lasted.
++//
++// Reads like a git graph: the date axis is the trunk, workouts are commits, and
++// each recovery is a branch that slopes off its workout and runs down the page
++// until it dies. Stripe *length* is the whole point of the view, so a stripe
++// never moves sideways once placed — see packLanes() for why that costs nothing.
++//
++// Every layout question that came up is a toggle rather than a baked-in choice,
++// so the call can be made by looking:
++//
++//   stripe per  — one stripe per workout, or one per muscle group in a workout
++//   missed days — bridge a day with no log, or break the stripe
++//   order       — oldest at top (cause above effect) or newest at top (feed order)
++//   quiet days  — collapse runs of empty dates, or show every one
++//   window      — how far back to draw
++//
++// Rendered as one SVG so rows, stripes and connectors cannot drift out of
++// alignment, inside a horizontally scrollable box for narrow screens.
++
++import { useMemo, useState, useEffect } from 'react';
++import { DAY_CONFIG } from '../utils/dayConfig';
++import { dayColor, pad2 } from '../utils/dayDesign';
++import { buildTracks, packLanes, datesBetween, daysBetween } from '../utils/sorenessLink';
++import { todayLocal } from '../utils/dateUtils';
++import { colors } from '../colors';
++
++const ROW_H = 30;
++const GAP_H = 22; // a collapsed run of dates with nothing in them
++const DATE_X = 0;
++const DATE_W = 56;
++const WO_X = DATE_W + 6;
++const WO_W = 146;
++const GUTTER = 64; // room for the spawn connector to slope
++const LANE_W = 20;
++const LANE_PITCH = 26;
++const LABEL_GAP = 14;
++const LABEL_COL = 100; // per-stripe label column, for stripes sharing a start day
++const TOP = 34;
++
++// Severity drives the day colour's opacity: faint when mild, solid when severe.
++const levelOpacity = (level) => 0.28 + 0.072 * level;
++
++const shortDate = (d) =>
++  new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
++
++// The chart is intrinsically wide, so on a phone the side panel has to move
++// below it — otherwise the row's fixed-width panel pushes the whole thing past
++// the viewport, and the app body doesn't scroll sideways so it just gets cut.
++function useNarrow(breakpoint = 760) {
++  const [narrow, setNarrow] = useState(() => window.innerWidth < breakpoint);
++  useEffect(() => {
++    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
++    const handler = (e) => setNarrow(e.matches);
++    mq.addEventListener('change', handler);
++    return () => mq.removeEventListener('change', handler);
++  }, [breakpoint]);
++  return narrow;
++}
++
++function shiftDays(date, delta) {
++  const d = new Date(date + 'T12:00:00');
++  d.setDate(d.getDate() + delta);
++  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
++}
++
++export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
++  const [group, setGroup] = useState('workout');   // 'workout' | 'muscle'
++  const [gaps, setGaps] = useState('bridge');     // 'bridge' | 'break'
++  const [order, setOrder] = useState('oldest');    // 'oldest' | 'newest'
++  const [quiet, setQuiet] = useState('collapse');  // 'collapse' | 'show'
++  const [windowDays, setWindowDays] = useState(30); // 30 | 90 | 0 (all)
++  const [hover, setHover] = useState(null);
++  const narrow = useNarrow();
++
++  const model = useMemo(() => {
++    const cutoff = windowDays ? shiftDays(todayLocal(), -windowDays) : null;
++    const inWindow = (d) => !cutoff || d >= cutoff;
++
++    const built = buildTracks(entries.filter((e) => inWindow(e.date)), group);
++    const { tracks, laneCount } = packLanes(built);
++    const visibleWorkouts = workouts.filter((w) => inWindow(w.date));
++
++    const stamps = [
++      ...visibleWorkouts.map((w) => w.date),
++      ...tracks.flatMap((t) => [t.startDate, t.endDate, t.sourceWorkoutDate].filter(Boolean)),
++    ];
++    if (stamps.length === 0) {
++      return { layout: [], yByDate: new Map(), bottom: TOP, tracks: [], laneCount: 0, workoutsByDate: new Map() };
++    }
++
++    const min = stamps.reduce((a, b) => (a < b ? a : b));
++    const max = stamps.reduce((a, b) => (a > b ? a : b));
++    let dates = datesBetween(min, max);
++    if (order === 'newest') dates = dates.reverse();
++
++    const workoutsByDate = new Map();
++    for (const w of visibleWorkouts) {
++      if (!workoutsByDate.has(w.date)) workoutsByDate.set(w.date, []);
++      workoutsByDate.get(w.date).push(w);
++    }
++
++    // A date earns a full row if something happens on it, or if a stripe is
++    // mid-run through it. A stripe must never be collapsed through, or its
++    // length — the one thing this view exists to show — would lie.
++    const active = new Set(workoutsByDate.keys());
++    for (const t of tracks) {
++      if (t.sourceWorkoutDate) active.add(t.sourceWorkoutDate);
++      for (const d of datesBetween(t.startDate, t.endDate)) active.add(d);
++    }
++
++    const layout = [];
++    let yPos = TOP;
++    let run = [];
++    const flushRun = () => {
++      if (!run.length) return;
++      if (quiet === 'collapse' && run.length >= 2) {
++        layout.push({ kind: 'gap', count: run.length, y: yPos, h: GAP_H });
++        yPos += GAP_H;
++      } else {
++        for (const d of run) {
++          layout.push({ kind: 'date', date: d, y: yPos + ROW_H / 2, h: ROW_H });
++          yPos += ROW_H;
++        }
++      }
++      run = [];
++    };
++    for (const d of dates) {
++      if (active.has(d)) {
++        flushRun();
++        layout.push({ kind: 'date', date: d, y: yPos + ROW_H / 2, h: ROW_H });
++        yPos += ROW_H;
++      } else {
++        run.push(d);
++      }
++    }
++    flushRun();
++
++    const yByDate = new Map();
++    for (const r of layout) if (r.kind === 'date') yByDate.set(r.date, r.y);
++
++    return { layout, yByDate, bottom: yPos, tracks, laneCount, workoutsByDate };
++  }, [entries, workouts, group, order, windowDays, quiet]);
++
++  const { layout, yByDate, bottom, tracks, laneCount, workoutsByDate } = model;
++  const y = (date) => yByDate.get(date);
++
++  // A stripe's label sits at whichever end is visually on top, which flips with
++  // the sort order — otherwise in newest-first the label floats at the bottom of
++  // the stripe it names.
++  const anchorDate = (t) => (order === 'newest' ? t.endDate : t.startDate);
++
++  // Several stripes can share an anchor row — after a leg session you might log
++  // quads, glutes and erectors at once — and their labels would otherwise print
++  // on top of each other. Lay them out left-to-right in lane order, so reading
++  // the labels across matches reading the stripes across.
++  const labelSlots = useMemo(() => {
++    const byRow = new Map();
++    for (const t of [...tracks].sort((a, b) => a.lane - b.lane)) {
++      const d = order === 'newest' ? t.endDate : t.startDate;
++      if (!byRow.has(d)) byRow.set(d, []);
++      byRow.get(d).push(t.key);
++    }
++    const slot = new Map();
++    let widest = 1;
++    for (const keys of byRow.values()) {
++      keys.forEach((k, i) => slot.set(k, i));
++      widest = Math.max(widest, keys.length);
++    }
++    return { slot, widest };
++  }, [tracks, order]);
++
++  const laneX0 = WO_X + WO_W + GUTTER;
++  const labelX = laneX0 + Math.max(laneCount, 1) * LANE_PITCH + LABEL_GAP;
++  const width = labelX + labelSlots.widest * LABEL_COL + 16;
++  const height = bottom + 16;
++
++  const controls = (
++    <Controls {...{ group, setGroup, gaps, setGaps, order, setOrder, quiet, setQuiet, windowDays, setWindowDays }} />
++  );
++
++  if (layout.length === 0) {
++    return (
++      <div style={{ maxWidth: '100%', minWidth: 0 }}>
++        {controls}
++        <p style={{ color: colors.text.tertiary, fontSize: 13, marginTop: 16 }}>
++          No workout-linked soreness in this window.
++        </p>
++      </div>
++    );
++  }
++
++  return (
++    <div style={{ maxWidth: '100%', minWidth: 0 }}>
++      {controls}
++
++      <div
++        style={{
++          display: 'flex',
++          flexDirection: narrow ? 'column' : 'row',
++          gap: 16,
++          // Stretch once stacked: with flex-start, a column's children size to
++          // their own content, so the scroll box would inflate to the SVG's full
++          // width and drag the panel and controls off the screen with it.
++          alignItems: narrow ? 'stretch' : 'flex-start',
++          marginTop: 14,
++          maxWidth: '100%',
++          minWidth: 0,
++        }}
++      >
++        <div
++          style={{
++            overflowX: 'auto',
++            width: '100%',
++            maxWidth: '100%',
++            minWidth: 0,
++            // `flex` addresses the main axis, so it must not be set once the
++            // row turns into a column — it would zero the chart's height.
++            ...(narrow ? {} : { flex: '1 1 0' }),
++          }}
++        >
++          <svg width={width} height={height} style={{ display: 'block' }}>
++            {/* Date rail */}
++            {layout.map((r) =>
++              r.kind === 'gap' ? (
++                <g key={`gap-${r.y}`}>
++                  <line
++                    x1={DATE_X}
++                    y1={r.y + GAP_H / 2}
++                    x2={width - 8}
++                    y2={r.y + GAP_H / 2}
++                    stroke={colors.border.subtle}
++                    strokeWidth={0.5}
++                    strokeDasharray="1 5"
++                  />
++                  <rect x={DATE_X} y={r.y + GAP_H / 2 - 7} width={80} height={14} fill={colors.bg.base} />
++                  <text
++                    x={DATE_X}
++                    y={r.y + GAP_H / 2 + 3}
++                    style={{ fontSize: 9, fontFamily: 'monospace', fill: colors.text.disabled }}
++                  >
++                    {r.count} quiet days
++                  </text>
++                </g>
++              ) : (
++                <g key={r.date}>
++                  <text
++                    x={DATE_X}
++                    y={r.y + 4}
++                    style={{ fontSize: 10, fontFamily: 'monospace', fill: colors.text.disabled }}
++                  >
++                    {shortDate(r.date)}
++                  </text>
++                  <line
++                    x1={DATE_W - 4}
++                    y1={r.y}
++                    x2={width - 8}
++                    y2={r.y}
++                    stroke={colors.border.subtle}
++                    strokeWidth={0.5}
++                    strokeDasharray="2 4"
++                    opacity={0.5}
++                  />
++                </g>
++              ),
++            )}
++
++            {/* Spawn connectors: workout -> first day of its stripe */}
++            {tracks.map((t) => {
++              const y1 = t.sourceWorkoutDate ? y(t.sourceWorkoutDate) : undefined;
++              const y2raw = y(t.startDate);
++              if (y1 == null || y2raw == null) return null;
++              const x1 = WO_X + WO_W;
++              const x2 = laneX0 + t.lane * LANE_PITCH;
++              const y2 = y2raw - ROW_H / 2 + 1;
++              const dim = hover && hover.workoutId !== t.sourceWorkoutId;
++              return (
++                <path
++                  key={`c-${t.key}`}
++                  d={`M${x1} ${y1} C${x1 + 34} ${y1} ${x2 - 30} ${y2} ${x2} ${y2}`}
++                  fill="none"
++                  stroke={dayColor(t.sourceWorkoutDay)}
++                  strokeWidth={1.5}
++                  opacity={dim ? 0.18 : 0.75}
++                />
++              );
++            })}
++
++            {/* Stripes */}
++            {tracks.map((t) => {
++              const x = laneX0 + t.lane * LANE_PITCH;
++              const color = dayColor(t.sourceWorkoutDay);
++              const dim = hover && hover.workoutId !== t.sourceWorkoutId;
++              return (
++                <g key={t.key} opacity={dim ? 0.2 : 1}>
++                  {datesBetween(t.startDate, t.endDate).map((d) => {
++                    const rowY = y(d);
++                    if (rowY == null) return null;
++                    const level = t.levels.get(d);
++                    const top = rowY - ROW_H / 2 + 1;
++                    if (level == null) {
++                      // A day you didn't log. Bridge it (the soreness was
++                      // presumably still there) or break the stripe.
++                      if (gaps === 'break') return null;
++                      return (
++                        <rect
++                          key={d}
++                          x={x + LANE_W / 2 - 1.5}
++                          y={top}
++                          width={3}
++                          height={ROW_H - 2}
++                          fill={color}
++                          opacity={0.3}
++                        />
++                      );
++                    }
++                    return (
++                      <rect
++                        key={d}
++                        x={x}
++                        y={top}
++                        width={LANE_W}
++                        height={ROW_H - 2}
++                        rx={2}
++                        fill={color}
++                        opacity={levelOpacity(level)}
++                        style={{ cursor: 'pointer' }}
++                        onMouseEnter={() =>
++                          setHover({
++                            workoutId: t.sourceWorkoutId,
++                            day: t.sourceWorkoutDay,
++                            workoutDate: t.sourceWorkoutDate,
++                            date: d,
++                            group: t.group,
++                            detail: t.detail.get(d) || [],
++                          })
++                        }
++                        onMouseLeave={() => setHover(null)}
++                      />
++                    );
++                  })}
++                </g>
++              );
++            })}
++
++            {/* One label per stripe, at its first day */}
++            {tracks.map((t) => {
++              const rowY = y(anchorDate(t));
++              if (rowY == null) return null;
++              const dim = hover && hover.workoutId !== t.sourceWorkoutId;
++              return (
++                <text
++                  key={`l-${t.key}`}
++                  x={labelX + (labelSlots.slot.get(t.key) || 0) * LABEL_COL}
++                  y={rowY + 4}
++                  style={{ fontSize: 10, fontFamily: 'monospace', fill: colors.text.tertiary }}
++                  opacity={dim ? 0.25 : 1}
++                >
++                  {group === 'muscle' ? t.group : `${t.spanDays}d · peak ${t.peak}`}
++                </text>
++              );
++            })}
++
++            {/* Workout nodes */}
++            {layout
++              .filter((r) => r.kind === 'date')
++              .map((r) =>
++                (workoutsByDate.get(r.date) || []).map((w, i) => {
++                  const dim = hover && hover.workoutId !== w.id;
++                  const c = dayColor(w.dayNumber);
++                  return (
++                    <g
++                      key={w.id}
++                      opacity={dim ? 0.3 : 1}
++                      style={{ cursor: isAdmin ? 'pointer' : 'default' }}
++                      onClick={() => isAdmin && onLogSoreness?.(w)}
++                    >
++                      <rect
++                        x={WO_X + i * 5}
++                        y={r.y - ROW_H / 2 + 2}
++                        width={WO_W - i * 5}
++                        height={ROW_H - 6}
++                        rx={4}
++                        fill={colors.bg.surface}
++                        stroke={c}
++                        strokeWidth={0.75}
++                      />
++                      <rect x={WO_X + i * 5} y={r.y - ROW_H / 2 + 2} width={3} height={ROW_H - 6} fill={c} />
++                      <text
++                        x={WO_X + 10 + i * 5}
++                        y={r.y + 4}
++                        style={{ fontSize: 11, fill: colors.text.primary, fontWeight: 600 }}
++                      >
++                        D{pad2(w.dayNumber)} · {(w.dayName || DAY_CONFIG[w.dayNumber]?.name || '').slice(0, 15)}
++                      </text>
++                    </g>
++                  );
++                }),
++              )}
++          </svg>
++        </div>
++
++        <HoverPanel hover={hover} laneCount={laneCount} trackCount={tracks.length} group={group} narrow={narrow} />
++      </div>
++    </div>
++  );
++}
++
++function HoverPanel({ hover, laneCount, trackCount, group, narrow }) {
++  return (
++    <div
++      style={{
++        width: narrow ? '100%' : 200,
++        boxSizing: 'border-box',
++        flexShrink: 0,
++        padding: 12,
++        borderRadius: 10,
++        background: colors.bg.raised,
++        border: `1px solid ${colors.border.subtle}`,
++        ...(narrow ? {} : { position: 'sticky', top: 12 }),
++      }}
++    >
++      {hover ? (
++        <>
++          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
++            <span style={{ width: 8, height: 8, borderRadius: '50%', background: dayColor(hover.day) }} />
++            <span style={{ fontSize: 12, fontWeight: 600, color: colors.text.primary }}>
++              D{pad2(hover.day)} · {DAY_CONFIG[hover.day]?.name}
++            </span>
++          </div>
++          <div style={{ fontSize: 11, color: colors.text.tertiary, marginBottom: 8 }}>
++            {shortDate(hover.date)}
++            {hover.workoutDate && ` · +${daysBetween(hover.workoutDate, hover.date)}d`}
++          </div>
++          {hover.group && (
++            <div style={{ fontSize: 11, color: colors.text.secondary, marginBottom: 6 }}>{hover.group}</div>
++          )}
++          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
++            {hover.detail.map((m) => (
++              <div key={m.name} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11 }}>
++                <span style={{ color: colors.text.secondary }}>{m.name}</span>
++                <span style={{ color: colors.text.primary, fontFamily: 'monospace' }}>{m.level}</span>
++              </div>
++            ))}
++          </div>
++        </>
++      ) : (
++        <div style={{ fontSize: 11, color: colors.text.tertiary, lineHeight: 1.6 }}>
++          Hover a stripe for detail.
++          <div style={{ marginTop: 8, fontFamily: 'monospace', color: colors.text.disabled }}>
++            {trackCount} stripe{trackCount === 1 ? '' : 's'}
++            <br />
++            {laneCount} lane{laneCount === 1 ? '' : 's'} at peak
++            <br />
++            per {group}
++          </div>
++        </div>
++      )}
++    </div>
++  );
++}
++
++function Controls({ group, setGroup, gaps, setGaps, order, setOrder, quiet, setQuiet, windowDays, setWindowDays }) {
++  return (
++    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', maxWidth: '100%', minWidth: 0 }}>
++      <Seg
++        label="Stripe per"
++        value={group}
++        onChange={setGroup}
++        opts={[
++          { id: 'workout', label: 'Workout' },
++          { id: 'muscle', label: 'Muscle group' },
++        ]}
++      />
++      <Seg
++        label="Missed days"
++        value={gaps}
++        onChange={setGaps}
++        opts={[
++          { id: 'bridge', label: 'Bridge' },
++          { id: 'break', label: 'Break' },
++        ]}
++      />
++      <Seg
++        label="Order"
++        value={order}
++        onChange={setOrder}
++        opts={[
++          { id: 'oldest', label: 'Oldest top' },
++          { id: 'newest', label: 'Newest top' },
++        ]}
++      />
++      <Seg
++        label="Quiet days"
++        value={quiet}
++        onChange={setQuiet}
++        opts={[
++          { id: 'collapse', label: 'Collapse' },
++          { id: 'show', label: 'Show' },
++        ]}
++      />
++      <Seg
++        label="Window"
++        value={windowDays}
++        onChange={setWindowDays}
++        opts={[
++          { id: 30, label: '30d' },
++          { id: 90, label: '90d' },
++          { id: 0, label: 'All' },
++        ]}
++      />
++    </div>
++  );
++}
++
++function Seg({ label, value, onChange, opts }) {
++  return (
++    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
++      <span style={{ fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.text.disabled }}>
++        {label}
++      </span>
++      <div
++        style={{
++          display: 'flex',
++          gap: 3,
++          padding: 3,
++          background: colors.bg.raised,
++          border: `1px solid ${colors.border.subtle}`,
++          borderRadius: 7,
++        }}
++      >
++        {opts.map((o) => {
++          const active = o.id === value;
++          return (
++            <button
++              key={o.id}
++              onClick={() => onChange(o.id)}
++              style={{
++                padding: '4px 9px',
++                borderRadius: 5,
++                fontSize: 11,
++                fontWeight: 600,
++                border: 'none',
++                cursor: 'pointer',
++                color: active ? colors.text.primary : colors.text.tertiary,
++                background: active ? 'rgba(255,255,255,0.07)' : 'transparent',
++              }}
++            >
++              {o.label}
++            </button>
++          );
++        })}
++      </div>
++    </div>
++  );
++}
+diff --git a/frontend/src/components/SorenessTab.jsx b/frontend/src/components/SorenessTab.jsx
+index c3a456cf..3abcfcac 100644
+--- a/frontend/src/components/SorenessTab.jsx
++++ b/frontend/src/components/SorenessTab.jsx
+@@ -1,19 +1,32 @@
+-// Soreness journal tab — tracks daily muscle soreness with structured muscle
+-// selection (group → specific muscle) and 1-10 severity levels.
++// Soreness journal tab — tracks muscle soreness caused by a specific workout.
+ //
+-// Public: anyone can view the soreness history.
+-// Admin: can add/edit soreness entries via the muscle picker.
++// Public: anyone can view. Admin: can add/edit entries.
+ //
+-// Data model: one document per date with an array of { group, muscle, level }.
++// An entry names the workout that caused the soreness, and you log against that
++// same workout repeatedly as it fades. Squat on the 19th, then log level 7 on
++// the 20th, 5 on the 21st, 2 on the 22nd — those three entries are one recovery
++// curve, which is what the Timeline view draws. Because identity is
++// (date, source workout) rather than date alone, two workouts' soreness can
++// overlap on the same day without fighting over one record.
++//
++// Entries written before workout attribution existed have no source workout and
++// show up as "unattributed"; they still render and can still be edited.
++//
++// Data model: { id, date, muscles: [{ group, muscle, level }],
++//               sourceWorkoutId, sourceWorkoutDay, sourceWorkoutDate }.
+ 
+-import { useState, useEffect, useMemo } from 'react';
++import { useState, useEffect, useMemo, useRef } from 'react';
+ import { apiFetch } from '../api/client';
+ import { useDataSource } from '../api/snapshotContext.jsx';
+ import { MUSCLE_TAXONOMY, MUSCLE_GROUPS, searchMuscles } from '../utils/muscleTaxonomy';
+ import { todayLocal } from '../utils/dateUtils';
++import { DAY_CONFIG } from '../utils/dayConfig';
++import { dayColor, pad2, sorenessTierColor } from '../utils/dayDesign';
++import { buildRecoveryCurves, daysBetween, groupsForDay, sorenessDocId } from '../utils/sorenessLink';
+ import { AnatomyDiagram } from './AnatomyDiagrams';
++import { SorenessLanes } from './SorenessLanes';
+ import { colors } from '../colors';
+-import { Wrench } from 'lucide-react';
++import { Wrench, ChevronLeft } from 'lucide-react';
+ 
+ // Map soreness levels to colors (green → yellow → red gradient)
+ function getLevelColor(level) {
+@@ -38,9 +51,33 @@ function formatDate(dateStr) {
+   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+ }
+ 
++// Format date as "Jan 15"
++function formatShortDate(dateStr) {
++  const d = new Date(dateStr + 'T12:00:00');
++  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
++}
++
++// "today" / "1 day later" / "3 days later"
++function relativeLabel(offset) {
++  if (offset === 0) return 'same day';
++  return `${offset} day${offset === 1 ? '' : 's'} later`;
++}
++
+ // Alias for readability within this component
+ const todayStr = todayLocal;
+ 
++// Normalise a logged-workout document into the compact source shape the editor
++// and the saved entry both use.
++function toSource(workout) {
++  if (!workout) return null;
++  return {
++    id: workout.id,
++    dayNumber: workout.dayNumber,
++    dayName: workout.dayName || DAY_CONFIG[workout.dayNumber]?.name || `Day ${workout.dayNumber}`,
++    date: workout.date,
++  };
++}
++
+ function useIsMobile(breakpoint = 640) {
+   const [mobile, setMobile] = useState(() => window.innerWidth < breakpoint);
+   useEffect(() => {
+@@ -52,17 +89,22 @@ function useIsMobile(breakpoint = 640) {
+   return mobile;
+ }
+ 
+-export function SorenessTab({ isAdmin }) {
++export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed }) {
+   const [entries, setEntries] = useState([]);
++  const [workouts, setWorkouts] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState(null);
+-  const { fetchSoreness, isReady } = useDataSource();
++  const { fetchSoreness, fetchWorkouts, isReady } = useDataSource();
+   const isMobile = useIsMobile();
+ 
++  const [view, setView] = useState('journal'); // 'journal' | 'timeline' | 'lanes'
++
+   // Editor state
+   const [editing, setEditing] = useState(false);
++  const [editorStep, setEditorStep] = useState('source'); // 'source' | 'muscles'
+   const [editDate, setEditDate] = useState(todayStr());
+-  const [originalDate, setOriginalDate] = useState(null); // tracks pre-edit date for moves
++  const [editSource, setEditSource] = useState(null); // { id, dayNumber, dayName, date }
++  const [originalId, setOriginalId] = useState(null); // pre-edit doc id, for moves
+   const [editMuscles, setEditMuscles] = useState([]);
+   const [saving, setSaving] = useState(false);
+ 
+@@ -71,22 +113,24 @@ export function SorenessTab({ isAdmin }) {
+   const [expandedGroup, setExpandedGroup] = useState(null);
+   const [searchQuery, setSearchQuery] = useState('');
+   const [hoveredMuscle, setHoveredMuscle] = useState(null); // { group, muscle } for diagram highlight
++  const [showAllGroups, setShowAllGroups] = useState(false); // escape hatch past the day filter
+ 
+   // List view — pinned muscle stays visible; hover temporarily overrides
+   const [pinnedMuscle, setPinnedMuscle] = useState(null); // { group, muscle }
+   const [listHover, setListHover] = useState(null); // { group, muscle }
+ 
+-  // Fetch entries
++  // Fetch entries and workouts (workouts drive the source picker and timeline)
+   useEffect(() => {
+     if (!isReady) return;
+-    loadEntries();
++    loadData();
+   }, [isReady]);
+ 
+-  async function loadEntries() {
++  async function loadData() {
+     try {
+       setLoading(true);
+-      const data = await fetchSoreness();
+-      setEntries(data.entries || []);
++      const [sorenessData, workoutData] = await Promise.all([fetchSoreness(), fetchWorkouts()]);
++      setEntries(sorenessData.entries || []);
++      setWorkouts(workoutData.workouts || []);
+     } catch (err) {
+       setError(err.message);
+     } finally {
+@@ -94,27 +138,106 @@ export function SorenessTab({ isAdmin }) {
+     }
+   }
+ 
+-  // Search results
+-  const searchResults = useMemo(() => searchMuscles(searchQuery), [searchQuery]);
+-
+-  // Start editing a date (new or existing).
+-  // For new entries, carry forward the most recent soreness entry since soreness
+-  // commonly persists across multiple days. Carried-forward muscles are marked
+-  // so the UI can show them as dismissable suggestions.
+-  function startEdit(date, existingMuscles = []) {
+-    setEditDate(date);
+-    setOriginalDate(existingMuscles.length > 0 ? date : null);
+-    if (existingMuscles.length > 0) {
+-      setEditMuscles(existingMuscles.map(m => ({ ...m })));
++  // Workouts, newest first — the order both the source picker and timeline want.
++  const workoutsByDate = useMemo(
++    () => [...workouts].sort((a, b) => b.date.localeCompare(a.date) || (b.time || '').localeCompare(a.time || '')),
++    [workouts],
++  );
++
++  // Arriving from "Log soreness" on a workout elsewhere in the app: open the
++  // editor straight onto that workout, skipping the source picker.
++  const consumedSource = useRef(null);
++  useEffect(() => {
++    if (!initialSource || consumedSource.current === initialSource) return;
++    consumedSource.current = initialSource;
++    beginEntryFor(toSource(initialSource));
++    onSourceConsumed?.();
++  }, [initialSource, entries]);
++
++  // Search results, restricted to the source day's groups unless overridden
++  const visibleGroups = useMemo(() => {
++    if (showAllGroups || !editSource) return MUSCLE_GROUPS;
++    return groupsForDay(editSource.dayNumber);
++  }, [showAllGroups, editSource]);
++
++  const searchResults = useMemo(() => {
++    const all = searchMuscles(searchQuery);
++    if (showAllGroups || !editSource) return all;
++    return all.filter((r) => visibleGroups.includes(r.group));
++  }, [searchQuery, visibleGroups, showAllGroups, editSource]);
++
++  // Most recent entry attributed to the same workout — the levels a follow-up
++  // log starts from, since re-logging a workout's soreness is mostly a matter of
++  // dragging yesterday's numbers down.
++  function lastEntryForSource(sourceId) {
++    const matching = entries
++      .filter((e) => (e.sourceWorkoutId || null) === (sourceId || null))
++      .sort((a, b) => b.date.localeCompare(a.date));
++    return matching[0] || null;
++  }
++
++  // Start a brand-new entry — begins at the workout picker.
++  function startNew() {
++    setEditDate(todayStr());
++    setEditSource(null);
++    setOriginalId(null);
++    setEditMuscles([]);
++    setEditorStep('source');
++    setEditing(true);
++    resetPicker();
++  }
++
++  // Source chosen (or explicitly skipped) — move on to the muscles.
++  function beginEntryFor(source) {
++    setEditSource(source);
++    setShowAllGroups(!source);
++
++    // An entry already logged today for this workout is an edit, not a new one.
++    const date = todayStr();
++    const existing = entries.find(
++      (e) => e.date === date && (e.sourceWorkoutId || null) === (source?.id || null),
++    );
++    if (existing) {
++      setEditDate(existing.date);
++      setOriginalId(existing.id || sorenessDocId(existing.date, existing.sourceWorkoutId));
++      setEditMuscles(existing.muscles.map((m) => ({ ...m })));
+     } else {
+-      // Pre-populate from the most recent entry (entries are sorted newest-first)
+-      const previous = entries.length > 0 ? entries[0].muscles : [];
+-      setEditMuscles(previous.map(m => ({ ...m, carryForward: true })));
++      setEditDate(date);
++      setOriginalId(null);
++      const previous = lastEntryForSource(source?.id || null);
++      setEditMuscles((previous?.muscles || []).map((m) => ({ ...m, carryForward: true })));
+     }
++    setEditorStep('muscles');
+     setEditing(true);
++    resetPicker();
++  }
++
++  // Edit an existing entry.
++  function startEdit(entry) {
++    setEditDate(entry.date);
++    setEditSource(
++      entry.sourceWorkoutId
++        ? {
++            id: entry.sourceWorkoutId,
++            dayNumber: entry.sourceWorkoutDay,
++            dayName: DAY_CONFIG[entry.sourceWorkoutDay]?.name || `Day ${entry.sourceWorkoutDay}`,
++            date: entry.sourceWorkoutDate,
++          }
++        : null,
++    );
++    setShowAllGroups(!entry.sourceWorkoutId);
++    setOriginalId(entry.id || sorenessDocId(entry.date, entry.sourceWorkoutId));
++    setEditMuscles(entry.muscles.map((m) => ({ ...m })));
++    setEditorStep('muscles');
++    setEditing(true);
++    resetPicker();
++  }
++
++  function resetPicker() {
+     setPickerOpen(false);
+     setExpandedGroup(null);
+     setSearchQuery('');
++    setHoveredMuscle(null);
+   }
+ 
+   // Add a muscle to the current edit. muscleName can be null for group-level soreness.
+@@ -144,10 +267,13 @@ export function SorenessTab({ isAdmin }) {
+   async function saveEntry() {
+     try {
+       setSaving(true);
++      setError(null);
++      const targetId = sorenessDocId(editDate, editSource?.id || null);
++
+       if (editMuscles.length === 0) {
+         // If all muscles removed, delete the entry
+         try {
+-          await apiFetch(`/api/soreness/${editDate}`, { method: 'DELETE' });
++          await apiFetch(`/api/soreness/${encodeURIComponent(targetId)}`, { method: 'DELETE' });
+         } catch {
+           // Entry might not exist yet, that's fine
+         }
+@@ -156,19 +282,26 @@ export function SorenessTab({ isAdmin }) {
+         const cleanMuscles = editMuscles.map(({ carryForward, ...rest }) => rest);
+         await apiFetch('/api/soreness', {
+           method: 'POST',
+-          body: JSON.stringify({ date: editDate, muscles: cleanMuscles }),
++          body: JSON.stringify({
++            date: editDate,
++            muscles: cleanMuscles,
++            sourceWorkoutId: editSource?.id || null,
++            sourceWorkoutDay: editSource?.dayNumber ?? null,
++            sourceWorkoutDate: editSource?.date || null,
++          }),
+         });
+       }
+-      // If date was changed on an existing entry, delete the old one
+-      if (originalDate && originalDate !== editDate) {
++      // Changing the date or the source workout changes the entry's identity,
++      // so the document it used to live in has to go.
++      if (originalId && originalId !== targetId) {
+         try {
+-          await apiFetch(`/api/soreness/${originalDate}`, { method: 'DELETE' });
++          await apiFetch(`/api/soreness/${encodeURIComponent(originalId)}`, { method: 'DELETE' });
+         } catch {
+           // Old entry might already be gone
+         }
+       }
+       setEditing(false);
+-      await loadEntries();
++      await loadData();
+     } catch (err) {
+       setError(err.message);
+     } finally {
+@@ -184,19 +317,103 @@ export function SorenessTab({ isAdmin }) {
+   // the hovered muscle's group (hovered takes priority for search results).
+   const diagramGroup = hoveredMuscle?.group || expandedGroup;
+ 
+-  // Editor view
++  // ── Source picker step ───────────────────────────────────────────────
++  if (editing && isAdmin && editorStep === 'source') {
++    return (
++      <div style={{ maxWidth: 720 }}>
++        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
++          <button onClick={() => setEditing(false)} style={styles.backBtn}>
++            <ChevronLeft size={13} style={{ verticalAlign: -2 }} /> Back
++          </button>
++          <h2 style={styles.heading}>What caused it?</h2>
++        </div>
++        <p style={{ color: colors.text.tertiary, fontSize: 12, margin: '0 0 18px 0' }}>
++          Pick the workout this soreness came from. The muscle picker narrows to that
++          day's muscles, and repeat logs against the same workout build its recovery curve.
++        </p>
++
++        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 460, overflowY: 'auto' }}>
++          {workoutsByDate.length === 0 && (
++            <p style={{ color: colors.text.tertiary, fontSize: 13 }}>No logged workouts to attribute to.</p>
++          )}
++          {workoutsByDate.map((w) => {
++            const since = daysBetween(w.date, todayStr());
++            const logged = entries.filter((e) => e.sourceWorkoutId === w.id).length;
++            return (
++              <button key={w.id} onClick={() => beginEntryFor(toSource(w))} style={styles.sourceOption}>
++                <span style={{ ...styles.dayChip, borderColor: dayColor(w.dayNumber) }}>
++                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: dayColor(w.dayNumber) }} />
++                  D{pad2(w.dayNumber)}
++                </span>
++                <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
++                  <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: colors.text.primary }}>
++                    {w.dayName || DAY_CONFIG[w.dayNumber]?.name}
++                  </span>
++                  <span style={{ display: 'block', fontSize: 11, color: colors.text.tertiary }}>
++                    {formatShortDate(w.date)} · {since === 0 ? 'today' : `${since} day${since === 1 ? '' : 's'} ago`}
++                    {logged > 0 && ` · ${logged} soreness log${logged === 1 ? '' : 's'}`}
++                  </span>
++                </span>
++              </button>
++            );
++          })}
++        </div>
++
++        <button
++          onClick={() => beginEntryFor(null)}
++          style={{ ...styles.sourceOption, marginTop: 12, borderStyle: 'dashed' }}
++        >
++          <span style={{ fontSize: 13, color: colors.text.secondary }}>
++            No specific workout — log unattributed soreness
++          </span>
++        </button>
++      </div>
++    );
++  }
++
++  // ── Muscle editor step ───────────────────────────────────────────────
+   if (editing && isAdmin) {
++    const offset = editSource?.date ? daysBetween(editSource.date, editDate) : null;
++    const filtered = !showAllGroups && editSource;
++
+     return (
+       <div style={{ maxWidth: 960, overflowX: 'auto' }}>
+-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
++        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+           <button onClick={() => setEditing(false)} style={styles.backBtn}>
+-            &larr; Back
++            <ChevronLeft size={13} style={{ verticalAlign: -2 }} /> Back
++          </button>
++          <h2 style={styles.heading}>{formatDate(editDate)}</h2>
++        </div>
++
++        {/* Originating workout */}
++        <div style={styles.sourceBanner}>
++          {editSource ? (
++            <>
++              <span style={{ ...styles.dayChip, borderColor: dayColor(editSource.dayNumber) }}>
++                <span style={{ width: 6, height: 6, borderRadius: '50%', background: dayColor(editSource.dayNumber) }} />
++                D{pad2(editSource.dayNumber)}
++              </span>
++              <span style={{ fontSize: 13, color: colors.text.primary, fontWeight: 600 }}>{editSource.dayName}</span>
++              <span style={{ fontSize: 11, color: colors.text.tertiary }}>
++                {formatShortDate(editSource.date)}
++                {offset != null && ` · soreness logged ${relativeLabel(offset)}`}
++              </span>
++            </>
++          ) : (
++            <span style={{ fontSize: 12, color: colors.text.tertiary }}>Not attributed to a workout</span>
++          )}
++          <span style={{ flex: 1 }} />
++          <button onClick={() => setEditorStep('source')} style={styles.linkBtn}>
++            {editSource ? 'Change workout' : 'Link a workout'}
+           </button>
+-          <h2 style={styles.heading}>
+-            {formatDate(editDate)}
+-          </h2>
+         </div>
+ 
++        {offset != null && offset < 0 && (
++          <p style={{ color: colors.accent.amber, fontSize: 12, margin: '0 0 12px 0' }}>
++            This date is before the workout — soreness can't precede its cause.
++          </p>
++        )}
++
+         {/* Date picker */}
+         <div style={{ marginBottom: 16 }}>
+           <label style={{ color: colors.text.secondary, fontSize: 12, marginRight: 8 }}>Date:</label>
+@@ -217,7 +434,7 @@ export function SorenessTab({ isAdmin }) {
+               {editMuscles.some(m => m.carryForward) && (
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '6px 10px', borderRadius: 6, background: colors.bg.tertiary }}>
+                   <span style={{ fontSize: 12, color: colors.text.secondary, flex: 1 }}>
+-                    Carried forward from previous entry
++                    Carried forward from the last log for this workout
+                   </span>
+                   <button
+                     onClick={() => setEditMuscles(editMuscles.filter(m => !m.carryForward))}
+@@ -282,6 +499,10 @@ export function SorenessTab({ isAdmin }) {
+               </button>
+             ) : (
+               <MusclePicker
++                groups={visibleGroups}
++                filtered={filtered}
++                sourceLabel={editSource?.dayName}
++                onShowAll={() => setShowAllGroups(true)}
+                 expandedGroup={expandedGroup}
+                 onExpandGroup={setExpandedGroup}
+                 onSelect={addMuscle}
+@@ -330,141 +551,426 @@ export function SorenessTab({ isAdmin }) {
+     );
+   }
+ 
++  const header = (
++    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
++      <div>
++        <h2 style={styles.heading}>Soreness Journal</h2>
++        <p style={{ color: colors.text.tertiary, fontSize: 12, margin: '4px 0 0 0' }}>
++          {view === 'journal'
++            ? 'Soreness logged per workout'
++            : view === 'lanes'
++              ? 'Each workout and how long its soreness ran'
++              : 'Each workout and the soreness it caused'}
++        </p>
++      </div>
++      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
++        <ViewToggle view={view} onChange={setView} />
++        {isAdmin && (
++          <button onClick={startNew} style={styles.addBtn}>
++            + Log Soreness
++          </button>
++        )}
++      </div>
++    </div>
++  );
++
++  // ── Lanes view ───────────────────────────────────────────────────────
++  if (view === 'lanes') {
++    return (
++      <div style={{ maxWidth: 1200 }}>
++        {header}
++        {error && <p style={{ color: colors.accent.red, fontSize: 12, marginBottom: 12 }}>{error}</p>}
++        <SorenessLanes
++          entries={entries}
++          workouts={workoutsByDate}
++          isAdmin={isAdmin}
++          onLogSoreness={(w) => beginEntryFor(toSource(w))}
++        />
++      </div>
++    );
++  }
++
++  // ── Timeline view ────────────────────────────────────────────────────
++  if (view === 'timeline') {
++    return (
++      <div style={{ maxWidth: 1000 }}>
++        {header}
++        {error && <p style={{ color: colors.accent.red, fontSize: 12, marginBottom: 12 }}>{error}</p>}
++        <RecoveryTimeline
++          workouts={workoutsByDate}
++          entries={entries}
++          isAdmin={isAdmin}
++          isMobile={isMobile}
++          onLogSoreness={(w) => beginEntryFor(toSource(w))}
++          onEditEntry={startEdit}
++        />
++      </div>
++    );
++  }
++
+   // Active muscle for the diagram: hover takes priority, then pinned
+   const activeMuscle = listHover || pinnedMuscle;
+   const activeDiagramGroup = activeMuscle?.group;
+ 
+-  // List view
++  // ── Journal (list) view ──────────────────────────────────────────────
+   return (
+-    <div style={{ maxWidth: isMobile ? undefined : 960, display: 'flex', gap: isMobile ? 16 : 24, alignItems: 'flex-start', overflowX: 'auto' }}>
+-      {/* Left column — entry list */}
+-      <div style={{ flex: '1 0 auto', minWidth: 0, ...(isMobile ? { width: 'calc(100vw - 80px)' } : {}) }}>
+-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+-          <div>
+-            <h2 style={styles.heading}>Soreness Journal</h2>
+-            <p style={{ color: colors.text.tertiary, fontSize: 12, margin: '4px 0 0 0' }}>
+-              Daily muscle soreness tracking
+-            </p>
++    <div style={{ maxWidth: isMobile ? undefined : 1000 }}>
++      {header}
++      {error && <p style={{ color: colors.accent.red, fontSize: 12, marginBottom: 12 }}>{error}</p>}
++
++      <div style={{ display: 'flex', gap: isMobile ? 16 : 24, alignItems: 'flex-start', overflowX: 'auto' }}>
++        {/* Left column — entry list */}
++        <div style={{ flex: '1 0 auto', minWidth: 0, ...(isMobile ? { width: 'calc(100vw - 80px)' } : {}) }}>
++          {entries.length === 0 ? (
++            <p style={{ color: colors.text.tertiary, fontSize: 14 }}>No soreness entries yet.</p>
++          ) : (
++            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
++              {entries.map((entry) => {
++                const offset =
++                  entry.sourceWorkoutDate ? daysBetween(entry.sourceWorkoutDate, entry.date) : null;
++                return (
++                  <div
++                    key={entry.id || sorenessDocId(entry.date, entry.sourceWorkoutId)}
++                    style={{
++                      ...styles.entryRow,
++                      ...(isMobile ? { flexDirection: 'column', alignItems: 'flex-start', gap: 8, padding: '10px 12px' } : {}),
++                    }}
++                  >
++                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
++                      <div>
++                        <div style={{ fontSize: 13, color: colors.text.secondary, fontWeight: 600 }}>
++                          {formatDate(entry.date)}
++                        </div>
++                        <div style={{ fontSize: 10, color: colors.text.disabled }}>{entry.date}</div>
++                      </div>
++                      {isAdmin && (
++                        <button
++                          onClick={() => startEdit(entry)}
++                          style={styles.editIconBtn}
++                          title="Edit entry"
++                        >
++                          <Wrench size={13} />
++                        </button>
++                      )}
++                    </div>
++                    <div style={{ flex: '1 1 100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
++                      {/* Originating workout */}
++                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
++                        {entry.sourceWorkoutId ? (
++                          <>
++                            <span style={{ ...styles.dayChip, borderColor: dayColor(entry.sourceWorkoutDay) }}>
++                              <span style={{ width: 5, height: 5, borderRadius: '50%', background: dayColor(entry.sourceWorkoutDay) }} />
++                              D{pad2(entry.sourceWorkoutDay)}
++                            </span>
++                            <span style={{ fontSize: 11, color: colors.text.tertiary }}>
++                              {DAY_CONFIG[entry.sourceWorkoutDay]?.name}
++                              {offset != null && ` · ${relativeLabel(offset)}`}
++                            </span>
++                          </>
++                        ) : (
++                          <span style={{ fontSize: 11, color: colors.text.disabled, fontStyle: 'italic' }}>
++                            unattributed
++                          </span>
++                        )}
++                      </div>
++                      {entry.muscles.map((m) => {
++                        const isPinned = pinnedMuscle?.group === m.group && pinnedMuscle?.muscle === m.muscle;
++                        return (
++                          <div
++                            key={`${m.group}-${m.muscle || 'group'}`}
++                            onClick={() => setPinnedMuscle(isPinned ? null : { group: m.group, muscle: m.muscle })}
++                            onMouseEnter={() => setListHover({ group: m.group, muscle: m.muscle })}
++                            onMouseLeave={() => setListHover(null)}
++                            style={{
++                              display: 'flex',
++                              alignItems: 'baseline',
++                              gap: 6,
++                              fontSize: 13,
++                              cursor: 'pointer',
++                              borderRadius: 4,
++                              padding: '1px 4px',
++                              margin: '0 -4px',
++                              backgroundColor: isPinned ? 'rgba(34, 211, 238, 0.08)' : 'transparent',
++                            }}
++                          >
++                            <span style={{ color: getLevelColor(m.level), fontWeight: 'bold', minWidth: 16, textAlign: 'right' }}>
++                              {m.level}
++                            </span>
++                            <span style={{ color: isPinned ? colors.accent.cyan : colors.text.secondary }}>
++                              {m.muscle
++                                ? <>{m.group} <span style={{ color: colors.text.tertiary }}>›</span> {m.muscle}</>
++                                : m.group
++                              }
++                            </span>
++                          </div>
++                        );
++                      })}
++                    </div>
++                  </div>
++                );
++              })}
++            </div>
++          )}
++        </div>
++
++        {/* Right column — anatomy diagram (pinned or hovered muscle), scrollable on mobile */}
++        <div style={{
++          ...styles.diagramPanel,
++          ...(isMobile ? { width: 220, flexShrink: 0 } : {}),
++          opacity: activeDiagramGroup ? 1 : 0,
++          transition: 'opacity 0.15s ease',
++          pointerEvents: activeDiagramGroup ? 'auto' : 'none',
++        }}>
++          {activeDiagramGroup ? (
++            <>
++              <AnatomyDiagram group={activeDiagramGroup} highlightMuscle={activeMuscle?.muscle} />
++              <div style={{ textAlign: 'center', marginTop: 8 }}>
++                <div style={{ fontSize: 13, fontWeight: 600, color: colors.accent.cyan }}>
++                  {activeMuscle?.muscle || activeDiagramGroup}
++                </div>
++                {activeMuscle?.muscle && (
++                  <div style={{ fontSize: 11, color: colors.text.tertiary }}>
++                    {MUSCLE_TAXONOMY[activeDiagramGroup]?.muscles.find(
++                      m => m.name === activeMuscle.muscle
++                    )?.location}
++                  </div>
++                )}
++              </div>
++            </>
++          ) : (
++            <div style={{ height: 300 }} />
++          )}
++        </div>
++      </div>
++    </div>
++  );
++}
++
++// ---------------------------------------------------------------------------
++// Timeline — workout history and the soreness each workout caused, side by side
++// ---------------------------------------------------------------------------
++
++function ViewToggle({ view, onChange }) {
++  const opts = [
++    { id: 'journal', label: 'Journal' },
++    { id: 'timeline', label: 'Timeline' },
++    { id: 'lanes', label: 'Lanes' },
++  ];
++  return (
++    <div style={{ display: 'flex', gap: 4, padding: 4, background: colors.bg.raised, border: `1px solid ${colors.border.subtle}`, borderRadius: 8 }}>
++      {opts.map((o) => {
++        const active = o.id === view;
++        return (
++          <button
++            key={o.id}
++            onClick={() => onChange(o.id)}
++            style={{
++              padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
++              border: 'none', cursor: 'pointer',
++              color: active ? colors.text.primary : colors.text.tertiary,
++              background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
++            }}
++          >
++            {o.label}
++          </button>
++        );
++      })}
++    </div>
++  );
++}
++
++// Every workout in reverse-chronological order with its recovery curve beneath
++// it. Workouts with nothing logged are still listed — the gaps are part of the
++// picture, and they double as the entry point for logging.
++function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onLogSoreness, onEditEntry }) {
++  const curves = useMemo(() => buildRecoveryCurves(entries), [entries]);
++  const unattributed = useMemo(
++    () => entries.filter((e) => !e.sourceWorkoutId),
++    [entries],
++  );
++
++  if (workouts.length === 0 && unattributed.length === 0) {
++    return <p style={{ color: colors.text.tertiary, fontSize: 14 }}>No workouts logged yet.</p>;
++  }
++
++  return (
++    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
++      {workouts.map((w) => (
++        <WorkoutRecoveryCard
++          key={w.id}
++          workout={w}
++          curve={curves.get(w.id)}
++          isAdmin={isAdmin}
++          isMobile={isMobile}
++          onLogSoreness={onLogSoreness}
++        />
++      ))}
++
++      {unattributed.length > 0 && (
++        <div style={{ marginTop: 18 }}>
++          <h3 style={{ ...styles.heading, fontSize: 15, marginBottom: 4 }}>Unattributed</h3>
++          <p style={{ color: colors.text.tertiary, fontSize: 11, margin: '0 0 10px 0' }}>
++            Logged without an originating workout — no recovery curve can be drawn for these.
++          </p>
++          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
++            {unattributed.map((e) => (
++              <div key={e.id || e.date} style={{ ...styles.entryRow, gap: 12 }}>
++                <span style={{ fontSize: 12, color: colors.text.secondary, fontWeight: 600, minWidth: 110 }}>
++                  {formatDate(e.date)}
++                </span>
++                <span style={{ flex: 1, fontSize: 12, color: colors.text.tertiary }}>
++                  {e.muscles.map((m) => `${m.muscle || m.group} ${m.level}`).join(' · ')}
++                </span>
++                {isAdmin && (
++                  <button onClick={() => onEditEntry(e)} style={styles.editIconBtn} title="Edit entry">
++                    <Wrench size={13} />
++                  </button>
++                )}
++              </div>
++            ))}
+           </div>
++        </div>
++      )}
++    </div>
++  );
++}
++
++function WorkoutRecoveryCard({ workout, curve, isAdmin, isMobile, onLogSoreness }) {
++  const color = dayColor(workout.dayNumber);
++  const span = curve ? Math.max(1, ...curve.muscles.map((m) => m.spanDays)) : 0;
++  const columns = span + 1; // day 0 (the workout) through the last log
++  const labelWidth = isMobile ? undefined : 150;
++
++  return (
++    <div style={{ ...styles.timelineCard, borderLeft: `3px solid ${color}` }}>
++      {/* Header. On mobile the meta and action drop to their own line rather
++          than being pushed off the right edge — the page itself never scrolls
++          sideways, so anything overflowing here would be silently cut off. */}
++      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
++        <span style={{ ...styles.dayChip, borderColor: color }}>
++          <span style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
++          D{pad2(workout.dayNumber)}
++        </span>
++        <span style={{ fontSize: 14, fontWeight: 600, color: colors.text.primary }}>
++          {workout.dayName || DAY_CONFIG[workout.dayNumber]?.name}
++        </span>
++        <span style={{ fontSize: 11, color: colors.text.tertiary }}>{formatShortDate(workout.date)}</span>
++        {!isMobile && <span style={{ flex: 1 }} />}
++        <span style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', ...(isMobile ? { width: '100%' } : {}) }}>
++          {curve ? (
++            <span style={{ fontSize: 11, color: colors.text.tertiary }}>
++              {curve.entries.length} log{curve.entries.length === 1 ? '' : 's'} · {curve.muscles.length} muscle
++              {curve.muscles.length === 1 ? '' : 's'}
++            </span>
++          ) : (
++            <span style={{ fontSize: 11, color: colors.text.disabled, fontStyle: 'italic' }}>no soreness logged</span>
++          )}
+           {isAdmin && (
+-            <button onClick={() => startEdit(todayStr(), findEntryMuscles(entries, todayStr()))} style={styles.addBtn}>
+-              + Log Soreness
++            <button onClick={() => onLogSoreness(workout)} style={styles.linkBtn}>
++              + Log soreness
+             </button>
+           )}
+-        </div>
++        </span>
++      </div>
+ 
+-        {error && <p style={{ color: colors.accent.red, fontSize: 12, marginBottom: 12 }}>{error}</p>}
++      {curve && (
++        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: isMobile ? 10 : 5 }}>
++          {/* Day-offset ruler. Desktop keeps it in a column aligned with the
++              muscle labels; mobile drops the label gutter and puts the muscle
++              name on its own line above its strip. */}
++          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
++            {!isMobile && <span style={{ width: labelWidth, flexShrink: 0 }} />}
++            <div style={styles.stripScroller}>
++              <div style={{ display: 'flex', gap: 2 }}>
++                {Array.from({ length: columns }, (_, i) => (
++                  <span key={i} style={styles.rulerCell}>{i === 0 ? 'W' : `+${i}`}</span>
++                ))}
++              </div>
++            </div>
++          </div>
+ 
+-        {entries.length === 0 ? (
+-          <p style={{ color: colors.text.tertiary, fontSize: 14 }}>No soreness entries yet.</p>
+-        ) : (
+-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+-            {entries.map((entry) => (
+-              <div
+-                key={entry.date}
++          {curve.muscles.map((m) => (
++            <div
++              key={`${m.group}-${m.muscle || 'group'}`}
++              style={{
++                display: 'flex',
++                gap: isMobile ? 4 : 12,
++                alignItems: isMobile ? 'flex-start' : 'center',
++                flexDirection: isMobile ? 'column' : 'row',
++              }}
++            >
++              <span
+                 style={{
+-                  ...styles.entryRow,
+-                  ...(isMobile ? { flexDirection: 'column', alignItems: 'flex-start', gap: 8, padding: '10px 12px' } : {}),
++                  width: labelWidth,
++                  maxWidth: '100%',
++                  flexShrink: 0,
++                  fontSize: 11,
++                  color: colors.text.secondary,
++                  overflow: 'hidden',
++                  textOverflow: 'ellipsis',
++                  whiteSpace: 'nowrap',
+                 }}
++                title={m.muscle ? `${m.group} › ${m.muscle}` : m.group}
+               >
+-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+-                  <div>
+-                    <div style={{ fontSize: 13, color: colors.text.secondary, fontWeight: 600 }}>
+-                      {formatDate(entry.date)}
+-                    </div>
+-                    <div style={{ fontSize: 10, color: colors.text.disabled }}>{entry.date}</div>
+-                  </div>
+-                  {isAdmin && (
+-                    <button
+-                      onClick={() => startEdit(entry.date, entry.muscles)}
+-                      style={styles.editIconBtn}
+-                      title="Edit entry"
+-                    >
+-                      <Wrench size={13} />
+-                    </button>
+-                  )}
+-                </div>
+-                <div style={{ flex: '1 1 100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
+-                  {entry.muscles.map((m) => {
+-                    const isPinned = pinnedMuscle?.group === m.group && pinnedMuscle?.muscle === m.muscle;
++                {m.muscle || m.group}
++              </span>
++
++              {/* One cell per day since the workout; filled where a level was
++                  logged. Long recoveries scroll inside the card. */}
++              <div style={styles.stripScroller}>
++                <div style={{ display: 'flex', gap: 2 }}>
++                  {Array.from({ length: columns }, (_, i) => {
++                    const point = m.points.find((p) => p.dayOffset === i);
+                     return (
+-                      <div
+-                        key={`${m.group}-${m.muscle || 'group'}`}
+-                        onClick={() => setPinnedMuscle(isPinned ? null : { group: m.group, muscle: m.muscle })}
+-                        onMouseEnter={() => setListHover({ group: m.group, muscle: m.muscle })}
+-                        onMouseLeave={() => setListHover(null)}
++                      <span
++                        key={i}
++                        title={point ? `${point.date} — level ${point.level}` : undefined}
+                         style={{
+-                          display: 'flex',
+-                          alignItems: 'baseline',
+-                          gap: 6,
+-                          fontSize: 13,
+-                          cursor: 'pointer',
+-                          borderRadius: 4,
+-                          padding: '1px 4px',
+-                          margin: '0 -4px',
+-                          backgroundColor: isPinned ? 'rgba(34, 211, 238, 0.08)' : 'transparent',
++                          ...styles.levelCell,
++                          background: point ? sorenessTierColor(point.level) : 'rgba(255,255,255,0.04)',
++                          color: point ? '#101010' : 'transparent',
+                         }}
+                       >
+-                        <span style={{ color: getLevelColor(m.level), fontWeight: 'bold', minWidth: 16, textAlign: 'right' }}>
+-                          {m.level}
+-                        </span>
+-                        <span style={{ color: isPinned ? colors.accent.cyan : colors.text.secondary }}>
+-                          {m.muscle
+-                            ? <>{m.group} <span style={{ color: colors.text.tertiary }}>›</span> {m.muscle}</>
+-                            : m.group
+-                          }
+-                        </span>
+-                      </div>
++                        {point ? point.level : ''}
++                      </span>
+                     );
+                   })}
+                 </div>
+               </div>
+-            ))}
+-          </div>
+-        )}
+-      </div>
+ 
+-      {/* Right column — anatomy diagram (pinned or hovered muscle), scrollable on mobile */}
+-      <div style={{
+-        ...styles.diagramPanel,
+-        ...(isMobile ? { width: 220, flexShrink: 0 } : {}),
+-        opacity: activeDiagramGroup ? 1 : 0,
+-        transition: 'opacity 0.15s ease',
+-        pointerEvents: activeDiagramGroup ? 'auto' : 'none',
+-      }}>
+-        {activeDiagramGroup ? (
+-          <>
+-            <AnatomyDiagram group={activeDiagramGroup} highlightMuscle={activeMuscle?.muscle} />
+-            <div style={{ textAlign: 'center', marginTop: 8 }}>
+-              <div style={{ fontSize: 13, fontWeight: 600, color: colors.accent.cyan }}>
+-                {activeMuscle?.muscle || activeDiagramGroup}
+-              </div>
+-              {activeMuscle?.muscle && (
+-                <div style={{ fontSize: 11, color: colors.text.tertiary }}>
+-                  {MUSCLE_TAXONOMY[activeDiagramGroup]?.muscles.find(
+-                    m => m.name === activeMuscle.muscle
+-                  )?.location}
+-                </div>
++              {/* The arrow sequence repeats what the cells already show, so it
++                  only earns its space on desktop. */}
++              {!isMobile && (
++                <span style={{ fontSize: 11, color: colors.text.tertiary, whiteSpace: 'nowrap' }}>
++                  {m.points.map((p) => p.level).join('→')}
++                </span>
+               )}
++              <span
++                style={{
++                  fontSize: 11,
++                  whiteSpace: 'nowrap',
++                  color: m.resolved ? colors.accent.green : colors.accent.amber,
++                }}
++              >
++                {m.resolved
++                  ? `faded after ${m.spanDays} day${m.spanDays === 1 ? '' : 's'}`
++                  : `still ${m.lastLevel} at day ${m.spanDays}`}
++              </span>
+             </div>
+-          </>
+-        ) : (
+-          <div style={{ height: 300 }} />
+-        )}
+-      </div>
++          ))}
++        </div>
++      )}
+     </div>
+   );
+ }
+ 
+-// Find muscles for a given date from entries array
+-function findEntryMuscles(entries, date) {
+-  const entry = entries.find(e => e.date === date);
+-  return entry ? entry.muscles : [];
+-}
+-
++// ---------------------------------------------------------------------------
+ // Muscle picker — browse groups or search.
+ // onHoverMuscle({ group, muscle }) drives the right-panel anatomy diagram.
+-function MusclePicker({ expandedGroup, onExpandGroup, onSelect, onClose, searchQuery, onSearchChange, searchResults, existingMuscles, onHoverMuscle }) {
++// `groups` is narrowed to the source workout's muscles unless the user opts out.
++// ---------------------------------------------------------------------------
++
++function MusclePicker({ groups, filtered, sourceLabel, onShowAll, expandedGroup, onExpandGroup, onSelect, onClose, searchQuery, onSearchChange, searchResults, existingMuscles, onHoverMuscle }) {
+   const isAlreadyAdded = (group, muscle) =>
+     existingMuscles.some(m => m.group === group && m.muscle === muscle);
+   const isGroupAdded = (group) =>
+@@ -477,6 +983,17 @@ function MusclePicker({ expandedGroup, onExpandGroup, onSelect, onClose, searchQ
+         <button onClick={onClose} style={styles.removeBtn}>✕</button>
+       </div>
+ 
++      {filtered && (
++        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '6px 10px', borderRadius: 6, background: colors.bg.tertiary }}>
++          <span style={{ fontSize: 11, color: colors.text.secondary, flex: 1 }}>
++            Showing muscles worked by {sourceLabel}
++          </span>
++          <button onClick={onShowAll} style={{ fontSize: 11, color: colors.accent.cyan, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px' }}>
++            Show all
++          </button>
++        </div>
++      )}
++
+       {/* Search */}
+       <input
+         type="text"
+@@ -491,7 +1008,9 @@ function MusclePicker({ expandedGroup, onExpandGroup, onSelect, onClose, searchQ
+       {searchQuery.length >= 2 ? (
+         <div style={{ maxHeight: 400, overflowY: 'auto', marginTop: 8 }}>
+           {searchResults.length === 0 ? (
+-            <p style={{ color: colors.text.tertiary, fontSize: 12 }}>No matches</p>
++            <p style={{ color: colors.text.tertiary, fontSize: 12 }}>
++              No matches{filtered ? ' in this workout’s muscles' : ''}
++            </p>
+           ) : (
+             searchResults.map((r) => (
+               <button
+@@ -518,7 +1037,7 @@ function MusclePicker({ expandedGroup, onExpandGroup, onSelect, onClose, searchQ
+       ) : (
+         /* Group browse */
+         <div style={{ maxHeight: 400, overflowY: 'auto', marginTop: 8 }}>
+-          {MUSCLE_GROUPS.map((group) => (
++          {groups.map((group) => (
+             <div key={group}>
+               <button
+                 onClick={() => onExpandGroup(expandedGroup === group ? null : group)}
+@@ -591,6 +1110,11 @@ const styles = {
+     fontFamily: 'monospace',
+   },
+   backBtn: {
++    display: 'inline-flex',
++    alignItems: 'center',
++    gap: 2,
++    whiteSpace: 'nowrap',
++    flexShrink: 0,
+     background: 'none',
+     border: `1px solid ${colors.border.subtle}`,
+     color: colors.text.secondary,
+@@ -599,6 +1123,83 @@ const styles = {
+     cursor: 'pointer',
+     fontSize: 13,
+   },
++  linkBtn: {
++    background: 'none',
++    border: `1px solid ${colors.border.subtle}`,
++    color: colors.accent.cyan,
++    padding: '4px 10px',
++    borderRadius: 6,
++    cursor: 'pointer',
++    fontSize: 11,
++    fontWeight: 600,
++    whiteSpace: 'nowrap',
++  },
++  dayChip: {
++    display: 'inline-flex',
++    alignItems: 'center',
++    gap: 5,
++    padding: '2px 8px',
++    borderRadius: 9999,
++    border: '1px solid',
++    fontSize: 10,
++    fontWeight: 700,
++    fontFamily: 'monospace',
++    color: colors.text.secondary,
++    flexShrink: 0,
++  },
++  sourceOption: {
++    display: 'flex',
++    alignItems: 'center',
++    gap: 10,
++    width: '100%',
++    padding: '10px 14px',
++    background: colors.bg.surface,
++    border: `1px solid ${colors.border.subtle}`,
++    borderRadius: 8,
++    cursor: 'pointer',
++    textAlign: 'left',
++  },
++  sourceBanner: {
++    display: 'flex',
++    alignItems: 'center',
++    gap: 10,
++    flexWrap: 'wrap',
++    padding: '8px 12px',
++    marginBottom: 14,
++    background: colors.bg.raised,
++    border: `1px solid ${colors.border.subtle}`,
++    borderRadius: 8,
++  },
++  timelineCard: {
++    padding: '12px 14px',
++    backgroundColor: colors.bg.surface,
++    border: `1px solid ${colors.border.subtle}`,
++    borderRadius: 8,
++  },
++  // Long recoveries scroll inside their own card rather than widening the page —
++  // the app body never scrolls sideways, so overflow here would be cut off.
++  stripScroller: {
++    overflowX: 'auto',
++    maxWidth: '100%',
++    minWidth: 0,
++  },
++  rulerCell: {
++    width: 22,
++    textAlign: 'center',
++    fontSize: 9,
++    fontFamily: 'monospace',
++    color: colors.text.disabled,
++  },
++  levelCell: {
++    width: 22,
++    height: 20,
++    borderRadius: 3,
++    display: 'grid',
++    placeItems: 'center',
++    fontSize: 10,
++    fontWeight: 700,
++    fontFamily: 'monospace',
++  },
+   dateInput: {
+     background: colors.bg.surface,
+     border: `1px solid ${colors.border.subtle}`,
+@@ -630,15 +1231,6 @@ const styles = {
+     alignItems: 'center',
+     opacity: 0.6,
+   },
+-  musclePill: {
+-    display: 'inline-flex',
+-    alignItems: 'center',
+-    padding: '2px 8px',
+-    borderRadius: 12,
+-    border: '1px solid',
+-    fontSize: 11,
+-    fontWeight: 500,
+-  },
+   muscleEntry: {
+     display: 'flex',
+     alignItems: 'center',
+diff --git a/frontend/src/components/WorkoutDrawer.jsx b/frontend/src/components/WorkoutDrawer.jsx
+index b340fe03..1e0989b0 100644
+--- a/frontend/src/components/WorkoutDrawer.jsx
++++ b/frontend/src/components/WorkoutDrawer.jsx
+@@ -26,6 +26,7 @@ export function LogTab({
+   onViewCardio,
+   onWorkoutChanged,
+   onCardioChanged,
++  onLogSoreness,
+   viewWorkout = null,
+   viewCardio = null,
+   currentDay = 1,
+@@ -887,6 +888,16 @@ export function LogTab({
+         </div>
+       )}
+ 
++      {/* Record the soreness this workout caused (edit mode only) */}
++      {isEditMode && onLogSoreness && (
++        <button
++          onClick={() => onLogSoreness(viewWorkout)}
++          className="w-full mt-4 bg-slate-800 hover:bg-orange-900/40 text-orange-300 px-6 py-3 rounded-xl font-bold uppercase tracking-wide border border-orange-500/30 hover:border-orange-500/60 transition-all"
++        >
++          Log Soreness From This Workout
++        </button>
++      )}
++
+       {/* Delete (edit mode only) */}
+       {isEditMode && (
+         <div className="mt-4">
+diff --git a/frontend/src/utils/sorenessLink.js b/frontend/src/utils/sorenessLink.js
+new file mode 100644
+index 00000000..38f5e693
+--- /dev/null
++++ b/frontend/src/utils/sorenessLink.js
+@@ -0,0 +1,253 @@
++// Linking soreness back to the workout that caused it.
++//
++// A soreness entry names an originating workout, and you log against that same
++// workout repeatedly as the soreness fades — the sequence of entries for one
++// workout *is* its recovery curve. This module holds the two pieces of shared
++// logic that supports: which muscles a given cycle day plausibly makes sore
++// (used to default-filter the muscle picker), and how to fold a flat list of
++// entries into per-workout recovery curves (used by the timeline view).
++
++import { MUSCLE_GROUPS } from './muscleTaxonomy';
++
++// Cycle day → muscle taxonomy groups that day plausibly makes sore.
++//
++// Deliberately generous rather than minimal: this only sets the *default*
++// filter on the muscle picker, and the picker always offers an escape hatch to
++// the full taxonomy. Missing a real group costs more than showing a spare one.
++// Groups are keyed by MUSCLE_TAXONOMY names, not the informal lowercase tags on
++// `primaryMuscleGroups` in the day definitions.
++export const DAY_MUSCLE_GROUPS = {
++  1:  ['Quadriceps', 'Glutes', 'Hamstrings', 'Hip & Adductors', 'Abs & Core', 'Lats & Back'],
++  2:  ['Calves'],
++  3:  ['Hamstrings', 'Glutes', 'Lats & Back'],
++  4:  ['Abs & Core', 'Hip & Adductors'],
++  5:  ['Lats & Back', 'Biceps', 'Deltoids', 'Forearms & Grip'],
++  6:  ['Biceps', 'Forearms & Grip'],
++  7:  ['Abs & Core', 'Lats & Back', 'Hip & Adductors'],
++  8:  ['Pecs', 'Deltoids'],
++  9:  ['Pecs', 'Deltoids', 'Triceps'],
++  10: ['Triceps', 'Deltoids'],
++  11: ['Deltoids', 'Lats & Back'],
++  12: ['Forearms & Grip', 'Biceps'],
++};
++
++// Groups to show for a source workout. Falls back to the whole taxonomy when
++// the day is unknown or unattributed.
++export function groupsForDay(dayNumber) {
++  return DAY_MUSCLE_GROUPS[dayNumber] || MUSCLE_GROUPS;
++}
++
++// Whole days between two YYYY-MM-DD strings (b - a). Parsed at noon so DST
++// transitions can't shift the result by a day.
++export function daysBetween(a, b) {
++  const ms = new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00');
++  return Math.round(ms / 86400000);
++}
++
++// Key identifying one muscle within an entry (muscle is null for group-level).
++export const muscleKey = (m) => `${m.group}\u0000${m.muscle || ''}`;
++
++/**
++ * Fold soreness entries into recovery curves, one per originating workout.
++ *
++ * Returns a Map of sourceWorkoutId → {
++ *   sourceWorkoutId, sourceWorkoutDay, sourceWorkoutDate,
++ *   entries: [...]                       // ascending by date
++ *   muscles: [{ group, muscle, points: [{ date, dayOffset, level }],
++ *               peak, lastLevel, lastDate, spanDays, resolved }]
++ * }
++ *
++ * `dayOffset` is days since the workout, so day 0 is the workout itself.
++ * A muscle counts as resolved once its final recorded level is 2 or below —
++ * "mild" on the journal's own scale — otherwise it is still ongoing and
++ * `spanDays` is a floor, not a total.
++ */
++export function buildRecoveryCurves(entries) {
++  const byWorkout = new Map();
++
++  for (const entry of entries) {
++    if (!entry.sourceWorkoutId) continue;
++    let curve = byWorkout.get(entry.sourceWorkoutId);
++    if (!curve) {
++      curve = {
++        sourceWorkoutId: entry.sourceWorkoutId,
++        sourceWorkoutDay: entry.sourceWorkoutDay ?? null,
++        sourceWorkoutDate: entry.sourceWorkoutDate ?? null,
++        entries: [],
++        muscleMap: new Map(),
++      };
++      byWorkout.set(entry.sourceWorkoutId, curve);
++    }
++    curve.entries.push(entry);
++    // Denormalised workout fields are written on every entry; keep the first
++    // non-null in case an older entry was saved without them.
++    curve.sourceWorkoutDay ??= entry.sourceWorkoutDay ?? null;
++    curve.sourceWorkoutDate ??= entry.sourceWorkoutDate ?? null;
++
++    for (const m of entry.muscles) {
++      const key = muscleKey(m);
++      let row = curve.muscleMap.get(key);
++      if (!row) {
++        row = { group: m.group, muscle: m.muscle || null, points: [] };
++        curve.muscleMap.set(key, row);
++      }
++      row.points.push({ date: entry.date, level: m.level });
++    }
++  }
++
++  for (const curve of byWorkout.values()) {
++    curve.entries.sort((a, b) => a.date.localeCompare(b.date));
++    const origin = curve.sourceWorkoutDate || curve.entries[0]?.date;
++
++    curve.muscles = [...curve.muscleMap.values()].map((row) => {
++      row.points.sort((a, b) => a.date.localeCompare(b.date));
++      for (const p of row.points) {
++        p.dayOffset = origin ? daysBetween(origin, p.date) : 0;
++      }
++      const last = row.points[row.points.length - 1];
++      return {
++        ...row,
++        peak: Math.max(...row.points.map((p) => p.level)),
++        lastLevel: last.level,
++        lastDate: last.date,
++        spanDays: last.dayOffset,
++        resolved: last.level <= 2,
++      };
++    });
++    // Worst-hit muscle first — that's the one the recovery read is about.
++    curve.muscles.sort((a, b) => b.peak - a.peak || b.spanDays - a.spanDays);
++    delete curve.muscleMap;
++  }
++
++  return byWorkout;
++}
++
++// Deterministic document id for a (date, sourceWorkoutId) pair — mirrors
++// `sorenessDocId` in backend/routes/routes/soreness.js. The frontend needs it
++// to notice when an edit moves an entry to a different date or workout, since
++// that changes its identity and the old document has to be removed.
++export function sorenessDocId(date, sourceWorkoutId) {
++  return sourceWorkoutId ? `soreness-${date}-${sourceWorkoutId}` : `soreness-${date}`;
++}
++
++// ---------------------------------------------------------------------------
++// Recovery tracks and lane packing (the Lanes view)
++// ---------------------------------------------------------------------------
++
++// Every date from a to b inclusive, as YYYY-MM-DD.
++export function datesBetween(a, b) {
++  const out = [];
++  const cur = new Date(a + 'T12:00:00');
++  const end = new Date(b + 'T12:00:00');
++  while (cur <= end) {
++    out.push(
++      `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`,
++    );
++    cur.setDate(cur.getDate() + 1);
++  }
++  return out;
++}
++
++/**
++ * Fold soreness entries into "tracks" — one contiguous stripe each.
++ *
++ *   mode 'workout' — one track per originating workout. A workout's whole
++ *                    recovery is a single stripe; the level shown on a day is
++ *                    the worst muscle that day. Rarely more than 2-3 overlap.
++ *   mode 'muscle'  — one track per (originating workout, muscle group), so a
++ *                    workout that made three groups sore spawns three stripes.
++ *                    Still anchored to its workout, just finer grained.
++ *
++ * Unattributed entries have no workout to spawn from, so they get no track.
++ */
++export function buildTracks(entries, mode = 'workout') {
++  const tracks = new Map();
++
++  // Record one day of one stripe. `muscles` is what the tooltip shows.
++  const add = (key, group, date, muscles, entry) => {
++    let t = tracks.get(key);
++    if (!t) {
++      t = {
++        key,
++        group,
++        sourceWorkoutId: entry.sourceWorkoutId,
++        sourceWorkoutDay: entry.sourceWorkoutDay ?? null,
++        sourceWorkoutDate: entry.sourceWorkoutDate ?? null,
++        levels: new Map(), // date -> worst level that day
++        detail: new Map(), // date -> [{ name, level }]
++      };
++      tracks.set(key, t);
++    }
++    const worst = Math.max(...muscles.map((m) => m.level));
++    // Two entries should never share a (track, date), but guard anyway.
++    t.levels.set(date, Math.max(t.levels.get(date) ?? 0, worst));
++    t.detail.set(date, muscles.map((m) => ({ name: m.muscle || m.group, level: m.level })));
++  };
++
++  for (const entry of entries) {
++    if (!entry.sourceWorkoutId || !entry.muscles?.length) continue;
++
++    if (mode === 'muscle') {
++      // One stripe per taxonomy group this workout made sore.
++      const byGroup = new Map();
++      for (const m of entry.muscles) {
++        if (!byGroup.has(m.group)) byGroup.set(m.group, []);
++        byGroup.get(m.group).push(m);
++      }
++      for (const [group, muscles] of byGroup) {
++        add(`${entry.sourceWorkoutId} :: ${group}`, group, entry.date, muscles, entry);
++      }
++    } else {
++      add(entry.sourceWorkoutId, null, entry.date, entry.muscles, entry);
++    }
++  }
++
++  for (const t of tracks.values()) {
++    t.dates = [...t.levels.keys()].sort();
++    t.startDate = t.dates[0];
++    t.endDate = t.dates[t.dates.length - 1];
++    t.peak = Math.max(...t.levels.values());
++    t.lastLevel = t.levels.get(t.endDate);
++    t.spanDays = t.sourceWorkoutDate ? daysBetween(t.sourceWorkoutDate, t.endDate) : t.dates.length;
++  }
++
++  return [...tracks.values()];
++}
++
++/**
++ * Assign each track a lane, greedily, in start-date order: always the lowest
++ * lane whose previous occupant has already finished.
++ *
++ * This is interval-graph colouring. Interval graphs are perfect, so the minimum
++ * possible lane count equals peak concurrency (the most stripes alive on any one
++ * day), and greedy-by-start-date provably achieves it. That is why nothing here
++ * ever reflows a stripe sideways: the layout is already as narrow as it can be,
++ * so shifting a live stripe to backfill a freed lane would buy zero width while
++ * destroying the stable x-position that makes a stripe's length readable.
++ * A freed lane simply stays empty until a later track claims it — and that hole
++ * is information: fewer concurrent recoveries that day.
++ *
++ * Returns { tracks (each with .lane), laneCount }.
++ */
++export function packLanes(tracks) {
++  const sorted = [...tracks].sort(
++    (a, b) =>
++      a.startDate.localeCompare(b.startDate) ||
++      b.endDate.localeCompare(a.endDate) ||
++      a.key.localeCompare(b.key),
++  );
++
++  const laneEnds = []; // lane index -> endDate of its current occupant
++  for (const t of sorted) {
++    let lane = laneEnds.findIndex((end) => end < t.startDate);
++    if (lane === -1) {
++      lane = laneEnds.length;
++      laneEnds.push(t.endDate);
++    } else {
++      laneEnds[lane] = t.endDate;
++    }
++    t.lane = lane;
++  }
++
++  return { tracks: sorted, laneCount: laneEnds.length };
++}
+diff --git a/snapshot/generate-snapshot.js b/snapshot/generate-snapshot.js
+index 7f0ab49c..fd13c27f 100644
+--- a/snapshot/generate-snapshot.js
++++ b/snapshot/generate-snapshot.js
+@@ -85,11 +85,18 @@ const SCHEMA = `
+     value TEXT NOT NULL
+   );
+ 
++  -- One row per (date, source workout). Several rows can share a date when the
++  -- soreness from two different workouts overlaps, so date alone is not the key.
+   CREATE TABLE soreness_entries (
+-    date    TEXT PRIMARY KEY,
+-    muscles TEXT NOT NULL
++    id                  TEXT PRIMARY KEY,
++    date                TEXT NOT NULL,
++    muscles             TEXT NOT NULL,
++    source_workout_id   TEXT,
++    source_workout_day  INTEGER,
++    source_workout_date TEXT
+   );
+   CREATE INDEX idx_soreness_date ON soreness_entries(date DESC);
++  CREATE INDEX idx_soreness_source ON soreness_entries(source_workout_id);
+ 
+   CREATE TABLE cardio_sessions (
+     id                TEXT PRIMARY KEY,
+@@ -230,9 +237,18 @@ async function main() {
+     insertSetting.run('currentDay', String(currentDay));
+ 
+     // Soreness entries
+-    const insertSoreness = db.prepare('INSERT INTO soreness_entries (date, muscles) VALUES (?, ?)');
++    const insertSoreness = db.prepare(
++      'INSERT INTO soreness_entries (id, date, muscles, source_workout_id, source_workout_day, source_workout_date) VALUES (?, ?, ?, ?, ?, ?)'
++    );
+     for (const doc of results.soreness) {
+-      insertSoreness.run(doc.date, JSON.stringify(doc.muscles));
++      insertSoreness.run(
++        doc.id,
++        doc.date,
++        JSON.stringify(doc.muscles),
++        doc.sourceWorkoutId || null,
++        doc.sourceWorkoutDay || null,
++        doc.sourceWorkoutDate || null
++      );
+     }
+ 
+     // Cardio sessions

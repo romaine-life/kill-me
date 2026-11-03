@@ -1,0 +1,260 @@
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index eae23142..d7bc6da4 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -190,7 +190,7 @@ function App() {
+         )}
+ 
+         {/* Tab content area */}
+-        <div style={styles.tabContent}>
++        <div className="app-tab-content" style={styles.tabContent}>
+           {activeTab === 'today' && (
+             <TodayTab currentDay={currentDay} isAdmin={isAdmin} onNavigateExercises={handleNavigateExercises} />
+           )}
+diff --git a/frontend/src/colors.js b/frontend/src/colors.js
+index 18bc452c..be236f7d 100644
+--- a/frontend/src/colors.js
++++ b/frontend/src/colors.js
+@@ -1,38 +1,38 @@
+-// Centralized color palette for the kill-me workout tracker.
+-// Dark cyan/slate theme — industrial gym aesthetic.
+-// All color values should be referenced from here — no raw hex/rgba in components.
++// Centralized compatibility palette. Older tabs still import this object; keep
++// the shape stable while mapping values onto the synergy-12 visual system.
+ 
+ export const colors = {
+   // ── Backgrounds (layered from deepest to most elevated) ──
+   bg: {
+-    base: '#0a0f14',
+-    raised: '#141f2a',
+-    surface: '#1a2a38',
+-    overlay: '#223d4e',
++    base: '#0e0e0e',
++    raised: '#161616',
++    surface: '#1a1a1a',
++    overlay: '#262626',
++    tertiary: 'rgba(255, 255, 255, 0.03)',
+   },
+ 
+   // ── Borders ──
+   border: {
+-    subtle: '#2a3f52',
+-    strong: '#3d5666',
++    subtle: 'rgba(255, 255, 255, 0.06)',
++    strong: 'rgba(255, 255, 255, 0.12)',
+   },
+ 
+   // ── Text ──
+   text: {
+-    primary: '#d4e4f0',
+-    secondary: '#96aac0',
+-    tertiary: '#6a7c8a',
+-    disabled: '#4a5566',
++    primary: '#ffffff',
++    secondary: '#cecece',
++    tertiary: '#8a8a8a',
++    disabled: '#666666',
+   },
+ 
+   // ── Accent colors ──
+   accent: {
+-    cyan: '#22d3ee',
+-    blue: '#3b82f6',
+-    purple: '#a855f7',
+-    green: '#5a8e70',
+-    gold: '#f5c842',
+-    amber: '#f59e0b',
+-    red: '#ff5555',
++    cyan: '#c83838',
++    blue: '#4f8cf7',
++    purple: '#a06ff5',
++    green: '#34d399',
++    gold: '#f0c560',
++    amber: '#f59e6f',
++    red: '#ef6f6f',
+   },
+ };
+diff --git a/frontend/src/index.css b/frontend/src/index.css
+index 97514757..c2771ace 100644
+--- a/frontend/src/index.css
++++ b/frontend/src/index.css
+@@ -106,7 +106,179 @@
+   color: var(--fg-muted);
+ }
+ 
++/* Compatibility pass for older tabs that still use Tailwind slate/cyan
++   utilities. Keep these mappings below Tailwind so the old markup inherits the
++   synergy-12 palette without a risky behavioral rewrite. */
++.text-cyan-400,
++.text-cyan-300,
++.hover\:text-cyan-400:hover {
++  color: var(--muscle-red) !important;
++}
++
++.text-cyan-400\/70,
++.text-cyan-300\/70 {
++  color: rgba(200, 56, 56, 0.74) !important;
++}
++
++.text-blue-400,
++.text-blue-300 {
++  color: var(--day-1) !important;
++}
++
++.text-slate-100,
++.text-slate-200 {
++  color: var(--fg-primary) !important;
++}
++
++.text-slate-300 {
++  color: var(--fg-secondary) !important;
++}
++
++.text-slate-400 {
++  color: var(--fg-muted) !important;
++}
++
++.text-slate-500,
++.text-slate-600 {
++  color: var(--fg-faint) !important;
++}
++
++.border-cyan-500\/40,
++.border-cyan-500\/50,
++.border-cyan-400,
++.focus\:border-cyan-500:focus,
++.focus\:border-cyan-400:focus {
++  border-color: rgba(200, 56, 56, 0.48) !important;
++}
++
++.border-slate-600,
++.border-slate-600\/30,
++.border-slate-600\/40,
++.border-slate-700\/30,
++.border-slate-700\/50 {
++  border-color: var(--border-subtle) !important;
++}
++
++.bg-cyan-500,
++.hover\:bg-cyan-600:hover {
++  background: var(--muscle-red) !important;
++}
++
++.bg-cyan-500\/10,
++.bg-cyan-500\/20,
++.bg-cyan-500\/30 {
++  background: rgba(200, 56, 56, 0.12) !important;
++}
++
++.bg-slate-700,
++.bg-slate-800,
++.bg-slate-700\/30,
++.bg-slate-700\/40,
++.bg-slate-700\/50,
++.bg-slate-700\/60,
++.bg-slate-800\/30,
++.bg-slate-800\/40,
++.bg-slate-800\/50,
++.hover\:bg-slate-600\/60:hover {
++  background: var(--bg-raised) !important;
++}
++
++.bg-green-500\/10,
++.bg-green-500\/20,
++.bg-green-500\/30 {
++  background: var(--status-active-bg) !important;
++}
++
++.bg-blue-600 { background: var(--day-1) !important; }
++.bg-green-600 { background: var(--day-2) !important; }
++.bg-purple-600 { background: var(--day-3) !important; }
++.bg-yellow-600 { background: var(--day-4) !important; }
++.bg-indigo-600 { background: var(--day-5) !important; }
++.bg-pink-600 { background: var(--day-6) !important; }
++.bg-teal-600 { background: var(--day-7) !important; }
++.bg-red-600 { background: var(--day-8) !important; }
++.bg-orange-600 { background: var(--day-9) !important; }
++.bg-cyan-600 { background: var(--day-10) !important; }
++.bg-violet-600 { background: var(--day-11) !important; }
++.bg-lime-600 { background: var(--day-12) !important; }
++
++.text-green-300,
++.text-green-400 {
++  color: var(--status-active) !important;
++}
++
++.border-green-500\/50,
++.ring-green-500\/30 {
++  border-color: rgba(52, 211, 153, 0.35) !important;
++}
++
++.bg-gradient-to-r.from-cyan-500,
++.bg-gradient-to-r.from-blue-500 {
++  background: var(--fg-primary) !important;
++  color: var(--bg-app) !important;
++  box-shadow: none !important;
++}
++
++.shadow-cyan-500\/30,
++.shadow-blue-500\/30 {
++  box-shadow: none !important;
++}
++
++.rounded-2xl {
++  border-radius: 12px !important;
++}
++
++.rounded-xl {
++  border-radius: 10px !important;
++}
++
++.uppercase {
++  letter-spacing: 0 !important;
++}
++
++.app-tab-content > div:not(.list-tab-page) {
++  width: 100%;
++  max-width: 1100px !important;
++  margin: 0 auto;
++  padding: 32px 32px 80px;
++  font-family: var(--font-primary);
++}
++
++.app-tab-content h2.text-5xl,
++.app-tab-content h2.text-3xl {
++  font-family: var(--font-primary);
++  font-size: 28px !important;
++  line-height: 1.05;
++  font-weight: 900;
++  color: var(--fg-primary) !important;
++  letter-spacing: 0 !important;
++}
++
++.app-tab-content h3 {
++  letter-spacing: 0 !important;
++}
++
++.app-tab-content input,
++.app-tab-content select,
++.app-tab-content textarea {
++  background: var(--bg-raised) !important;
++  border-color: var(--border-subtle) !important;
++  color: var(--fg-body) !important;
++  font-family: var(--font-primary);
++}
++
++.app-tab-content input:focus,
++.app-tab-content select:focus,
++.app-tab-content textarea:focus {
++  border-color: rgba(200, 56, 56, 0.55) !important;
++  outline: none !important;
++}
++
+ @media (max-width: 759px) {
++  .app-tab-content > div:not(.list-tab-page) {
++    padding: 16px 16px 104px;
++  }
++
+   .list-tab-page {
+     width: 100%;
+     padding: 16px 16px 104px !important;

@@ -1,0 +1,467 @@
+diff --git a/.github/workflows/container-app-build.yml b/.github/workflows/container-app-build.yml
+new file mode 100644
+index 00000000..6aadb1c6
+--- /dev/null
++++ b/.github/workflows/container-app-build.yml
+@@ -0,0 +1,18 @@
++# .github/workflows/ci-caller.yml
++name: Phase 1 - CI Build
++
++on:
++  push:
++    branches: [ "main" ]
++  pull_request:
++    branches: [ "main" ]
++
++jobs:
++  # The name of this job ("build-pipeline") becomes part of the final check name!
++  build-pipeline:
++    uses: nelsong6/infra-bootstrap/.github/workflows/ci-template.yml@main
++    with:
++      backend_directory: './backend'
++      image_name_suffix: 'workout-api'
++      node_version: '20'
++    secrets: inherit
+diff --git a/.github/workflows/deploy.yml b/.github/workflows/deploy.yml
+deleted file mode 100644
+index 2544c208..00000000
+--- a/.github/workflows/deploy.yml
++++ /dev/null
+@@ -1,91 +0,0 @@
+-name: Consolidated Deployment
+-
+-on:
+-  push:
+-    branches: ['**']
+-    # Removing paths entirely means this will trigger on ANY file change in the repo
+-  workflow_dispatch:
+-    inputs:
+-      run_infra:
+-        description: 'Deploy Infrastructure (OpenTofu)'
+-        required: true
+-        type: boolean
+-        default: true
+-      action:
+-        description: 'OpenTofu action (if running infra)'
+-        required: true
+-        default: 'apply'
+-        type: choice
+-        options:
+-          - plan
+-          - apply
+-          - destroy
+-      run_frontend:
+-        description: 'Deploy Frontend (Static Web App)'
+-        required: true
+-        type: boolean
+-        default: true
+-      run_backend:
+-        description: 'Deploy Backend (Container App)'
+-        required: true
+-        type: boolean
+-        default: true
+-
+-concurrency:
+-  group: "master-deployment-lock"
+-  cancel-in-progress: false
+-
+-permissions:
+-  id-token: write
+-  contents: write
+-  pull-requests: write
+-  actions: write
+-  packages: write
+-
+-jobs:
+-  # ==========================================
+-  # 1. INFRASTRUCTURE
+-  # ==========================================
+-  deploy-infra:
+-    # Run on pushes, or if manually triggered and the checkbox is checked
+-    if: ${{ github.event_name == 'push' || inputs.run_infra }}
+-    uses: nelsong6/pipeline-templates/.github/workflows/tofu-deploy-template.yml@main
+-    with:
+-      action: ${{ inputs.action || 'apply' }}
+-    secrets: inherit
+-
+-  # ==========================================
+-  # 2. FRONTEND (Runs parallel to Backend)
+-  # ==========================================
+-  deploy-frontend:
+-    name: Deploy Frontend
+-    needs: deploy-infra
+-    # Run if infra succeeded OR was deliberately skipped by the user,
+-    # AND we are not trying to 'destroy' the environment.
+-    if: |
+-      always() && 
+-      (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped') &&
+-      (github.event_name == 'push' || (inputs.run_frontend && inputs.action != 'destroy'))
+-    uses: nelsong6/pipeline-templates/.github/workflows/static-site-deploy.yml@main
+-    with:
+-      node_version: '20.x'
+-    secrets: inherit
+-
+-  # ==========================================
+-  # 3. BACKEND (Runs parallel to Frontend)
+-  # ==========================================
+-  deploy-backend:
+-    name: Deploy Backend
+-    needs: deploy-infra
+-    # Run if infra succeeded OR was deliberately skipped by the user,
+-    # AND we are not trying to 'destroy' the environment.
+-    if: |
+-      always() && 
+-      (needs.deploy-infra.result == 'success' || needs.deploy-infra.result == 'skipped') &&
+-      (github.event_name == 'push' || (inputs.run_backend && inputs.action != 'destroy'))
+-    uses: nelsong6/pipeline-templates/.github/workflows/container-app-deploy-template.yml@main
+-    with:
+-      backend_directory: './backend'
+-      tofu_directory: './tofu'
+-      image_name_suffix: 'workout-api'
+-    secrets: inherit
+diff --git a/.github/workflows/full-stack-deploy.yml b/.github/workflows/full-stack-deploy.yml
+new file mode 100644
+index 00000000..b9b0c0fd
+--- /dev/null
++++ b/.github/workflows/full-stack-deploy.yml
+@@ -0,0 +1,15 @@
++# .github/workflows/cd-caller.yml
++name: Phase 3 - CD Deploy
++
++on:
++  repository_dispatch:
++    types: [spacelift_infra_ready]
++
++jobs:
++  call-deployment-template:
++    # Point this to wherever you store your centralized workflows
++    uses: nelsong6/infra-bootstrap/.github/workflows/deploy-template.yml@main
++    with:
++      # Extract the SHA from the webhook and pass it as an input
++      target_sha: ${{ github.event.client_payload.commit_sha }}
++    secrets: inherit
+diff --git a/.github/workflows/spacelift-stack-to-main.yml b/.github/workflows/spacelift-stack-to-main.yml
+new file mode 100644
+index 00000000..e612588c
+--- /dev/null
++++ b/.github/workflows/spacelift-stack-to-main.yml
+@@ -0,0 +1,18 @@
++name: Reset Spacelift on PR Merge
++
++on:
++  pull_request:
++    types: [closed]
++
++jobs:
++  # GitHub fires the "closed" event for BOTH merged and unmerged (abandoned) PRs.
++  # We use this if-condition to ensure it only runs if the PR was actually merged.
++  reset-spacelift:
++    if: github.event.pull_request.merged == true
++    uses: your-org/your-shared-repo/.github/workflows/spacelift-reset-branch.yml@main
++    with:
++      spacelift_endpoint: 'https://your-tenant.app.spacelift.io'
++      target_branch: 'main'
++    secrets:
++      spacelift_api_key_id: ${{ secrets.SPACELIFT_API_KEY_ID }}
++      spacelift_api_key_secret: ${{ secrets.SPACELIFT_API_KEY_SECRET }}
+diff --git a/tofu/backend.tf b/tofu/backend.tf
+index e69b8c4f..aeb73cfc 100644
+--- a/tofu/backend.tf
++++ b/tofu/backend.tf
+@@ -6,7 +6,7 @@
+ resource "azurerm_container_app" "workout_api" {
+   name                         = "workout-api"
+   resource_group_name          = azurerm_resource_group.workout.name
+-  container_app_environment_id = data.terraform_remote_state.infra.outputs.container_app_environment_id
++  container_app_environment_id = var.container_app_environment_id
+   revision_mode                = "Single"
+ 
+   # Enable system-assigned managed identity
+@@ -26,7 +26,7 @@ resource "azurerm_container_app" "workout_api" {
+       # Environment variables
+       env {
+         name  = "COSMOS_DB_ENDPOINT"
+-        value = data.terraform_remote_state.infra.outputs.cosmos_db_endpoint
++        value = var.cosmos_db_endpoint
+       }
+ 
+       env {
+@@ -68,7 +68,7 @@ resource "azurerm_container_app" "workout_api" {
+       allowed_origins = [
+         # Production: Default Azure hostname
+         "https://${azurerm_static_web_app.workout.default_host_name}",
+-        "https://${local.front_app_dns_name}.${data.terraform_remote_state.infra.outputs.dns_zone_name}",
++        "https://${local.front_app_dns_name}.${var.dns_zone_name}",
+ 
+         # Development: Localhost ports for Vite
+         "http://localhost:5173",
+@@ -86,18 +86,18 @@ resource "azurerm_container_app" "workout_api" {
+ 
+ # Grant Container App managed identity access to Cosmos DB
+ resource "azurerm_cosmosdb_sql_role_assignment" "container_app_cosmos" {
+-  resource_group_name = data.terraform_remote_state.infra.outputs.resource_group_name
+-  account_name        = data.terraform_remote_state.infra.outputs.cosmos_db_account_name
+-  role_definition_id  = "${data.terraform_remote_state.infra.outputs.cosmos_db_account_id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002" # Built-in Data Contributor
++  resource_group_name = var.resource_group_name
++  account_name        = var.cosmos_db_account_name
++  role_definition_id  = "${var.cosmos_db_account_id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002" # Built-in Data Contributor
+   principal_id        = azurerm_container_app.workout_api.identity[0].principal_id
+-  scope               = data.terraform_remote_state.infra.outputs.cosmos_db_account_id
++  scope               = var.cosmos_db_account_id
+ }
+ 
+ resource "auth0_resource_server" "backend_api" {
+   name = "WorkoutTracker Backend API"
+   # The audience identifier doesn't have to be a publicly routable URL, 
+   # but using your domain is best practice to guarantee uniqueness.
+-  identifier  = "https://api.${data.terraform_remote_state.infra.outputs.dns_zone_name}"
++  identifier  = "https://api.${var.dns_zone_name}"
+   signing_alg = "RS256"
+ 
+   # Allows the frontend to request refresh tokens so users stay logged in
+diff --git a/tofu/db.tf b/tofu/db.tf
+index b40b00a9..0aa4f7ed 100644
+--- a/tofu/db.tf
++++ b/tofu/db.tf
+@@ -1,15 +1,15 @@
+ # Cosmos DB NoSQL Database (app-specific; account is managed by shared infra)
+ resource "azurerm_cosmosdb_sql_database" "workout" {
+   name                = "WorkoutTrackerDB"
+-  resource_group_name = data.terraform_remote_state.infra.outputs.resource_group_name
+-  account_name        = data.terraform_remote_state.infra.outputs.cosmos_db_account_name
++  resource_group_name = var.resource_group_name
++  account_name        = var.cosmos_db_account_name
+ }
+ 
+ # Cosmos DB Container for Workouts
+ resource "azurerm_cosmosdb_sql_container" "workouts" {
+   name                = "workouts"
+-  resource_group_name = data.terraform_remote_state.infra.outputs.resource_group_name
+-  account_name        = data.terraform_remote_state.infra.outputs.cosmos_db_account_name
++  resource_group_name = var.resource_group_name
++  account_name        = var.cosmos_db_account_name
+   database_name       = azurerm_cosmosdb_sql_database.workout.name
+   partition_key_paths = ["/userId"]
+ 
+diff --git a/tofu/frontend.tf b/tofu/frontend.tf
+index 6340e0de..7b37237a 100644
+--- a/tofu/frontend.tf
++++ b/tofu/frontend.tf
+@@ -24,8 +24,8 @@ locals {
+ # 1. Create the CNAME record in your shared DNS zone
+ resource "azurerm_dns_cname_record" "workout" {
+   name                = local.front_app_dns_name
+-  zone_name           = data.terraform_remote_state.infra.outputs.dns_zone_name
+-  resource_group_name = data.terraform_remote_state.infra.outputs.resource_group_name
++  zone_name           = var.dns_zone_name
++  resource_group_name = var.resource_group_name
+   ttl                 = 3600
+   record              = azurerm_static_web_app.workout.default_host_name
+ }
+@@ -33,7 +33,7 @@ resource "azurerm_dns_cname_record" "workout" {
+ # 2. Bind the custom domain to the Static Web App
+ resource "azurerm_static_web_app_custom_domain" "workout" {
+   static_web_app_id = azurerm_static_web_app.workout.id
+-  domain_name       = "${local.front_app_dns_name}.${data.terraform_remote_state.infra.outputs.dns_zone_name}"
++  domain_name       = "${local.front_app_dns_name}.${var.dns_zone_name}"
+   validation_type   = "cname-delegation"
+ 
+   # Ensure the DNS record exists before Azure tries to validate the domain
+@@ -49,19 +49,19 @@ resource "auth0_client" "frontend_spa" {
+   # Includes your local Vite dev server and the future Azure Static Web App URL.
+   callbacks = [
+     "http://localhost:5173",
+-    "https://${local.front_app_dns_name}.${data.terraform_remote_state.infra.outputs.dns_zone_name}"
++    "https://${local.front_app_dns_name}.${var.dns_zone_name}"
+   ]
+ 
+   # Where users are allowed to be sent after clicking logout
+   allowed_logout_urls = [
+     "http://localhost:5173",
+-    "https://${local.front_app_dns_name}.${data.terraform_remote_state.infra.outputs.dns_zone_name}"
++    "https://${local.front_app_dns_name}.${var.dns_zone_name}"
+   ]
+ 
+   # Enforces CORS so only your domain and localhost can make requests to Auth0
+   web_origins = [
+     "http://localhost:5173",
+-    "https://${local.front_app_dns_name}.${data.terraform_remote_state.infra.outputs.dns_zone_name}"
++    "https://${local.front_app_dns_name}.${var.dns_zone_name}"
+   ]
+ 
+   jwt_configuration {
+diff --git a/tofu/main.tf b/tofu/main.tf
+index c5864f6d..6e2c7db3 100644
+--- a/tofu/main.tf
++++ b/tofu/main.tf
+@@ -7,20 +7,6 @@ resource "azurerm_resource_group" "workout" {
+   location = var.location
+ }
+ 
+-# ============================================================================
+-# Shared Infrastructure (Remote State)
+-# ============================================================================
+-
+-data "terraform_remote_state" "infra" {
+-  backend = "azurerm"
+-  config = {
+-    resource_group_name  = "infra"
+-    storage_account_name = "tfstate6792"
+-    container_name       = "tfstate"
+-    key                  = "infra.tfstate"
+-    use_oidc             = true
+-  }
+-}
+ 
+ # ============================================================================
+ # Note: User/developer role assignments for Cosmos DB should be managed
+@@ -46,12 +32,12 @@ output "static_web_app_default_hostname" {
+ 
+ 
+ output "cosmos_db_endpoint" {
+-  value       = data.terraform_remote_state.infra.outputs.cosmos_db_endpoint
++  value       = var.cosmos_db_endpoint
+   description = "Cosmos DB account endpoint"
+ }
+ 
+ output "cosmos_db_name" {
+-  value       = data.terraform_remote_state.infra.outputs.cosmos_db_account_name
++  value       = var.cosmos_db_account_name
+   description = "Cosmos DB account name"
+ }
+ 
+diff --git a/tofu/provider.tf b/tofu/provider.tf
+index 15c1331a..756490aa 100644
+--- a/tofu/provider.tf
++++ b/tofu/provider.tf
+@@ -1,20 +1,11 @@
+ terraform {
+   required_version = ">= 1.6.0"
+-
+   required_providers {
+     azurerm = {
+       source  = "hashicorp/azurerm"
+       version = "~> 4.0"
+     }
+   }
+-
+-  backend "azurerm" {
+-    resource_group_name  = "infra"
+-    storage_account_name = "tfstate6792"
+-    container_name       = "tfstate"
+-    key                  = "kill-me.tfstate"
+-    use_oidc             = true
+-  }
+ }
+ 
+ provider "azurerm" {
+@@ -22,26 +13,8 @@ provider "azurerm" {
+   use_oidc = true # Enable OIDC authentication
+ }
+ 
+-
+-provider "infisical" {
+-  host = "https://app.infisical.com"
+-  auth = {
+-    oidc = {
+-      identity_id                     = "474b7b4f-9205-48f6-8ae1-2f4f2a248af1"
+-      token_environment_variable_name = "GITHUB_OIDC_TOKEN" 
+-    }
+-  }
+-}
+-
+-ephemeral "infisical_secret" "auth0_secret" {
+-  name         = "auth0"
+-  env_slug     = "prod"
+-  folder_path  = "/"
+-  workspace_id = "a5846fc0-c6e3-4a47-9deb-b3c6e2da9240"
+-}
+-
+ provider "auth0" {
+   domain        = "dev-gtdi5x5p0nmticqd.us.auth0.com"
+   client_id     = "7qsN7zrBAh7TwhjEUcgtU46yOSs9TXbg"
+-  client_secret = ephemeral.infisical_secret.auth0_secret.value
++  client_secret = var.auth0_client_secret
+ }
+diff --git a/tofu/variables.tf b/tofu/variables.tf
+index 48e89fee..3e85b9d3 100644
+--- a/tofu/variables.tf
++++ b/tofu/variables.tf
+@@ -7,3 +7,77 @@ variable "location" {
+   type        = string
+   default     = "westus2"
+ }
++
++variable "auth0_client_secret" {
++  type      = string
++  sensitive = true
++}
++
++# ============================================================================
++# Shared Infrastructure Variables
++# ============================================================================
++
++variable "resource_group_name" {
++  description = "Name of the shared resource group"
++  type        = string
++}
++
++variable "resource_group_location" {
++  description = "Location of the shared resource group"
++  type        = string
++}
++
++variable "resource_group_id" {
++  description = "ID of the shared resource group"
++  type        = string
++}
++
++variable "dns_zone_name" {
++  description = "Name of the DNS zone"
++  type        = string
++}
++
++variable "dns_zone_id" {
++  description = "ID of the DNS zone"
++  type        = string
++}
++
++variable "dns_zone_nameservers" {
++  description = "Nameservers for the DNS zone"
++  type        = string
++}
++
++variable "container_app_environment_name" {
++  description = "Name of the Container App Environment"
++  type        = string
++}
++
++variable "container_app_environment_id" {
++  description = "ID of the Container App Environment"
++  type        = string
++}
++
++variable "cosmos_db_account_name" {
++  description = "Name of the Cosmos DB account"
++  type        = string
++}
++
++variable "cosmos_db_account_id" {
++  description = "ID of the Cosmos DB account"
++  type        = string
++}
++
++variable "cosmos_db_endpoint" {
++  description = "Endpoint URL of the Cosmos DB account"
++  type        = string
++}
++
++variable "azure_subscription_id" {
++  description = "Azure subscription ID"
++  type        = string
++}
++
++variable "azure_tenant_id" {
++  description = "Azure tenant ID"
++  type        = string
++}

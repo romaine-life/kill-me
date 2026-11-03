@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/e11556634bbb24aeb0cab4d3e934ad814c3c752e/comments",
+    "commit": {
+      "author": {
+        "date": "2026-06-20T21:15:50Z",
+        "email": "tank-operator-host[bot]@users.noreply.github.com",
+        "name": "tank-operator-host[bot]"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-06-20T21:21:10Z",
+        "email": "tank-operator-host[bot]@users.noreply.github.com",
+        "name": "tank-operator-host[bot]"
+      },
+      "message": "ci(test-slots): remove dead ci-pr/ci-ref lookup tag emission\n\nThe deploy-image resolver now resolves CI images by the sha-\u003ccommit\u003e alias\n(romaine-life/glimmung#873, deployed), so the run-scoped ci-pr/ci-ref lookup\ntag is unread. Remove its emission from docker-build-check and migrate the\ncheck-image-fingerprint-config guard to assert the sha-\u003ccommit\u003e surface is\npresent and the retired ci-* surface is gone.\n\nCo-Authored-By: Claude Opus 4.8 \u003cnoreply@anthropic.com\u003e",
+      "tree": {
+        "sha": "6333a493a92dee9480e7de15872964f090abfc33",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/6333a493a92dee9480e7de15872964f090abfc33"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/e11556634bbb24aeb0cab4d3e934ad814c3c752e",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/e11556634bbb24aeb0cab4d3e934ad814c3c752e",
+    "node_id": "C_kwDORV0mMdoAKGUxMTU1NjYzNGJiYjI0YWViMGNhYjRkM2U5MzRhZDgxNGMzYzc1MmU",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/5abf102cf70bb0dc3565b84fdac941c20257ce12",
+        "sha": "5abf102cf70bb0dc3565b84fdac941c20257ce12",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/5abf102cf70bb0dc3565b84fdac941c20257ce12"
+      }
+    ],
+    "sha": "e11556634bbb24aeb0cab4d3e934ad814c3c752e",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/e11556634bbb24aeb0cab4d3e934ad814c3c752e"
+  }
+]

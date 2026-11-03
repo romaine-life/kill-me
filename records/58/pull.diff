@@ -1,0 +1,178 @@
+diff --git a/k8s/.gitignore b/k8s/.gitignore
+new file mode 100644
+index 00000000..ea9b929b
+--- /dev/null
++++ b/k8s/.gitignore
+@@ -0,0 +1,8 @@
++# Glimmung vendors the generic live-preview-edge library partial into
++# charts/live-preview-edge/ at preview-provision time (a cluster ConfigMap, NOT
++# an oci:// Helm dependency — ACR is Basic SKU; NOT a committed copy). The slot
++# chart includes the partial's named templates gated on livePreview.enabled and
++# declares no Helm dependency, so a normal/CI/prod/validation render never needs
++# the library. This keeps any locally-vendored copy out of git.
++# See glimmung docs/live-preview-plan.md "Stage 4a landed contracts".
++charts/
+diff --git a/k8s/templates/deployment.yaml b/k8s/templates/deployment.yaml
+index 549692f3..f8fa1e94 100644
+--- a/k8s/templates/deployment.yaml
++++ b/k8s/templates/deployment.yaml
+@@ -7,7 +7,13 @@ metadata:
+   labels:
+     app: {{ include "kill-me.resourceName" . }}
+ spec:
+-  replicas: 1
++  # Single serving pod. When livePreview is enabled the live-preview-edge.replicas
++  # helper returns 1 and FAILS the render on requested>1 (a per-pod emptyDir
++  # override behind replicas>1 flickers the co-watched frontend, v1 #1419). The
++  # include is GATED on enabled so the chart renders standalone WITHOUT the
++  # vendored library on a normal/CI/validation install (where it stays 1,
++  # byte-identical to today); Glimmung vendors the library only on a preview lease.
++  replicas: {{ if .Values.livePreview.enabled }}{{ include "live-preview-edge.replicas" (dict "spec" .Values.livePreview "requested" 1) }}{{ else }}1{{ end }}
+   selector:
+     matchLabels:
+       app: {{ include "kill-me.resourceName" . }}
+@@ -28,7 +34,13 @@ spec:
+           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+           imagePullPolicy: {{ .Values.image.pullPolicy }}
+           ports:
+-            - name: http
++            # When a live-preview edge fronts the backend, the edge owns the
++            # "http" served port and the backend's own port is renamed to an
++            # internal name (kill-me.appPortName) to avoid a duplicate port name
++            # in the pod. The container port NUMBER (3000) is unchanged, so the
++            # edge's loopback upstream still targets :3000. Without the edge the
++            # name stays "http", so normal/validation renders are byte-identical.
++            - name: {{ include "kill-me.appPortName" . }}
+               containerPort: 3000
+           env:
+             - name: PORT
+@@ -45,19 +57,32 @@ spec:
+           startupProbe:
+             httpGet:
+               path: /health
+-              port: http
++              port: {{ include "kill-me.appPortName" . }}
+             periodSeconds: 5
+             failureThreshold: 20
+           readinessProbe:
+             httpGet:
+               path: /health
+-              port: http
++              port: {{ include "kill-me.appPortName" . }}
+             periodSeconds: 10
+             failureThreshold: 3
+           livenessProbe:
+             httpGet:
+               path: /health
+-              port: http
++              port: {{ include "kill-me.appPortName" . }}
+             periodSeconds: 30
+             failureThreshold: 3
++        {{- /*
++        The live-preview edge, in front of the backend. Gated on
++        livePreview.enabled (off by default → renders nothing), so this changes
++        nothing on a normal/validation install. When enabled it becomes the
++        pod's served port and reverse-proxies the backend on :3000.
++        */ -}}
++        {{- if .Values.livePreview.enabled }}
++        {{- include "live-preview-edge.container" .Values.livePreview | nindent 8 }}
++        {{- end }}
++      {{- if .Values.livePreview.enabled }}
++      volumes:
++        {{- include "live-preview-edge.volume" .Values.livePreview | nindent 8 }}
++      {{- end }}
+ {{- end }}
+diff --git a/k8s/templates/helpers.tpl b/k8s/templates/helpers.tpl
+index 850b880b..b1064a1f 100644
+--- a/k8s/templates/helpers.tpl
++++ b/k8s/templates/helpers.tpl
+@@ -36,3 +36,15 @@
+ {{- .Values.namespace | default .Release.Namespace -}}
+ {{- end -}}
+ {{- end -}}
++
++{{/*
++kill-me.appPortName — the backend container's served port name. When a
++live-preview edge fronts the backend (livePreview.enabled), the edge owns the
++"http" served port, so the backend's own port is renamed to an internal name to
++avoid a duplicate port name in the pod; the Service then targets the edge via
++live-preview-edge.servedPortName. Without the edge it stays "http", so normal /
++validation renders are byte-identical.
++*/}}
++{{- define "kill-me.appPortName" -}}
++{{- if .Values.livePreview.enabled -}}app-internal{{- else -}}http{{- end -}}
++{{- end -}}
+diff --git a/k8s/templates/service.yaml b/k8s/templates/service.yaml
+index 99394a86..5d5fa0a6 100644
+--- a/k8s/templates/service.yaml
++++ b/k8s/templates/service.yaml
+@@ -13,6 +13,11 @@ spec:
+   ports:
+     - name: http
+       port: 80
+-      targetPort: http
++      # Served port: the live-preview edge when livePreview is enabled (it fronts
++      # the backend), the backend's own port ("http") otherwise. The include is
++      # GATED on enabled so the chart renders standalone WITHOUT the vendored
++      # library on a normal/CI/validation install (targetPort stays "http",
++      # byte-identical to today); Glimmung vendors the library on a preview lease.
++      targetPort: {{ if .Values.livePreview.enabled }}{{ include "live-preview-edge.servedPortName" (dict "spec" .Values.livePreview "appPortName" (include "kill-me.appPortName" .)) }}{{ else }}http{{ end }}
+       protocol: TCP
+ {{- end }}
+diff --git a/k8s/values.yaml b/k8s/values.yaml
+index 07161d50..31affdeb 100644
+--- a/k8s/values.yaml
++++ b/k8s/values.yaml
+@@ -19,6 +19,52 @@ testEnv:
+ serviceAccount: infra-shared
+ serviceAccountClientId: 2ba3e252-c553-4a57-8811-c29b51c06cd9
+ 
++# Live-preview lane (glimmung docs/live-preview-plan.md). OFF by default: a
++# normal/prod, CI, or validation (warm/hot) install renders no edge, so this
++# changes NOTHING until Glimmung sets livePreview.enabled=true on a preview
++# lease. When enabled, the generic live-preview-edge library partial runs the
++# edge in front of kill-me's own backend: the edge becomes the served port, the
++# app backend listens internally on its own port (3000), and the edge serves the
++# dev's freshly-pushed frontend override-first (fresh-preview passthrough to the
++# stable backend). The partial is vendored into charts/live-preview-edge/ by
++# Glimmung's preview install Job (a cluster ConfigMap), NOT a committed copy and
++# NOT a Helm dependency — every reference is gated on livePreview.enabled so the
++# chart renders standalone without the library. Glimmung --sets image.tag,
++# upstream.url, authorizedSubject, and backendPrefixes per preview lease. The
++# single-serving-pod invariant (replicas=1) is enforced by the
++# live-preview-edge.replicas helper.
++#
++# AUTH: the edge validates pushes against auth.romaine.life JWKS (public RS256
++# keys fetched over HTTPS); it needs only outbound HTTPS to auth.romaine.life,
++# which the slot pod already has. No projected SA token is added to the pod.
++livePreview:
++  enabled: false
++  image:
++    repository: romainecr.azurecr.io/glimmung-live-preview-edge
++    # Empty by default — Glimmung --sets the fingerprint-pinned tag from its
++    # control-plane Settings at provision time. The live-preview-edge.container
++    # helper fails the render if this is empty while enabled, so a missing edge
++    # image surfaces loudly rather than as a silent ImagePull.
++    tag: ""
++    pullPolicy: IfNotPresent
++  port: 8080
++  servedPortName: http
++  upstream:
++    # kill-me's backend listens internally on :3000 (== live_preview.backend_port);
++    # the edge reverse-proxies to it on loopback.
++    url: "http://127.0.0.1:3000"
++  # Request path prefixes the edge always proxies to the backend (kill-me's API
++  # and health routes). Everything else is served override-first by the edge.
++  # Glimmung --sets this from the project's live_preview.backend_prefixes.
++  backendPrefixes: []
++  # The auth.romaine.life JWT subject permitted to push/delete an override.
++  # Glimmung --sets it to the preview lease owner per provision.
++  authorizedSubject: ""
++  override:
++    volumeName: live-preview-override
++    mountPath: /var/run/glimmung-live-preview
++  resources: {}
++
+ ingress:
+   gatewayName: main
+   gatewayNamespace: envoy-gateway-system

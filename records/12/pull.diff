@@ -1,0 +1,38 @@
+diff --git a/frontend/package-lock.json b/frontend/package-lock.json
+index f068d126..f4b3646b 100644
+--- a/frontend/package-lock.json
++++ b/frontend/package-lock.json
+@@ -30,7 +30,7 @@
+         "globals": "^16.5.0",
+         "postcss": "^8.5.13",
+         "tailwindcss": "^4.1.18",
+-        "vite": "^7.3.1"
++        "vite": "^7.3.2"
+       }
+     },
+     "node_modules/@alloc/quick-lru": {
+@@ -3618,9 +3618,9 @@
+       }
+     },
+     "node_modules/vite": {
+-      "version": "7.3.1",
+-      "resolved": "https://registry.npmjs.org/vite/-/vite-7.3.1.tgz",
+-      "integrity": "sha512-w+N7Hifpc3gRjZ63vYBXA56dvvRlNWRczTdmCBBa+CotUzAPf5b7YMdMR/8CQoeYE5LX3W4wj6RYTgonm1b9DA==",
++      "version": "7.3.2",
++      "resolved": "https://registry.npmjs.org/vite/-/vite-7.3.2.tgz",
++      "integrity": "sha512-Bby3NOsna2jsjfLVOHKes8sGwgl4TT0E6vvpYgnAYDIF/tie7MRaFthmKuHx1NSXjiTueXH3do80FMQgvEktRg==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+diff --git a/frontend/package.json b/frontend/package.json
+index 260462a4..0ce05633 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -32,6 +32,6 @@
+     "globals": "^16.5.0",
+     "postcss": "^8.5.13",
+     "tailwindcss": "^4.1.18",
+-    "vite": "^7.3.1"
++    "vite": "^7.3.2"
+   }
+ }

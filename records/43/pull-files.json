@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/1d2112bf496e338e3820cb3f94980a7d659c3a9d/.github%2Fworkflows%2Fgenerate-local-env.yaml",
+    "changes": 13,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fgenerate-local-env.yaml?ref=1d2112bf496e338e3820cb3f94980a7d659c3a9d",
+    "deletions": 13,
+    "filename": ".github/workflows/generate-local-env.yaml",
+    "patch": "@@ -1,13 +0,0 @@\n-name: Generate Local .env Files\n-\n-on:\n-  workflow_dispatch:\n-\n-permissions:\n-  id-token: write\n-  contents: read\n-\n-jobs:\n-  call-generate-env-template:\n-    uses: nelsong6/pipeline-templates/.github/workflows/generate-local-env-template.yml@main\n-    secrets: inherit",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/1d2112bf496e338e3820cb3f94980a7d659c3a9d/.github%2Fworkflows%2Fgenerate-local-env.yaml",
+    "sha": "edd74c4fcc88c0fcdcb05a2dae85ba5c2fd56e75",
+    "status": "removed"
+  }
+]

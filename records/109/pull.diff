@@ -1,0 +1,68 @@
+diff --git a/frontend/src/components/SorenessLanes.jsx b/frontend/src/components/SorenessLanes.jsx
+index f912433..149497d 100644
+--- a/frontend/src/components/SorenessLanes.jsx
++++ b/frontend/src/components/SorenessLanes.jsx
+@@ -76,7 +76,7 @@ function shiftDays(date, delta) {
+   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+ }
+ 
+-export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWorkout, onOpenCardio }) {
++export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWorkout, onOpenCardio, onOpenSoreness }) {
+   const [group, setGroup] = useState('workout');   // 'workout' | 'muscle'
+   const [gaps, setGaps] = useState('bridge');     // 'bridge' | 'break'
+   const [order, setOrder] = useState('oldest');    // 'oldest' | 'newest'
+@@ -449,8 +449,8 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+                     );
+                   })}
+ 
+-                  {/* Invisible per-day hit targets preserve precise hover details.
+-                      Editing remains an explicit action on a record card. */}
++                  {/* Invisible per-day hit targets preserve precise hover details,
++                      and open that day's soreness record like any other node. */}
+                   {segments
+                     .filter((seg) => seg.logged)
+                     .flatMap((seg) => seg.days)
+@@ -463,6 +463,11 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+                         height={ROW_H}
+                         fill="transparent"
+                         pointerEvents="all"
++                        style={{ cursor: onOpenSoreness ? 'pointer' : 'default' }}
++                        onClick={() => {
++                          const entry = t.entries.get(d);
++                          if (entry) onOpenSoreness?.(entry);
++                        }}
+                         onMouseEnter={() =>
+                           setHover({
+                             kind: 'soreness',
+diff --git a/frontend/src/components/SorenessTab.jsx b/frontend/src/components/SorenessTab.jsx
+index 8834248..7cffab7 100644
+--- a/frontend/src/components/SorenessTab.jsx
++++ b/frontend/src/components/SorenessTab.jsx
+@@ -692,6 +692,7 @@ export function SorenessTab({
+           cardioSessions={cardioSessions}
+           onOpenWorkout={showWorkout}
+           onOpenCardio={onOpenCardio}
++          onOpenSoreness={onOpenSoreness}
+         />
+       </div>
+     );
+diff --git a/frontend/src/utils/sorenessLink.js b/frontend/src/utils/sorenessLink.js
+index 2f73212..8d1eec8 100644
+--- a/frontend/src/utils/sorenessLink.js
++++ b/frontend/src/utils/sorenessLink.js
+@@ -195,6 +195,7 @@ export function buildTracks(entries, mode = 'workout') {
+         logged: new Set(),  // every date this stripe was logged on
+         levels: new Map(),  // date -> record-level intensity
+         detail: new Map(),  // date -> [{ name, level }]
++        entries: new Map(), // date -> the soreness record logged that day
+       };
+       tracks.set(key, t);
+     }
+@@ -207,6 +208,7 @@ export function buildTracks(entries, mode = 'workout') {
+       t.levels.set(date, Math.max(t.levels.get(date) ?? 0, entry.level));
+     }
+     t.detail.set(date, muscles.map((m) => ({ name: m.muscle || m.group, level: m.level })));
++    t.entries.set(date, entry);
+   };
+ 
+   for (const entry of entries) {

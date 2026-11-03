@@ -1,0 +1,61 @@
+diff --git a/frontend/index.html b/frontend/index.html
+index 325f46c5..54cadae7 100644
+--- a/frontend/index.html
++++ b/frontend/index.html
+@@ -2,9 +2,9 @@
+ <html lang="en">
+   <head>
+     <meta charset="UTF-8" />
+-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
++    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+-    <title>12-Day Synergy System</title>
++    <title>synergy-12</title>
+   </head>
+   <body>
+     <div id="root"></div>
+diff --git a/frontend/public/favicon.svg b/frontend/public/favicon.svg
+new file mode 100644
+index 00000000..ba9447d2
+--- /dev/null
++++ b/frontend/public/favicon.svg
+@@ -0,0 +1,7 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
++  <rect width="64" height="64" rx="14" fill="#0d0d0d"/>
++  <rect x="1" y="1" width="62" height="62" rx="13" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="2"/>
++  <path d="M15 43c5 5 12 7 19 5 8-2 14-8 16-16" fill="none" stroke="#c83838" stroke-width="5" stroke-linecap="round"/>
++  <path d="M17 21c6-5 14-7 22-4 5 2 8 5 10 9" fill="none" stroke="#f0c560" stroke-width="5" stroke-linecap="round"/>
++  <text x="32" y="38" text-anchor="middle" font-family="Archivo, Arial, sans-serif" font-size="18" font-weight="900" fill="#ffffff">12</text>
++</svg>
+diff --git a/frontend/src/components/ListTab.jsx b/frontend/src/components/ListTab.jsx
+index 65b2c07e..8372763e 100644
+--- a/frontend/src/components/ListTab.jsx
++++ b/frontend/src/components/ListTab.jsx
+@@ -8,6 +8,7 @@ import { useState, useEffect, useMemo } from 'react';
+ import { DAY_CONFIG } from '../utils/dayConfig';
+ import { useDataSource } from '../api/snapshotContext.jsx';
+ import { formatTime12h, todayLocal } from '../utils/dateUtils';
++import { formatIntervalSummary } from '../utils/cardioTemplates.js';
+ import {
+   DAY_DESIGN,
+   dayColor,
+@@ -558,6 +559,10 @@ function WorkoutCard({ w, onClick }) {
+ // ── Cardio card ────────────────────────────────────────────────────────
+ function CardioCard({ c, onClick }) {
+   const isBike = c.activity === 'bike';
++  const intervalSummary = Array.isArray(c.treadmill?.intervals)
++    ? formatIntervalSummary(c.treadmill.intervals)
++    : c.treadmill?.intervals;
++
+   return (
+     <div
+       onClick={() => onClick?.(c)}
+@@ -600,7 +605,7 @@ function CardioCard({ c, onClick }) {
+         <div style={{ fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+           {c.time && <>{formatTime12h(c.time)} · </>}
+           {c.durationMinutes} min
+-          {c.treadmill?.intervals && <span> · {c.treadmill.intervals}</span>}
++          {intervalSummary && <span> · {intervalSummary}</span>}
+         </div>
+       </div>
+       <div style={{ display: 'flex', gap: 16, alignItems: 'baseline' }}>

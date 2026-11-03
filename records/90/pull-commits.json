@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/fbc33d9ff24fb89b4a2590355cb80608b40ea7a3/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-27T05:51:05Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-27T05:51:05Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "feat: add Synergy 17 shoulder press day",
+      "tree": {
+        "sha": "0f8d52c93913e0315c53ba588c63377890cbd432",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/0f8d52c93913e0315c53ba588c63377890cbd432"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/fbc33d9ff24fb89b4a2590355cb80608b40ea7a3",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/fbc33d9ff24fb89b4a2590355cb80608b40ea7a3",
+    "node_id": "C_kwDORV0mMdoAKGZiYzMzZDlmZjI0ZmI4OWI0YTI1OTAzNTVjYjgwNjA4YjQwZWE3YTM",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/e3532049f129222734c04eb9339183787778c724",
+        "sha": "e3532049f129222734c04eb9339183787778c724",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/e3532049f129222734c04eb9339183787778c724"
+      }
+    ],
+    "sha": "fbc33d9ff24fb89b4a2590355cb80608b40ea7a3",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/fbc33d9ff24fb89b4a2590355cb80608b40ea7a3"
+  }
+]

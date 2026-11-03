@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/541c9d96b8a25f12ac9b129af7e4ce6fa68d8ffd/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-24T14:55:05Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-24T14:55:05Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "fix: label workout detail fields",
+      "tree": {
+        "sha": "5890362d34ad0c6d429f58637d67836d88148bfe",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/5890362d34ad0c6d429f58637d67836d88148bfe"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/541c9d96b8a25f12ac9b129af7e4ce6fa68d8ffd",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/541c9d96b8a25f12ac9b129af7e4ce6fa68d8ffd",
+    "node_id": "C_kwDORV0mMdoAKDU0MWM5ZDk2YjhhMjVmMTJhYzliMTI5YWY3ZTRjZTZmYTY4ZDhmZmQ",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/bf977db858eaa450c350ff8b42a18f464b19c4f2",
+        "sha": "bf977db858eaa450c350ff8b42a18f464b19c4f2",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/bf977db858eaa450c350ff8b42a18f464b19c4f2"
+      }
+    ],
+    "sha": "541c9d96b8a25f12ac9b129af7e4ce6fa68d8ffd",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/541c9d96b8a25f12ac9b129af7e4ce6fa68d8ffd"
+  }
+]

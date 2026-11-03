@@ -1,0 +1,2458 @@
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 2e5ecfa4..7927fba3 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -1,16 +1,13 @@
+ // Root application component. Left sidebar tab navigation (matches bender-world /
+ // eight-queens pattern). Tabs:
+-//   - History (default): calendar/list view of past workouts with color-coded days
+-//   - Workout: detailed view of any day in the cycle (defaults to current day)
++//   - Activity (default): overview, recovery, journal, list, and calendar views
++//   - Exercises: exercise library organized by cycle day
+ //   - Cycle: Synergy cycle overview — philosophy, day breakdown, recovery notes
+-//   - Soreness: daily muscle soreness journal with structured muscle picker
+ //   - Log (admin only): log a workout with quick or detailed mode
+ //   - Admin (localhost only + admin role): day override, database init and data migration
+ //
+-// Auth model: anyone can view (History/Today tabs load publicly). Only the
++// Auth model: anyone can view Activity, Exercises, and Cycle. Only the
+ // admin user (whitelisted Microsoft email) sees the Log tab and the Admin tab.
+-/* global __BUILD_NUMBER__ */
+-
+ import { useState, useEffect, useCallback } from 'react';
+ import { useWorkouts } from './hooks/useWorkouts';
+ import { useAuth } from './auth/AuthContext.jsx';
+@@ -24,23 +21,25 @@ import { SorenessTab } from './components/SorenessTab';
+ import { ExercisesTab } from './components/ExercisesTab';
+ import { ListTab } from './components/ListTab';
+ import { CycleDial } from './components/CycleDial';
++import { ActivityRecordDetail } from './components/ActivityRecordDetail';
+ import { isAdminMode } from './utils/adminMode';
+ import { getTotalDays } from './utils/dayConfig';
+-import { CalendarDays, RefreshCw, Activity, PenLine, Wrench, ListChecks, List, Menu } from 'lucide-react';
++import { RefreshCw, Activity, PenLine, Wrench, ListChecks, Menu } from 'lucide-react';
+ 
+ // Brand string tracks the cycle length, which now comes from the active workout
+ // model. It has to be read at render rather than at import: the model loads
+ // asynchronously, and at module-evaluation time there is no cycle yet.
+ const brand = () => `synergy-${getTotalDays()}`;
+ 
+-// Map URL path to tab id. Unknown paths fall back to 'list' (the landing page).
++// Map URL path to tab id. The bare root and unknown paths land on Activity.
+ const tabFromPath = (path) => {
+   const slug = path.replace(/^\//, '').toLowerCase();
+-  const valid = ['list', 'exercises', 'cycle', 'soreness', 'log', 'admin'];
+-  return valid.includes(slug) ? slug : 'list';
++  if (slug === 'list' || slug === 'history') return 'soreness';
++  const valid = ['exercises', 'cycle', 'soreness', 'log', 'admin'];
++  return valid.includes(slug) ? slug : 'soreness';
+ };
+ 
+-const pathFromTab = (tab) => (tab === 'list' ? '/' : `/${tab}`);
++const pathFromTab = (tab) => (tab === 'soreness' ? '/' : `/${tab}`);
+ 
+ function App() {
+   const [activeTab, setActiveTab] = useState(() => tabFromPath(window.location.pathname));
+@@ -51,12 +50,14 @@ function App() {
+   const [refreshKey, setRefreshKey] = useState(0);
+   const [logViewWorkout, setLogViewWorkout] = useState(null);
+   const [logViewCardio, setLogViewCardio] = useState(null);
++  const [detailStack, setDetailStack] = useState([]);
+   // Workout handed to the Soreness tab by a "Log soreness" action elsewhere,
+   // so the editor opens already attributed to it. Cleared once consumed.
+   const [sorenessSource, setSorenessSource] = useState(null);
++  const [sorenessEditEntry, setSorenessEditEntry] = useState(null);
+   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 760);
+   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+-  const [activityView, setActivityView] = useState('list'); // History tab: 'list' | 'calendar'
++  const [activityView, setActivityView] = useState('lanes');
+ 
+   // Push URL when tab changes (but not on initial mount)
+   const navigateTab = useCallback((tab) => {
+@@ -69,7 +70,10 @@ function App() {
+ 
+   // Handle browser back/forward buttons
+   useEffect(() => {
+-    const onPopState = () => setActiveTab(tabFromPath(window.location.pathname));
++    const onPopState = () => {
++      setDetailStack([]);
++      setActiveTab(tabFromPath(window.location.pathname));
++    };
+     window.addEventListener('popstate', onPopState);
+     return () => window.removeEventListener('popstate', onPopState);
+   }, []);
+@@ -80,11 +84,20 @@ function App() {
+     return () => window.removeEventListener('resize', onResize);
+   }, []);
+ 
++  // History is now a view within Activity, not a separate destination. Keep
++  // old bookmarks working while normalizing them to the single Activity URL.
++  useEffect(() => {
++    if (/^\/(list|history)\/?$/i.test(window.location.pathname)) {
++      window.history.replaceState(null, '', '/');
++    }
++  }, []);
++
+   // Admin tab requires both localhost dev mode AND admin role
+   const showAdminTab = isAdminMode() && isAdmin;
+ 
+   // Navigate to Log tab, optionally pre-filling day/date (e.g. from empty calendar click)
+   const handleOpenLog = (dayNumber = null, date = null) => {
++    setDetailStack([]);
+     setLogViewWorkout(null);
+     setLogViewCardio(null);
+     setLogInitialDay(dayNumber);
+@@ -92,12 +105,22 @@ function App() {
+     navigateTab('log');
+   };
+ 
+-  // Navigate to Log tab showing an existing workout's details
+-  const handleViewWorkout = (workout) => {
++  const handleOpenRecord = (kind, record) => {
++    if (!record) return;
++    setDetailStack((current) => [...current, { kind, record }]);
++  };
++
++  const handleCloseRecord = () => {
++    setDetailStack((current) => current.slice(0, -1));
++  };
++
++  // Editors are explicit destinations reached from the shared record detail.
++  const handleEditWorkout = (workout) => {
+     if (workout === null) {
+       setLogViewWorkout(null);
+       return;
+     }
++    setDetailStack([]);
+     setLogViewWorkout(workout);
+     setLogViewCardio(null);
+     setLogInitialDay(null);
+@@ -107,16 +130,18 @@ function App() {
+ 
+   // Navigate to the Soreness tab with the editor pre-attributed to a workout
+   const handleLogSoreness = (workout) => {
++    setDetailStack([]);
+     setSorenessSource(workout);
++    setActivityView('journal');
+     navigateTab('soreness');
+   };
+ 
+-  // Navigate to Log tab showing an existing cardio session
+-  const handleViewCardio = (session) => {
++  const handleEditCardio = (session) => {
+     if (session === null) {
+       setLogViewCardio(null);
+       return;
+     }
++    setDetailStack([]);
+     setLogViewCardio(session);
+     setLogViewWorkout(null);
+     setLogInitialDay(null);
+@@ -124,6 +149,19 @@ function App() {
+     navigateTab('log');
+   };
+ 
++  const handleEditSoreness = (entry) => {
++    setDetailStack([]);
++    setSorenessEditEntry(entry);
++    setActivityView('journal');
++    navigateTab('soreness');
++  };
++
++  const handleEditRecord = (kind, record) => {
++    if (kind === 'workout') handleEditWorkout(record);
++    if (kind === 'cardio') handleEditCardio(record);
++    if (kind === 'soreness') handleEditSoreness(record);
++  };
++
+   const handleWorkoutSuccess = (advancedTo) => {
+     if (advancedTo) {
+       setCurrentDay(advancedTo);
+@@ -133,23 +171,27 @@ function App() {
+     setLogInitialDate(null);
+     setLogViewWorkout(null);
+     setLogViewCardio(null);
+-    navigateTab('list');
++    setDetailStack([]);
++    setActivityView('list');
++    navigateTab('soreness');
+   };
+ 
+   const handleNav = (tab) => {
++    setDetailStack([]);
+     navigateTab(tab);
+     setMobileNavOpen(false);
+   };
+ 
+   const tabs = [
+-    { id: 'list', label: 'History', icon: CalendarDays },
++    { id: 'soreness', label: 'Activity', icon: Activity },
+     { id: 'exercises', label: 'Exercises', icon: ListChecks },
+     { id: 'cycle', label: 'Cycle', icon: RefreshCw },
+-    { id: 'soreness', label: 'Soreness', icon: Activity },
+     ...(isAdmin ? [{ id: 'log', label: 'Log', icon: PenLine }] : []),
+     ...(showAdminTab ? [{ id: 'admin', label: 'Admin', icon: Wrench }] : [])
+   ];
+ 
++  const activeDetail = detailStack[detailStack.length - 1] || null;
++
+   if (loading) {
+     return (
+       <div style={{ ...styles.app, alignItems: 'center', justifyContent: 'center' }}>
+@@ -176,7 +218,6 @@ function App() {
+             onTabChange={handleNav}
+             currentDay={currentDay}
+             onDay={isAdmin ? setDay : undefined}
+-            isAdmin={isAdmin}
+           />
+         )}
+ 
+@@ -188,7 +229,6 @@ function App() {
+               onTabChange={handleNav}
+               currentDay={currentDay}
+               onDay={isAdmin ? setDay : undefined}
+-              isAdmin={isAdmin}
+               compact
+             />
+           </div>
+@@ -204,6 +244,18 @@ function App() {
+             ...(isMobile ? { paddingBottom: 'calc(76px + env(safe-area-inset-bottom))' } : {}),
+           }}
+         >
++          {activeDetail ? (
++            <ActivityRecordDetail
++              kind={activeDetail.kind}
++              record={activeDetail.record}
++              isAdmin={isAdmin}
++              onBack={handleCloseRecord}
++              onEdit={handleEditRecord}
++              onOpenRecord={handleOpenRecord}
++              onAddSoreness={handleLogSoreness}
++            />
++          ) : (
++            <>
+           {activeTab === 'exercises' && (
+             <ExercisesTab
+               currentDay={currentDay}
+@@ -211,22 +263,36 @@ function App() {
+             />
+           )}
+ 
+-          {activeTab === 'list' && (
++          {activeTab === 'soreness' && (
+             activityView === 'calendar' ? (
+               <HistoryTab
+                 key={refreshKey}
+                 viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
+                 onDayClick={isAdmin ? handleOpenLog : undefined}
+-                onWorkoutClick={isAdmin ? handleViewWorkout : undefined}
+-                onCardioClick={isAdmin ? handleViewCardio : undefined}
++                onWorkoutClick={(workout) => handleOpenRecord('workout', workout)}
++                onCardioClick={(session) => handleOpenRecord('cardio', session)}
++                onSorenessClick={(entry) => handleOpenRecord('soreness', entry)}
+               />
+-            ) : (
++            ) : activityView === 'list' ? (
+               <ListTab
+                 key={refreshKey}
+                 viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
+-                onWorkoutClick={isAdmin ? handleViewWorkout : undefined}
+-                onCardioClick={isAdmin ? handleViewCardio : undefined}
+-                onLogSoreness={isAdmin ? handleLogSoreness : undefined}
++                onWorkoutClick={(workout) => handleOpenRecord('workout', workout)}
++                onCardioClick={(session) => handleOpenRecord('cardio', session)}
++                onSorenessClick={(entry) => handleOpenRecord('soreness', entry)}
++              />
++            ) : (
++              <SorenessTab
++                isAdmin={isAdmin}
++                view={activityView}
++                viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
++                initialSource={sorenessSource}
++                onSourceConsumed={() => setSorenessSource(null)}
++                initialEditEntry={sorenessEditEntry}
++                onEditConsumed={() => setSorenessEditEntry(null)}
++                onOpenWorkout={(workout) => handleOpenRecord('workout', workout)}
++                onOpenCardio={(session) => handleOpenRecord('cardio', session)}
++                onOpenSoreness={(entry) => handleOpenRecord('soreness', entry)}
+               />
+             )
+           )}
+@@ -235,14 +301,6 @@ function App() {
+             <CycleTab currentDay={currentDay} />
+           )}
+ 
+-          {activeTab === 'soreness' && (
+-            <SorenessTab
+-              isAdmin={isAdmin}
+-              initialSource={sorenessSource}
+-              onSourceConsumed={() => setSorenessSource(null)}
+-            />
+-          )}
+-
+           {activeTab === 'log' && isAdmin && (
+             <LogTab
+               initialDay={logInitialDay}
+@@ -250,14 +308,14 @@ function App() {
+               currentDay={currentDay}
+               onSuccess={handleWorkoutSuccess}
+               viewWorkout={logViewWorkout}
+-              onViewWorkout={handleViewWorkout}
++              onViewWorkout={handleEditWorkout}
+               onLogSoreness={handleLogSoreness}
+               onWorkoutChanged={() => {
+                 setLogViewWorkout(null);
+                 setRefreshKey(prev => prev + 1);
+               }}
+               viewCardio={logViewCardio}
+-              onViewCardio={handleViewCardio}
++              onViewCardio={handleEditCardio}
+               onCardioChanged={() => {
+                 setLogViewCardio(null);
+                 setRefreshKey(prev => prev + 1);
+@@ -268,6 +326,8 @@ function App() {
+           {activeTab === 'admin' && showAdminTab && (
+             <DayOverride currentDay={currentDay} onDayChange={setDay} />
+           )}
++            </>
++          )}
+         </div>
+       </div>
+ 
+@@ -282,17 +342,24 @@ function App() {
+ export default App;
+ 
+ function ActivityToggle({ view, onChange }) {
+-  const opts = [{ id: 'list', label: 'List' }, { id: 'calendar', label: 'Calendar' }];
++  const opts = [
++    { id: 'lanes', label: 'Overview' },
++    { id: 'timeline', label: 'Recovery' },
++    { id: 'journal', label: 'Journal' },
++    { id: 'list', label: 'List' },
++    { id: 'calendar', label: 'Calendar' },
++  ];
+   return (
+-    <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, width: 'fit-content' }}>
++    <div className="activity-view-toggle" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: 4, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, width: 'fit-content', maxWidth: '100%', boxSizing: 'border-box' }}>
+       {opts.map((o) => {
+         const active = o.id === view;
+         return (
+           <button
+             key={o.id}
+             onClick={() => onChange(o.id)}
++            aria-pressed={active}
+             style={{
+-              padding: '9px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600,
++              padding: '9px 12px', borderRadius: 7, fontSize: 13, fontWeight: 600,
+               fontFamily: 'var(--font-primary)', border: 'none', cursor: 'pointer',
+               color: active ? 'var(--fg-primary)' : 'var(--fg-muted)',
+               background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
+@@ -307,7 +374,9 @@ function ActivityToggle({ view, onChange }) {
+ }
+ 
+ function TopBar({ activeTab, isMobile, showAdminTab, mobileNavOpen, onToggleMobileNav }) {
+-  const title = activeTab === 'list' ? 'History' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
++  const title = activeTab === 'soreness'
++      ? 'Activity'
++      : activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
+ 
+   return (
+     <header style={{ ...styles.topBar, ...(isMobile ? styles.topBarMobile : {}) }}>
+@@ -335,7 +404,7 @@ function TopBar({ activeTab, isMobile, showAdminTab, mobileNavOpen, onToggleMobi
+   );
+ }
+ 
+-function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, isAdmin, compact = false }) {
++function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, compact = false }) {
+   return (
+     <aside style={{ ...styles.sidebar, ...(compact ? styles.sidebarCompact : {}) }}>
+       <div style={styles.brand}>
+@@ -356,9 +425,9 @@ function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, isAdmin,
+ }
+ 
+ function BottomNav({ tabs, activeTab, onTabChange }) {
+-  // Log is the primary daily action for admins — surface it centered in the bar
+-  // (it's only in `tabs` when signed in as admin, so public visitors still see 4).
+-  const order = ['list', 'log', 'cycle', 'soreness'];
++  // Activity is home; Log stays prominent for admins, and the remaining public
++  // destinations fill out the compact mobile navigation.
++  const order = ['soreness', 'log', 'cycle', 'exercises'];
+   const visibleTabs = order
+     .map((id) => tabs.find((tab) => tab.id === id))
+     .filter(Boolean);
+@@ -397,6 +466,9 @@ function BrandMark() {
+ const styles = {
+   app: {
+     height: '100vh',
++    width: '100vw',
++    maxWidth: '100vw',
++    boxSizing: 'border-box',
+     background: 'var(--bg-app)',
+     color: 'var(--fg-body)',
+     fontFamily: 'var(--font-primary)',
+@@ -480,6 +552,8 @@ const styles = {
+     flex: 1,
+     minHeight: 0,
+     width: '100%',
++    maxWidth: '100%',
++    minWidth: 0,
+     position: 'relative',
+   },
+   sidebar: {
+diff --git a/frontend/src/components/ActivityRecordDetail.jsx b/frontend/src/components/ActivityRecordDetail.jsx
+new file mode 100644
+index 00000000..43bb6298
+--- /dev/null
++++ b/frontend/src/components/ActivityRecordDetail.jsx
+@@ -0,0 +1,480 @@
++import { createElement, useEffect, useMemo, useRef, useState } from 'react';
++import { Activity, Bike, ChevronLeft, Dumbbell, Wrench } from 'lucide-react';
++import { useDataSource } from '../api/snapshotContext.jsx';
++import { colors } from '../colors';
++import { cardioColor, cardioName } from '../utils/cardioConfig';
++import { formatTime12h } from '../utils/dateUtils';
++import { describeLoggedDay, getDayInfo } from '../utils/dayConfig';
++import { dayColor, pad2 } from '../utils/dayDesign';
++
++function formatDate(dateStr) {
++  if (!dateStr) return 'Date not recorded';
++  return new Date(`${dateStr}T12:00:00`).toLocaleDateString('en-US', {
++    weekday: 'long',
++    month: 'long',
++    day: 'numeric',
++    year: 'numeric',
++  });
++}
++
++function entryLevel(entry) {
++  if (Number.isInteger(entry?.level) && entry.level >= 1 && entry.level <= 10) return entry.level;
++  const levels = (entry?.muscles || []).map((muscle) => muscle.level).filter(Number.isFinite);
++  return levels.length ? Math.max(...levels) : null;
++}
++
++function levelLabel(level) {
++  if (level == null) return 'Not recorded';
++  if (level <= 2) return 'Mild';
++  if (level <= 4) return 'Noticeable';
++  if (level <= 6) return 'Moderate';
++  if (level <= 8) return 'Significant';
++  return 'Severe';
++}
++
++function levelColor(level) {
++  if (level == null) return colors.text.tertiary;
++  if (level <= 2) return colors.accent.green;
++  if (level <= 4) return colors.accent.cyan;
++  if (level <= 6) return colors.accent.gold;
++  if (level <= 8) return colors.accent.amber;
++  return colors.accent.red;
++}
++
++function loggedWeights(exercise) {
++  if (Array.isArray(exercise.weights)) return exercise.weights;
++  return Object.entries(exercise.weights || {}).map(([key, value]) => ({
++    key,
++    label: key.charAt(0).toUpperCase() + key.slice(1),
++    value,
++  }));
++}
++
++function recordKey(record) {
++  return record?.id || `${record?.date || ''}-${record?.sourceWorkoutId || ''}`;
++}
++
++export function ActivityRecordDetail({
++  kind,
++  record,
++  isAdmin,
++  onBack,
++  onEdit,
++  onOpenRecord,
++  onAddSoreness,
++}) {
++  const { fetchWorkouts, fetchCardioSessions, fetchSoreness, isReady } = useDataSource();
++  const fetchers = useRef({ fetchWorkouts, fetchCardioSessions, fetchSoreness });
++  useEffect(() => {
++    fetchers.current = { fetchWorkouts, fetchCardioSessions, fetchSoreness };
++  }, [fetchWorkouts, fetchCardioSessions, fetchSoreness]);
++  const [related, setRelated] = useState({ workouts: [], cardio: [], soreness: [] });
++  const [loading, setLoading] = useState(true);
++  const [error, setError] = useState(null);
++
++  useEffect(() => {
++    if (!isReady) return;
++    let active = true;
++    setLoading(true);
++    setError(null);
++    Promise.all([
++      fetchers.current.fetchWorkouts(),
++      fetchers.current.fetchCardioSessions(),
++      fetchers.current.fetchSoreness(),
++    ])
++      .then(([workoutData, cardioData, sorenessData]) => {
++        if (!active) return;
++        setRelated({
++          workouts: workoutData.workouts || [],
++          cardio: cardioData.sessions || [],
++          soreness: sorenessData.entries || [],
++        });
++      })
++      .catch((err) => {
++        if (active) setError(err.message);
++      })
++      .finally(() => {
++        if (active) setLoading(false);
++      });
++    return () => {
++      active = false;
++    };
++  }, [isReady, kind, record]);
++
++  const context = useMemo(() => {
++    if (kind === 'workout') {
++      return {
++        cardio: related.cardio.filter((session) => session.date === record.date),
++        soreness: related.soreness
++          .filter((entry) => entry.sourceWorkoutId === record.id)
++          .sort((a, b) => b.date.localeCompare(a.date)),
++      };
++    }
++    if (kind === 'soreness') {
++      return {
++        sourceWorkout: related.workouts.find((workout) => workout.id === record.sourceWorkoutId) || null,
++      };
++    }
++    return {};
++  }, [kind, record, related]);
++
++  if (!record) return null;
++
++  return (
++    <div style={styles.page}>
++      <button onClick={onBack} style={styles.backButton}>
++        <ChevronLeft size={15} /> Back
++      </button>
++
++      {kind === 'workout' && (
++        <WorkoutDetail
++          workout={record}
++          context={context}
++          isAdmin={isAdmin}
++          loading={loading}
++          onEdit={() => onEdit?.('workout', record)}
++          onOpenRecord={onOpenRecord}
++          onAddSoreness={() => onAddSoreness?.(record)}
++        />
++      )}
++      {kind === 'cardio' && (
++        <CardioDetail
++          session={record}
++          isAdmin={isAdmin}
++          onEdit={() => onEdit?.('cardio', record)}
++        />
++      )}
++      {kind === 'soreness' && (
++        <SorenessDetail
++          entry={record}
++          sourceWorkout={context.sourceWorkout}
++          isAdmin={isAdmin}
++          loading={loading}
++          onEdit={() => onEdit?.('soreness', record)}
++          onOpenRecord={onOpenRecord}
++        />
++      )}
++
++      {error && <div style={styles.error}>Related records could not be loaded: {error}</div>}
++    </div>
++  );
++}
++
++function DetailHeader({ eyebrow, title, date, time, accent, icon, actions }) {
++  return (
++    <header className="activity-detail-header" style={{ ...styles.header, borderColor: `${accent}55` }}>
++      <div style={{ ...styles.icon, color: accent, background: `${accent}18` }}>
++        {createElement(icon, { size: 20 })}
++      </div>
++      <div style={{ flex: 1, minWidth: 0 }}>
++        <div style={styles.eyebrow}>{eyebrow}</div>
++        <h2 style={styles.title}>{title}</h2>
++        <div style={styles.meta}>
++          {formatDate(date)}{time ? ` · ${formatTime12h(time)}` : ''}
++        </div>
++      </div>
++      {actions && <div className="activity-detail-actions" style={styles.actions}>{actions}</div>}
++    </header>
++  );
++}
++
++function WorkoutDetail({ workout, context, isAdmin, loading, onEdit, onOpenRecord, onAddSoreness }) {
++  const accent = dayColor(workout.daySlug);
++  const exercises = workout.exercises || [];
++  const hasRelated = context.cardio?.length > 0 || context.soreness?.length > 0;
++
++  return (
++    <>
++      <DetailHeader
++        eyebrow="Strength workout"
++        title={describeLoggedDay(workout)}
++        date={workout.date}
++        time={workout.time}
++        accent={accent}
++        icon={Dumbbell}
++        actions={isAdmin && (
++          <>
++            <button onClick={onAddSoreness} style={styles.primaryAction}>+ Add soreness</button>
++            <button onClick={onEdit} style={styles.secondaryAction}><Wrench size={13} /> Edit workout</button>
++          </>
++        )}
++      />
++
++      <section style={styles.section}>
++        <div style={styles.sectionHeadingRow}>
++          <h3 style={styles.sectionHeading}>Exercises</h3>
++          <span style={styles.count}>{exercises.length}</span>
++        </div>
++        {exercises.length === 0 ? (
++          <div style={styles.empty}>No exercise details were recorded.</div>
++        ) : (
++          <div style={styles.cardList}>
++            {exercises.map((exercise, index) => (
++              <ExerciseRow key={`${exercise.name}-${index}`} exercise={exercise} number={index + 1} accent={accent} />
++            ))}
++          </div>
++        )}
++      </section>
++
++      {!loading && hasRelated && (
++        <section style={styles.section}>
++          <h3 style={styles.sectionHeading}>Related records</h3>
++          <div style={styles.relatedGrid}>
++            {context.cardio.map((session) => (
++              <RecordLink
++                key={recordKey(session)}
++                eyebrow="Cardio · same day"
++                title={cardioName(session.activity)}
++                detail={`${session.durationMinutes || '—'} min${session.time ? ` · ${formatTime12h(session.time)}` : ''}`}
++                accent={cardioColor(session.activity)}
++                onClick={() => onOpenRecord?.('cardio', session)}
++              />
++            ))}
++            {context.soreness.map((entry) => {
++              const level = entryLevel(entry);
++              const muscles = entry.muscles || [];
++              return (
++                <RecordLink
++                  key={recordKey(entry)}
++                  eyebrow="Soreness"
++                  title={level ? `Intensity ${level} · ${levelLabel(level)}` : 'Intensity not recorded'}
++                  detail={`${formatDate(entry.date)} · ${muscles.length ? muscles.map((m) => m.muscle || m.group).join(', ') : 'No muscles specified'}`}
++                  accent={levelColor(level)}
++                  onClick={() => onOpenRecord?.('soreness', entry)}
++                />
++              );
++            })}
++          </div>
++        </section>
++      )}
++    </>
++  );
++}
++
++function ExerciseRow({ exercise, number, accent }) {
++  const weights = loggedWeights(exercise).filter((entry) => entry.value != null && entry.value !== '');
++  const metrics = [
++    exercise.weight != null && exercise.weight !== '' ? ['Weight', `${exercise.weight} lb`] : null,
++    ...weights.map((entry) => [entry.label || entry.key, `${entry.value} lb`]),
++    exercise.inclineDegrees != null && exercise.inclineDegrees !== '' ? ['Incline', `${exercise.inclineDegrees}°`] : null,
++    exercise.sets != null ? ['Sets', exercise.sets] : null,
++    exercise.reps != null ? ['Reps', exercise.reps] : null,
++  ].filter(Boolean);
++
++  return (
++    <div style={styles.exerciseRow}>
++      <div style={{ ...styles.exerciseNumber, borderColor: accent, color: accent }}>{number}</div>
++      <div style={{ flex: 1, minWidth: 0 }}>
++        <div style={styles.exerciseName}>{exercise.name}</div>
++        {exercise.variation && exercise.variation !== 'Standard' && (
++          <div style={styles.exerciseVariation}>{exercise.variation}</div>
++        )}
++        {metrics.length > 0 && (
++          <div style={styles.metricGrid}>
++            {metrics.map(([label, value]) => <DetailField key={label} label={label} value={value} compact />)}
++          </div>
++        )}
++      </div>
++    </div>
++  );
++}
++
++function CardioDetail({ session, isAdmin, onEdit }) {
++  const accent = cardioColor(session.activity);
++  const isBike = session.activity === 'bike';
++  const intervals = Array.isArray(session.treadmill?.intervals) ? session.treadmill.intervals : [];
++  const metrics = [
++    ['Duration', session.durationMinutes != null ? `${session.durationMinutes} min` : 'Not recorded'],
++    session.treadmill?.templateName ? ['Workout', session.treadmill.templateName] : null,
++    session.bike?.distanceMiles != null ? ['Distance', `${session.bike.distanceMiles} mi`] : null,
++    session.bike?.avgSpeedMph != null ? ['Average speed', `${session.bike.avgSpeedMph} mph`] : null,
++    session.bike?.avgHeartRate != null ? ['Average heart rate', `${session.bike.avgHeartRate} bpm`] : null,
++    session.bike?.calories != null ? ['Calories', `${session.bike.calories} cal`] : null,
++  ].filter(Boolean);
++
++  return (
++    <>
++      <DetailHeader
++        eyebrow="Cardio session"
++        title={cardioName(session.activity)}
++        date={session.date}
++        time={session.time}
++        accent={accent}
++        icon={isBike ? Bike : Activity}
++        actions={isAdmin && (
++          <button onClick={onEdit} style={styles.secondaryAction}><Wrench size={13} /> Edit cardio</button>
++        )}
++      />
++
++      <section style={styles.section}>
++        <div style={styles.metricGridLarge}>
++          {metrics.map(([label, value]) => <DetailField key={label} label={label} value={value} />)}
++        </div>
++      </section>
++
++      {intervals.length > 0 && (
++        <section style={styles.section}>
++          <h3 style={styles.sectionHeading}>Intervals</h3>
++          <div style={styles.cardList}>
++            {intervals.map((interval, index) => (
++              <div key={`${interval.type}-${index}`} style={styles.intervalRow}>
++                <span style={{ color: interval.type === 'jog' ? accent : colors.text.secondary, fontWeight: 700, textTransform: 'capitalize' }}>
++                  {interval.type}
++                </span>
++                <span style={styles.mono}>{interval.durationMinutes} min · {interval.speedMph} mph</span>
++              </div>
++            ))}
++          </div>
++        </section>
++      )}
++
++      {session.notes && (
++        <section style={styles.section}>
++          <h3 style={styles.sectionHeading}>Notes</h3>
++          <div style={styles.note}>{session.notes}</div>
++        </section>
++      )}
++    </>
++  );
++}
++
++function SorenessDetail({ entry, sourceWorkout, isAdmin, loading, onEdit, onOpenRecord }) {
++  const level = entryLevel(entry);
++  const muscles = entry.muscles || [];
++  const accent = levelColor(level);
++  const sourceTitle = sourceWorkout
++    ? describeLoggedDay(sourceWorkout)
++    : getDayInfo(entry.sourceWorkoutDaySlug)?.name || `Day ${entry.sourceWorkoutDay}`;
++
++  return (
++    <>
++      <DetailHeader
++        eyebrow="Soreness record"
++        title={level ? `Intensity ${level} · ${levelLabel(level)}` : 'Intensity not recorded'}
++        date={entry.date}
++        accent={accent}
++        icon={Activity}
++        actions={isAdmin && (
++          <button onClick={onEdit} style={styles.secondaryAction}><Wrench size={13} /> Edit soreness</button>
++        )}
++      />
++
++      <section style={styles.section}>
++        <div style={styles.metricGridLarge}>
++          <DetailField label="Intensity" value={level ? `${level} / 10 · ${levelLabel(level)}` : 'Not recorded'} />
++          <DetailField label="Muscles" value={muscles.length ? `${muscles.length} specified` : 'Not specified'} />
++        </div>
++      </section>
++
++      {muscles.length > 0 && (
++        <section style={styles.section}>
++          <h3 style={styles.sectionHeading}>Muscles</h3>
++          <div style={styles.muscleList}>
++            {muscles.map((muscle, index) => (
++              <div key={`${muscle.group}-${muscle.muscle || 'group'}-${index}`} style={styles.musclePill}>
++                <span style={{ width: 7, height: 7, borderRadius: '50%', background: accent }} />
++                <span>{muscle.muscle || muscle.group}</span>
++                {muscle.muscle && <span style={styles.muscleGroup}>{muscle.group}</span>}
++              </div>
++            ))}
++          </div>
++        </section>
++      )}
++
++      {!loading && (entry.sourceWorkoutId || entry.sourceWorkoutDay != null) && (
++        <section style={styles.section}>
++          <h3 style={styles.sectionHeading}>Originating workout</h3>
++          {sourceWorkout ? (
++            <RecordLink
++              eyebrow="Strength workout"
++              title={sourceTitle}
++              detail={formatDate(sourceWorkout.date)}
++              accent={dayColor(sourceWorkout.daySlug)}
++              onClick={() => onOpenRecord?.('workout', sourceWorkout)}
++            />
++          ) : (
++            <div style={styles.note}>
++              D{pad2(entry.sourceWorkoutDay)} · {sourceTitle} · {formatDate(entry.sourceWorkoutDate)}
++            </div>
++          )}
++        </section>
++      )}
++    </>
++  );
++}
++
++function DetailField({ label, value, compact = false }) {
++  return (
++    <div style={compact ? styles.metricCompact : styles.metric}>
++      <div style={styles.fieldLabel}>{label}</div>
++      <div style={styles.fieldValue}>{value}</div>
++    </div>
++  );
++}
++
++function RecordLink({ eyebrow, title, detail, accent, onClick }) {
++  return (
++    <button onClick={onClick} style={{ ...styles.recordLink, borderLeftColor: accent }}>
++      <span style={styles.eyebrow}>{eyebrow}</span>
++      <span style={styles.recordTitle}>{title}</span>
++      <span style={styles.recordDetail}>{detail}</span>
++      <span style={styles.openLabel}>View details →</span>
++    </button>
++  );
++}
++
++const styles = {
++  page: { width: '100%', maxWidth: 960, minWidth: 0, boxSizing: 'border-box' },
++  backButton: {
++    display: 'inline-flex', alignItems: 'center', gap: 4, marginBottom: 14, padding: '7px 10px',
++    borderRadius: 8, border: '1px solid var(--border-subtle)', background: 'transparent',
++    color: 'var(--fg-muted)', fontFamily: 'var(--font-primary)', fontSize: 12, fontWeight: 650, cursor: 'pointer',
++  },
++  header: {
++    display: 'flex', alignItems: 'center', gap: 14, padding: '18px 20px', borderRadius: 14,
++    border: '1px solid', background: 'var(--bg-raised)', flexWrap: 'wrap',
++  },
++  icon: { width: 44, height: 44, borderRadius: 10, display: 'grid', placeItems: 'center', flexShrink: 0 },
++  eyebrow: { color: 'var(--fg-faint)', fontSize: 10, fontWeight: 750, letterSpacing: '0.09em', textTransform: 'uppercase' },
++  title: { margin: '2px 0 0', color: 'var(--fg-primary)', fontFamily: 'var(--font-primary)', fontSize: 24, lineHeight: 1.2, fontWeight: 750 },
++  meta: { marginTop: 5, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)', fontSize: 11 },
++  actions: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
++  primaryAction: {
++    padding: '8px 11px', borderRadius: 8, border: '1px solid rgba(245,158,111,0.42)',
++    background: 'rgba(245,158,111,0.12)', color: '#f59e6f', fontFamily: 'var(--font-primary)',
++    fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
++  },
++  secondaryAction: {
++    display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 11px', borderRadius: 8,
++    border: '1px solid var(--border-subtle)', background: 'transparent', color: 'var(--fg-body)',
++    fontFamily: 'var(--font-primary)', fontSize: 12, fontWeight: 650, cursor: 'pointer', whiteSpace: 'nowrap',
++  },
++  section: { marginTop: 22 },
++  sectionHeadingRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 },
++  sectionHeading: { margin: '0 0 10px', color: 'var(--fg-secondary)', fontFamily: 'var(--font-primary)', fontSize: 13, fontWeight: 750, letterSpacing: '0.02em' },
++  count: { minWidth: 20, height: 20, borderRadius: 999, display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,0.05)', color: 'var(--fg-muted)', fontSize: 10 },
++  cardList: { display: 'flex', flexDirection: 'column', gap: 8 },
++  exerciseRow: { display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 15px', borderRadius: 11, background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)' },
++  exerciseNumber: { width: 25, height: 25, display: 'grid', placeItems: 'center', borderRadius: 7, border: '1px solid', fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, flexShrink: 0 },
++  exerciseName: { color: 'var(--fg-primary)', fontSize: 14, fontWeight: 700 },
++  exerciseVariation: { marginTop: 2, color: 'var(--fg-muted)', fontSize: 11 },
++  metricGrid: { display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 10 },
++  metricGridLarge: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: 10 },
++  metricCompact: { minWidth: 76, padding: '6px 9px', borderRadius: 7, background: 'rgba(255,255,255,0.025)', border: '1px solid var(--border-subtle)' },
++  metric: { padding: '13px 14px', borderRadius: 10, background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)' },
++  fieldLabel: { color: 'var(--fg-faint)', fontSize: 9, fontWeight: 750, letterSpacing: '0.08em', textTransform: 'uppercase' },
++  fieldValue: { marginTop: 3, color: 'var(--fg-primary)', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 650 },
++  relatedGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(235px, 1fr))', gap: 8 },
++  recordLink: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', padding: '13px 14px', borderRadius: 10, border: '1px solid var(--border-subtle)', borderLeft: '3px solid', background: 'var(--bg-raised)', color: 'inherit', cursor: 'pointer', minWidth: 0 },
++  recordTitle: { marginTop: 4, color: 'var(--fg-primary)', fontSize: 13, fontWeight: 700 },
++  recordDetail: { marginTop: 3, color: 'var(--fg-muted)', fontSize: 11, lineHeight: 1.45 },
++  openLabel: { marginTop: 10, color: 'var(--fg-secondary)', fontSize: 10, fontWeight: 700 },
++  intervalRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 8, background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)', color: 'var(--fg-secondary)', fontSize: 12 },
++  mono: { fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)' },
++  note: { padding: '13px 14px', borderRadius: 10, background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)', color: 'var(--fg-body)', fontSize: 13, lineHeight: 1.55 },
++  muscleList: { display: 'flex', flexWrap: 'wrap', gap: 8 },
++  musclePill: { display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 11px', borderRadius: 999, background: 'var(--bg-raised)', border: '1px solid var(--border-subtle)', color: 'var(--fg-body)', fontSize: 12, fontWeight: 600 },
++  muscleGroup: { color: 'var(--fg-faint)', fontSize: 10 },
++  empty: { padding: '20px', borderRadius: 10, border: '1px dashed var(--border-subtle)', color: 'var(--fg-muted)', fontSize: 12 },
++  error: { marginTop: 18, color: colors.accent.red, fontSize: 12 },
++};
+diff --git a/frontend/src/components/HistoryTab.jsx b/frontend/src/components/HistoryTab.jsx
+index 89e24c6f..62476bf7 100644
+--- a/frontend/src/components/HistoryTab.jsx
++++ b/frontend/src/components/HistoryTab.jsx
+@@ -1,8 +1,7 @@
+ // Calendar view of workout history with week/month/year views. Each day cell is
+ // color-coded by the day's accent color, looked up by slug so a workout logged
+-// under a day that has since been renamed or retired keeps its own color. Clicking
+-// a day opens the
+-// WorkoutDrawer pre-filled with that day's workout type and date.
++// under a day that has since been renamed or retired keeps its own color. Each
++// record stripe opens the app's shared record detail; empty days can start a log.
+ //
+ // Filter bar lets you toggle visibility of specific workout types —
+ // useful for seeing patterns like "how often do I do compound days?"
+@@ -16,13 +15,13 @@ import { useState, useEffect } from 'react';
+ import { motion } from 'framer-motion';
+ import { getDays } from '../utils/dayConfig';
+ import { dayColor } from '../utils/dayDesign';
+-import { CARDIO_CONFIG } from '../utils/cardioConfig';
++import { CARDIO_CONFIG, cardioColor } from '../utils/cardioConfig';
+ import { useDataSource } from '../api/snapshotContext.jsx';
+ import { dateToLocal } from '../utils/dateUtils';
+ 
+ const SORENESS_COLOR = '#f97316'; // orange-500
+ 
+-export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewToggle }) {
++export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, onSorenessClick, viewToggle }) {
+   const [calendarPeriod, setCalendarPeriod] = useState('month'); // 'week', 'month', or 'year'
+   const [workouts, setWorkouts] = useState([]);
+   const [cardioSessions, setCardioSessions] = useState([]);
+@@ -168,7 +167,7 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
+   // class names on DAY_CONFIG; they live in dayDesign.js keyed by slug, as hex.
+   const getItemColorStyle = (item) => {
+     if (item._kind === 'cardio') {
+-      return { backgroundColor: CARDIO_CONFIG[item.activity]?.color || '#10b981' };
++      return { backgroundColor: cardioColor(item.activity) };
+     }
+     if (item._kind === 'soreness') {
+       return { backgroundColor: SORENESS_COLOR };
+@@ -201,7 +200,7 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
+     if (item._kind === 'cardio') {
+       onCardioClick?.(item);
+     } else if (item._kind === 'soreness') {
+-      // No click action for soreness in calendar
++      onSorenessClick?.(item);
+     } else {
+       onWorkoutClick?.(item);
+     }
+@@ -385,10 +384,9 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
+                     days.push(
+                       <div
+                         key={i}
+-                        onClick={() => dayItems.length > 0
+-                          ? handleItemClick(dayItems[0])
+-                          : onDayClick?.(null, dateToLocal(date))
+-                        }
++                        onClick={() => {
++                          if (dayItems.length === 0) onDayClick?.(null, dateToLocal(date));
++                        }}
+                         className={`min-h-[80px] sm:min-h-[120px] rounded-lg sm:rounded-xl border transition-all overflow-hidden cursor-pointer hover:scale-105 ${
+                           isToday
+                             ? 'border-cyan-500 shadow-lg shadow-cyan-500/20'
+@@ -407,6 +405,19 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
+                                 } ${hoveredWorkoutType && hoveredWorkoutType !== getItemFilterKey(item) ? 'opacity-30' : 'opacity-100'}`}
+                                 style={getItemColorStyle(item)}
+                                 title={getItemTitle(item)}
++                                role="button"
++                                tabIndex={0}
++                                onClick={(event) => {
++                                  event.stopPropagation();
++                                  handleItemClick(item);
++                                }}
++                                onKeyDown={(event) => {
++                                  if (event.key === 'Enter' || event.key === ' ') {
++                                    event.preventDefault();
++                                    event.stopPropagation();
++                                    handleItemClick(item);
++                                  }
++                                }}
+                                 onMouseEnter={() => setHoveredWorkoutType(getItemFilterKey(item))}
+                                 onMouseLeave={() => setHoveredWorkoutType(null)}
+                               />
+@@ -471,10 +482,9 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
+                   days.push(
+                     <div
+                       key={day}
+-                      onClick={() => dayItems.length > 0
+-                        ? handleItemClick(dayItems[0])
+-                        : onDayClick?.(null, dateToLocal(date))
+-                      }
++                      onClick={() => {
++                        if (dayItems.length === 0) onDayClick?.(null, dateToLocal(date));
++                      }}
+                       className={`h-14 sm:h-20 rounded-md sm:rounded-lg border transition-all overflow-hidden cursor-pointer hover:scale-105 ${
+                         isToday
+                           ? 'border-cyan-500 shadow-lg shadow-cyan-500/20'
+@@ -491,6 +501,19 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
+                               } ${hoveredWorkoutType && hoveredWorkoutType !== getItemFilterKey(item) ? 'opacity-30' : 'opacity-100'}`}
+                               style={getItemColorStyle(item)}
+                               title={getItemTitle(item)}
++                              role="button"
++                              tabIndex={0}
++                              onClick={(event) => {
++                                event.stopPropagation();
++                                handleItemClick(item);
++                              }}
++                              onKeyDown={(event) => {
++                                if (event.key === 'Enter' || event.key === ' ') {
++                                  event.preventDefault();
++                                  event.stopPropagation();
++                                  handleItemClick(item);
++                                }
++                              }}
+                               onMouseEnter={() => setHoveredWorkoutType(getItemFilterKey(item))}
+                               onMouseLeave={() => setHoveredWorkoutType(null)}
+                             />
+@@ -576,9 +599,12 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
+                             key={day}
+                             onClick={(e) => {
+                               e.stopPropagation();
+-                              dayItems.length > 0
+-                                ? handleItemClick(dayItems[0])
+-                                : onDayClick?.(null, dateToLocal(date));
++                              if (dayItems.length > 0) {
++                                setSelectedMonth(date);
++                                setCalendarPeriod('month');
++                              } else {
++                                onDayClick?.(null, dateToLocal(date));
++                              }
+                             }}
+                             className={`aspect-square rounded-sm flex items-center justify-center text-[9px] font-bold transition-all cursor-pointer hover:scale-110 hover:ring-1 hover:ring-white/30 ${
+                               isToday
+@@ -588,7 +614,7 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, viewTogg
+                             style={!isToday ? yearCellStyle : {}}
+                             title={
+                               dayItems.length > 0
+-                                ? dayItems.map(getItemTitle).join(', ')
++                                ? `${dayItems.length} record${dayItems.length === 1 ? '' : 's'} — open month`
+                                 : 'Click to log'
+                             }
+                           >
+diff --git a/frontend/src/components/ListTab.jsx b/frontend/src/components/ListTab.jsx
+index 2d99a29e..a1105ce6 100644
+--- a/frontend/src/components/ListTab.jsx
++++ b/frontend/src/components/ListTab.jsx
+@@ -9,22 +9,14 @@ import { describeLoggedDay, getDayInfo } from '../utils/dayConfig';
+ import { useDataSource } from '../api/snapshotContext.jsx';
+ import { formatTime12h, todayLocal } from '../utils/dateUtils';
+ import { formatIntervalSummary } from '../utils/cardioTemplates.js';
+-import {
+-  dayWarns,
+-  dayColor,
+-  dayMuscle,
+-  anatomyUrl,
+-  pad2,
+-  sorenessTierColor,
+-} from '../utils/dayDesign';
++import { cardioColor, cardioName } from '../utils/cardioConfig.js';
++import { dayColor, pad2, sorenessTierColor } from '../utils/dayDesign';
+ import { daysBetween } from '../utils/sorenessLink';
+ import {
+-  Plus,
+-  Check,
+   Bike,
+   Activity,
++  Dumbbell,
+   ChevronRight,
+-  AlertTriangle,
+ } from 'lucide-react';
+ 
+ const fmtDate = (iso) => {
+@@ -38,23 +30,7 @@ const daysSince = (iso) => {
+   return Math.round((b - a) / (1000 * 60 * 60 * 24));
+ };
+ 
+-const loggedWeights = (exercise) => {
+-  if (Array.isArray(exercise.weights)) return exercise.weights;
+-  return Object.entries(exercise.weights || {}).map(([key, value]) => ({
+-    key,
+-    label: key.charAt(0).toUpperCase() + key.slice(1),
+-    value,
+-  }));
+-};
+-
+-const chartWeight = (exercise) => {
+-  const values = [exercise.weight, ...loggedWeights(exercise).map((entry) => entry.value)]
+-    .map(Number)
+-    .filter(Number.isFinite);
+-  return values.length > 0 ? Math.max(...values) : 0;
+-};
+-
+-export function ListTab({ onWorkoutClick, onCardioClick, onLogSoreness, viewToggle }) {
++export function ListTab({ onWorkoutClick, onCardioClick, onSorenessClick, viewToggle }) {
+   const [workouts, setWorkouts] = useState([]);
+   const [cardioSessions, setCardioSessions] = useState([]);
+   const [sorenessEntries, setSorenessEntries] = useState([]);
+@@ -192,7 +168,7 @@ export function ListTab({ onWorkoutClick, onCardioClick, onLogSoreness, viewTogg
+           </div>
+         ) : (
+           groups.map(([date, dayItems]) => (
+-            <DateGroup key={date} date={date} items={dayItems} onWorkoutClick={onWorkoutClick} onCardioClick={onCardioClick} onLogSoreness={onLogSoreness} />
++            <DateGroup key={date} date={date} items={dayItems} onWorkoutClick={onWorkoutClick} onCardioClick={onCardioClick} onSorenessClick={onSorenessClick} />
+           ))
+         )}
+       </div>
+@@ -234,7 +210,7 @@ function StatsStrip({ workouts, cardio, cycles, activeDays }) {
+ }
+ 
+ // ── Date group ─────────────────────────────────────────────────────────
+-function DateGroup({ date, items, onWorkoutClick, onCardioClick, onLogSoreness }) {
++function DateGroup({ date, items, onWorkoutClick, onCardioClick, onSorenessClick }) {
+   const ds = daysSince(date);
+   const rel = ds === 0 ? 'today' : ds === 1 ? 'yesterday' : `${ds} days ago`;
+   return (
+@@ -245,9 +221,9 @@ function DateGroup({ date, items, onWorkoutClick, onCardioClick, onLogSoreness }
+       </div>
+       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+         {items.map((it) => {
+-          if (it._kind === 'workout') return <WorkoutCard key={it.id} w={it} onClick={onWorkoutClick} onLogSoreness={onLogSoreness} />;
++          if (it._kind === 'workout') return <WorkoutCard key={it.id} w={it} onClick={onWorkoutClick} />;
+           if (it._kind === 'cardio') return <CardioCard key={it.id} c={it} onClick={onCardioClick} />;
+-          if (it._kind === 'soreness') return <SorenessCard key={it.id || `s-${it.date}`} s={it} />;
++          if (it._kind === 'soreness') return <SorenessCard key={it.id || `s-${it.date}`} s={it} onClick={onSorenessClick} />;
+           return null;
+         })}
+       </div>
+@@ -285,54 +261,22 @@ function DayChip({ daySlug, number, size = 'md' }) {
+ }
+ 
+ // ── Workout card ───────────────────────────────────────────────────────
+-function WorkoutCard({ w, onClick, onLogSoreness }) {
+-  const [open, setOpen] = useState(false);
+-  const muscle = dayMuscle(w.daySlug);
+-  const sets = (w.exercises || []).reduce((s, e) => s + (e.sets || 0), 0);
+-  const handleHeader = (e) => {
+-    e.stopPropagation();
+-    setOpen((o) => !o);
+-  };
++function WorkoutCard({ w, onClick }) {
++  const sets = (w.exercises || []).reduce((sum, exercise) => sum + (exercise.sets || 0), 0);
+   return (
+-    <div
++    <button
++      onClick={() => onClick?.(w)}
++      aria-label={`View ${w.dayName || describeLoggedDay(w)} workout details`}
+       style={{
+-        borderRadius: 12,
+-        border: '1px solid var(--border-subtle)',
+-        background: 'var(--bg-raised)',
+-        overflow: 'hidden',
++        width: '100%', padding: 0, textAlign: 'left', color: 'inherit', borderRadius: 12,
++        border: '1px solid var(--border-subtle)', background: 'var(--bg-raised)',
++        overflow: 'hidden', cursor: onClick ? 'pointer' : 'default',
+       }}
+     >
+       <div style={{ height: 2, background: dayColor(w.daySlug) }} />
+-      <button
+-        onClick={handleHeader}
+-        style={{
+-          display: 'grid',
+-          gridTemplateColumns: 'auto minmax(0, 1fr) auto auto',
+-          alignItems: 'center',
+-          gap: 14,
+-          padding: '14px 16px',
+-          width: '100%',
+-          textAlign: 'left',
+-          background: 'transparent',
+-          border: 'none',
+-          color: 'inherit',
+-          cursor: 'pointer',
+-        }}
+-      >
+-        <div
+-          style={{
+-            width: 56,
+-            height: 56,
+-            borderRadius: 8,
+-            background: 'var(--bg-app)',
+-            border: '1px solid var(--border-subtle)',
+-            display: 'grid',
+-            placeItems: 'center',
+-            overflow: 'hidden',
+-            flexShrink: 0,
+-          }}
+-        >
+-          <img className="anatomy" src={anatomyUrl(muscle)} alt="" style={{ height: 62, width: 'auto' }} />
++      <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', alignItems: 'center', gap: 14, padding: '14px 16px' }}>
++        <div style={{ width: 40, height: 40, borderRadius: 8, background: `${dayColor(w.daySlug)}18`, color: dayColor(w.daySlug), display: 'grid', placeItems: 'center' }}>
++          <Dumbbell size={16} />
+         </div>
+         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+@@ -341,129 +285,27 @@ function WorkoutCard({ w, onClick, onLogSoreness }) {
+               {w.dayName || describeLoggedDay(w)}
+             </span>
+             {w.mode === 'quick' && (
+-              <span
+-                style={{
+-                  fontSize: 10,
+-                  fontFamily: 'var(--font-mono)',
+-                  color: 'var(--fg-muted)',
+-                  padding: '2px 6px',
+-                  borderRadius: 4,
+-                  background: 'rgba(255,255,255,0.04)',
+-                  textTransform: 'lowercase',
+-                }}
+-              >
++              <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--fg-muted)', padding: '2px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.04)' }}>
+                 quick log
+               </span>
+             )}
+-            {dayWarns(w.daySlug) && (
+-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--status-warn)', fontFamily: 'var(--font-mono)' }}>
+-                <AlertTriangle size={12} /> shoulder-safe
+-              </span>
+-            )}
+           </div>
+-          <div style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+-            {w.time && <span>{formatTime12h(w.time)}</span>}
+-            {w.time && <span>·</span>}
++          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
++            {w.time && <span>{formatTime12h(w.time)} ·</span>}
+             <span>{(w.exercises || []).length} exercises</span>
+-            <span>·</span>
+-            <span className="tnum">{sets} sets</span>
++            <span>· {sets} sets</span>
+           </div>
+         </div>
+-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 28 }}>
+-          {(w.exercises || []).map((e, i) => {
+-            const h = Math.max(6, Math.min(28, (chartWeight(e) / 4) + 6));
+-            return <div key={i} style={{ width: 4, height: h, background: dayColor(w.daySlug), opacity: 0.6, borderRadius: 1 }} />;
+-          })}
+-        </div>
+-        <div
+-          style={{
+-            color: 'var(--fg-muted)',
+-            display: 'flex',
+-            alignItems: 'center',
+-            transform: open ? 'rotate(90deg)' : 'none',
+-            transition: 'transform var(--t-fast) var(--ease)',
+-          }}
+-        >
+-          <ChevronRight size={14} />
+-        </div>
+-      </button>
+-      {open && (
+-        <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 4, marginLeft: 70 }}>
+-          {(w.exercises || []).map((e, i) => (
+-            <div
+-              key={i}
+-              style={{
+-                display: 'grid',
+-                gridTemplateColumns: '1fr auto',
+-                padding: '8px 12px',
+-                background: 'rgba(255,255,255,0.02)',
+-                borderRadius: 6,
+-                alignItems: 'center',
+-                fontSize: 12,
+-                fontFamily: 'var(--font-mono)',
+-              }}
+-            >
+-              <div>
+-                <span style={{ color: 'var(--fg-body)', fontWeight: 600 }}>{e.name}</span>
+-                {e.variation && e.variation !== 'Standard' && (
+-                  <span style={{ color: 'var(--fg-faint)', marginLeft: 8 }}>{e.variation}</span>
+-                )}
+-              </div>
+-              <div className="tnum" style={{ color: 'var(--fg-secondary)', display: 'flex', gap: 10 }}>
+-                {e.weight != null && e.weight !== '' && <span>{e.weight} lb</span>}
+-                {loggedWeights(e).map((entry) => (
+-                  entry.value != null && entry.value !== ''
+-                    ? <span key={entry.key}>{entry.label} {entry.value} lb</span>
+-                    : null
+-                ))}
+-                {e.inclineDegrees != null && e.inclineDegrees !== '' && <span>{e.inclineDegrees}° incline</span>}
+-                {e.reps != null && <span>×{e.reps}</span>}
+-                {e.sets != null && <span style={{ color: dayColor(w.daySlug) }}>×{e.sets} sets</span>}
+-              </div>
+-            </div>
+-          ))}
+-          {(onClick || onLogSoreness) && (
+-            <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+-              {onClick && (
+-                <button onClick={() => onClick(w)} style={cardActionStyle()}>
+-                  Open in editor →
+-                </button>
+-              )}
+-              {onLogSoreness && (
+-                <button
+-                  onClick={() => onLogSoreness(w)}
+-                  style={cardActionStyle('#f59e6f')}
+-                  title="Record the soreness this workout caused"
+-                >
+-                  Log soreness →
+-                </button>
+-              )}
+-            </div>
+-          )}
+-        </div>
+-      )}
+-    </div>
++        <ChevronRight size={15} color="var(--fg-muted)" />
++      </div>
++    </button>
+   );
+ }
+ 
+-// Pill button used for the actions revealed inside an expanded workout card.
+-function cardActionStyle(color) {
+-  return {
+-    padding: '6px 10px',
+-    fontSize: 11,
+-    fontFamily: 'var(--font-primary)',
+-    fontWeight: 600,
+-    color: color || 'var(--fg-muted)',
+-    background: 'transparent',
+-    border: `1px solid ${color ? 'rgba(245,158,111,0.35)' : 'var(--border-subtle)'}`,
+-    borderRadius: 9999,
+-    cursor: 'pointer',
+-  };
+-}
+-
+ // ── Cardio card ────────────────────────────────────────────────────────
+ function CardioCard({ c, onClick }) {
+   const isBike = c.activity === 'bike';
++  const activityColor = cardioColor(c.activity);
+   const intervalSummary = Array.isArray(c.treadmill?.intervals)
+     ? formatIntervalSummary(c.treadmill.intervals)
+     : c.treadmill?.intervals;
+@@ -471,6 +313,14 @@ function CardioCard({ c, onClick }) {
+   return (
+     <div
+       onClick={() => onClick?.(c)}
++      onKeyDown={(event) => {
++        if (onClick && (event.key === 'Enter' || event.key === ' ')) {
++          event.preventDefault();
++          onClick(c);
++        }
++      }}
++      role={onClick ? 'button' : undefined}
++      tabIndex={onClick ? 0 : undefined}
+       style={{
+         borderRadius: 12,
+         border: '1px solid var(--border-subtle)',
+@@ -483,7 +333,7 @@ function CardioCard({ c, onClick }) {
+         cursor: onClick ? 'pointer' : 'default',
+       }}
+     >
+-      <div style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(103,232,249,0.10)', color: '#67e8f9', display: 'grid', placeItems: 'center' }}>
++      <div style={{ width: 40, height: 40, borderRadius: 8, background: `${activityColor}1a`, color: activityColor, display: 'grid', placeItems: 'center' }}>
+         {isBike ? <Bike size={16} /> : <Activity size={16} />}
+       </div>
+       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+@@ -497,14 +347,14 @@ function CardioCard({ c, onClick }) {
+               textTransform: 'uppercase',
+               padding: '3px 8px',
+               borderRadius: 9999,
+-              background: 'rgba(103,232,249,0.14)',
+-              color: '#a5f3fc',
++              background: `${activityColor}24`,
++              color: activityColor,
+             }}
+           >
+             Cardio
+           </span>
+-          <span style={{ fontFamily: 'var(--font-primary)', fontWeight: 600, fontSize: 15, color: 'var(--fg-primary)', textTransform: 'capitalize' }}>
+-            {c.activity}
++          <span style={{ fontFamily: 'var(--font-primary)', fontWeight: 600, fontSize: 15, color: 'var(--fg-primary)' }}>
++            {cardioName(c.activity)}
+           </span>
+         </div>
+         <div style={{ fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}>
+@@ -533,9 +383,18 @@ function MetricStat({ val, unit }) {
+ }
+ 
+ // ── Soreness card ──────────────────────────────────────────────────────
+-function SorenessCard({ s }) {
++function SorenessCard({ s, onClick }) {
+   return (
+     <div
++      onClick={() => onClick?.(s)}
++      onKeyDown={(event) => {
++        if (onClick && (event.key === 'Enter' || event.key === ' ')) {
++          event.preventDefault();
++          onClick(s);
++        }
++      }}
++      role={onClick ? 'button' : undefined}
++      tabIndex={onClick ? 0 : undefined}
+       style={{
+         borderRadius: 12,
+         border: '1px solid var(--border-subtle)',
+@@ -544,6 +403,7 @@ function SorenessCard({ s }) {
+         display: 'flex',
+         flexDirection: 'column',
+         gap: 10,
++        cursor: onClick ? 'pointer' : 'default',
+       }}
+     >
+       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+@@ -586,6 +446,9 @@ function SorenessCard({ s }) {
+             flexWrap: 'wrap',
+             padding: '5px 10px',
+             borderRadius: 8,
++            width: '100%',
++            maxWidth: '100%',
++            boxSizing: 'border-box',
+             background: 'rgba(255,255,255,0.03)',
+             borderLeft: `3px solid ${dayColor(s.sourceWorkoutDaySlug)}`,
+           }}
+diff --git a/frontend/src/components/SorenessLanes.jsx b/frontend/src/components/SorenessLanes.jsx
+index 1007187f..4dce36c0 100644
+--- a/frontend/src/components/SorenessLanes.jsx
++++ b/frontend/src/components/SorenessLanes.jsx
+@@ -1,5 +1,6 @@
+ // Lanes view — a vertical date rail where each workout spawns a stripe that
+-// runs for as long as its soreness lasted.
++// runs for as long as its soreness lasted. Cardio sessions share the date rail
++// as peer activity records, but never spawn a soreness stripe.
+ //
+ // Reads like a git graph: the date axis is the trunk, workouts are commits, and
+ // each recovery is a branch that slopes off its workout and runs down the page
+@@ -21,23 +22,23 @@
+ import { useMemo, useState, useEffect } from 'react';
+ import { getDayInfo, describeLoggedDay } from '../utils/dayConfig';
+ import { dayColor, pad2 } from '../utils/dayDesign';
++import { cardioColor, cardioLabel, cardioName } from '../utils/cardioConfig';
+ import { buildTracks, packLanes, datesBetween, daysBetween } from '../utils/sorenessLink';
+ import { todayLocal } from '../utils/dateUtils';
+ import { colors } from '../colors';
+ 
+ const ROW_H = 30;
+ const GAP_H = 22; // a collapsed run of dates with nothing in them
+-const DATE_X = 0;
++const ACTIVITY_W = 146;
++const CARDIO_GAP = 12;
+ const DATE_W = 74; // wide enough for "Sat Aug 13" in 10px monospace
+-const WO_X = DATE_W + 6;
+-const WO_W = 146;
++const ACTIVITY_GAP = 6;
+ const GUTTER = 64; // room for the spawn connector to slope
+ const LANE_W = 20;
+ const LANE_PITCH = 26;
+ const LABEL_GAP = 14;
+ const LABEL_COL = 100; // per-stripe label column, for stripes sharing a start day
+ const TOP = 34;
+-
+ const shortDate = (d) =>
+   new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+ 
+@@ -75,12 +76,13 @@ function shiftDays(date, delta) {
+   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+ }
+ 
+-export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
++export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWorkout, onOpenCardio }) {
+   const [group, setGroup] = useState('workout');   // 'workout' | 'muscle'
+   const [gaps, setGaps] = useState('bridge');     // 'bridge' | 'break'
+   const [order, setOrder] = useState('oldest');    // 'oldest' | 'newest'
+   const [quiet, setQuiet] = useState('collapse');  // 'collapse' | 'show'
+   const [windowDays, setWindowDays] = useState(30); // 30 | 90 | 0 (all)
++  const [activityContext, setActivityContext] = useState('all'); // 'all' | 'weights'
+   const [hover, setHover] = useState(null);
+   const narrow = useNarrow();
+ 
+@@ -91,13 +93,20 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+     const built = buildTracks(entries.filter((e) => inWindow(e.date)), group);
+     const { tracks, laneCount } = packLanes(built);
+     const visibleWorkouts = workouts.filter((w) => inWindow(w.date));
++    const visibleCardio = activityContext === 'all'
++      ? cardioSessions.filter((session) => inWindow(session.date))
++      : [];
+ 
+     const stamps = [
+       ...visibleWorkouts.map((w) => w.date),
++      ...visibleCardio.map((session) => session.date),
+       ...tracks.flatMap((t) => [t.startDate, t.endDate, t.sourceWorkoutDate].filter(Boolean)),
+     ];
+     if (stamps.length === 0) {
+-      return { layout: [], yByDate: new Map(), bottom: TOP, tracks: [], laneCount: 0, workoutsByDate: new Map() };
++      return {
++        layout: [], yByDate: new Map(), bottom: TOP, tracks: [], laneCount: 0,
++        workoutsByDate: new Map(), cardioByDate: new Map(),
++      };
+     }
+ 
+     const min = stamps.reduce((a, b) => (a < b ? a : b));
+@@ -110,11 +119,17 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+       if (!workoutsByDate.has(w.date)) workoutsByDate.set(w.date, []);
+       workoutsByDate.get(w.date).push(w);
+     }
++    const cardioByDate = new Map();
++    for (const session of visibleCardio) {
++      if (!cardioByDate.has(session.date)) cardioByDate.set(session.date, []);
++      cardioByDate.get(session.date).push(session);
++    }
+ 
+     // A date earns a full row if something happens on it, or if a stripe is
+     // mid-run through it. A stripe must never be collapsed through, or its
+     // length — the one thing this view exists to show — would lie.
+     const active = new Set(workoutsByDate.keys());
++    for (const date of cardioByDate.keys()) active.add(date);
+     for (const t of tracks) {
+       if (t.sourceWorkoutDate) active.add(t.sourceWorkoutDate);
+       for (const d of datesBetween(t.startDate, t.endDate)) active.add(d);
+@@ -150,10 +165,10 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+     const yByDate = new Map();
+     for (const r of layout) if (r.kind === 'date') yByDate.set(r.date, r.y);
+ 
+-    return { layout, yByDate, bottom: yPos, tracks, laneCount, workoutsByDate };
+-  }, [entries, workouts, group, order, windowDays, quiet]);
++    return { layout, yByDate, bottom: yPos, tracks, laneCount, workoutsByDate, cardioByDate };
++  }, [entries, workouts, cardioSessions, activityContext, group, order, windowDays, quiet]);
+ 
+-  const { layout, yByDate, bottom, tracks, laneCount, workoutsByDate } = model;
++  const { layout, yByDate, bottom, tracks, laneCount, workoutsByDate, cardioByDate } = model;
+   const y = (date) => yByDate.get(date);
+ 
+   // A stripe's label sits at whichever end is visually on top, which flips with
+@@ -181,13 +196,25 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+     return { slot, widest };
+   }, [tracks, order]);
+ 
+-  const laneX0 = WO_X + WO_W + GUTTER;
++  const showCardioColumn = activityContext === 'all';
++  const dateX = 0;
++  const cardioX = dateX + DATE_W + ACTIVITY_GAP;
++  const workoutX = showCardioColumn
++    ? cardioX + ACTIVITY_W + CARDIO_GAP
++    : cardioX;
++  const laneX0 = workoutX + ACTIVITY_W + GUTTER;
+   const labelX = laneX0 + Math.max(laneCount, 1) * LANE_PITCH + LABEL_GAP;
+   const width = labelX + labelSlots.widest * LABEL_COL + 16;
+   const height = bottom + 16;
++  const visibleCardioActivities = [...new Set(
++    [...cardioByDate.values()].flat().map((session) => session.activity),
++  )];
+ 
+   const controls = (
+-    <Controls {...{ group, setGroup, gaps, setGaps, order, setOrder, quiet, setQuiet, windowDays, setWindowDays }} />
++    <Controls {...{
++      group, setGroup, gaps, setGaps, order, setOrder, quiet, setQuiet,
++      windowDays, setWindowDays, activityContext, setActivityContext, narrow,
++    }} />
+   );
+ 
+   if (layout.length === 0) {
+@@ -195,7 +222,7 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+       <div style={{ maxWidth: '100%', minWidth: 0 }}>
+         {controls}
+         <p style={{ color: colors.text.tertiary, fontSize: 13, marginTop: 16 }}>
+-          No workout-linked soreness in this window.
++          No strength, cardio, or soreness activity in this window.
+         </p>
+       </div>
+     );
+@@ -205,6 +232,14 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+     <div style={{ maxWidth: '100%', minWidth: 0 }}>
+       {controls}
+ 
++      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginTop: 10, color: colors.text.tertiary, fontSize: 10 }}>
++        <LegendMark color={colors.text.secondary} label="Strength workout" />
++        {visibleCardioActivities.map((activity) => (
++          <LegendMark key={activity} color={cardioColor(activity)} label={cardioLabel(activity)} />
++        ))}
++        <LegendMark color={colors.text.secondary} label="Recovery lane matches strength" />
++      </div>
++
+       <div
+         style={{
+           display: 'flex',
+@@ -231,12 +266,30 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+           }}
+         >
+           <svg width={width} height={height} style={{ display: 'block' }}>
++            {/* Keep the timeline in one reading direction. Date is the stable
++                lookup key, cardio and strength are peer activity records, and
++                strength remains adjacent to the recovery it can originate. */}
++            <text x={dateX} y={12} style={{ fontSize: 8, fontFamily: 'monospace', fill: colors.text.disabled, letterSpacing: '0.08em' }}>
++              DATE
++            </text>
++            {showCardioColumn && (
++              <text x={cardioX} y={12} style={{ fontSize: 8, fontFamily: 'monospace', fill: colors.text.disabled, letterSpacing: '0.08em' }}>
++                CARDIO
++              </text>
++            )}
++            <text x={workoutX} y={12} style={{ fontSize: 8, fontFamily: 'monospace', fill: colors.text.disabled, letterSpacing: '0.08em' }}>
++              STRENGTH
++            </text>
++            <text x={laneX0} y={12} style={{ fontSize: 8, fontFamily: 'monospace', fill: colors.text.disabled, letterSpacing: '0.08em' }}>
++              SORENESS
++            </text>
++
+             {/* Date rail */}
+             {layout.map((r) =>
+               r.kind === 'gap' ? (
+                 <g key={`gap-${r.y}`}>
+                   <line
+-                    x1={DATE_X}
++                    x1={dateX}
+                     y1={r.y + GAP_H / 2}
+                     x2={width - 8}
+                     y2={r.y + GAP_H / 2}
+@@ -244,9 +297,9 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+                     strokeWidth={0.5}
+                     strokeDasharray="1 5"
+                   />
+-                  <rect x={DATE_X} y={r.y + GAP_H / 2 - 7} width={DATE_W + 24} height={14} fill={colors.bg.base} />
++                  <rect x={dateX} y={r.y + GAP_H / 2 - 7} width={DATE_W + 24} height={14} fill={colors.bg.base} />
+                   <text
+-                    x={DATE_X}
++                    x={dateX}
+                     y={r.y + GAP_H / 2 + 3}
+                     style={{ fontSize: 9, fontFamily: 'monospace', fill: colors.text.disabled }}
+                   >
+@@ -256,14 +309,14 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+               ) : (
+                 <g key={r.date}>
+                   <text
+-                    x={DATE_X}
++                    x={dateX}
+                     y={r.y + 4}
+                     style={{ fontSize: 10, fontFamily: 'monospace', fill: colors.text.tertiary }}
+                   >
+                     {weekday(r.date)} {shortDate(r.date)}
+                   </text>
+                   <line
+-                    x1={DATE_W - 4}
++                    x1={dateX + DATE_W - 4}
+                     y1={r.y}
+                     x2={width - 8}
+                     y2={r.y}
+@@ -281,7 +334,7 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+               const y1 = t.sourceWorkoutDate ? y(t.sourceWorkoutDate) : undefined;
+               const y2raw = y(t.startDate);
+               if (y1 == null || y2raw == null) return null;
+-              const x1 = WO_X + WO_W;
++              const x1 = workoutX + ACTIVITY_W;
+               const x2 = laneX0 + t.lane * LANE_PITCH;
+               // Land on the middle of the first day, not on the edge above it.
+               // The edge is where a day boundary is scored, so arriving there
+@@ -289,7 +342,7 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+               // the same height — the connector looked like it ran through the
+               // stripe it was passing behind.
+               const y2 = y2raw;
+-              const dim = hover && hover.workoutId !== t.sourceWorkoutId;
++              const dim = hover?.kind === 'soreness' && hover.workoutId !== t.sourceWorkoutId;
+               return (
+                 <path
+                   key={`c-${t.key}`}
+@@ -312,7 +365,7 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+             {tracks.map((t) => {
+               const x = laneX0 + t.lane * LANE_PITCH;
+               const color = dayColor(t.sourceWorkoutDaySlug);
+-              const dim = hover && hover.workoutId !== t.sourceWorkoutId;
++              const dim = hover?.kind === 'soreness' && hover.workoutId !== t.sourceWorkoutId;
+ 
+               // Consecutive days of like kind collapse into one segment. An
+               // unlogged day therefore ends the solid run whether it is bridged
+@@ -409,6 +462,7 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+                         pointerEvents="all"
+                         onMouseEnter={() =>
+                           setHover({
++                            kind: 'soreness',
+                             workoutId: t.sourceWorkoutId,
+                             daySlug: t.sourceWorkoutDaySlug,
+                             day: t.sourceWorkoutDay,
+@@ -429,7 +483,7 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+             {tracks.map((t) => {
+               const rowY = y(anchorDate(t));
+               if (rowY == null) return null;
+-              const dim = hover && hover.workoutId !== t.sourceWorkoutId;
++              const dim = hover?.kind === 'soreness' && hover.workoutId !== t.sourceWorkoutId;
+               return (
+                 <text
+                   key={`l-${t.key}`}
+@@ -445,42 +499,121 @@ export function SorenessLanes({ entries, workouts, onOpenWorkout }) {
+               );
+             })}
+ 
+-            {/* Workout nodes */}
++            {/* Cardio and strength are peer records on the shared date rail. */}
++            {showCardioColumn && layout
++              .filter((r) => r.kind === 'date')
++              .map((r) => {
++                const sessions = cardioByDate.get(r.date) || [];
++                const availableHeight = ROW_H - 6;
++                const gap = sessions.length > 1 ? 2 : 0;
++                const nodeHeight = sessions.length
++                  ? Math.max(7, (availableHeight - gap * (sessions.length - 1)) / sessions.length)
++                  : availableHeight;
++
++                return sessions.map((session, i) => {
++                  const nodeY = r.y - ROW_H / 2 + 2 + i * (nodeHeight + gap);
++                  const activityLabel = cardioLabel(session.activity);
++                  const activityColor = cardioColor(session.activity);
++                  const label = `${activityLabel} · ${session.durationMinutes || '—'} min`;
++                  return (
++                    <g
++                      key={`cardio-${session.id}`}
++                      role={onOpenCardio ? 'button' : undefined}
++                      tabIndex={onOpenCardio ? 0 : undefined}
++                      aria-label={onOpenCardio ? `View ${activityLabel} session from ${session.date}` : undefined}
++                      style={{ cursor: onOpenCardio ? 'pointer' : 'default' }}
++                      onClick={() => onOpenCardio?.(session)}
++                      onKeyDown={(event) => {
++                        if (event.key === 'Enter' || event.key === ' ') {
++                          event.preventDefault();
++                          onOpenCardio?.(session);
++                        }
++                      }}
++                      onMouseEnter={() => setHover({ kind: 'cardio', session })}
++                      onMouseLeave={() => setHover(null)}
++                      onFocus={() => setHover({ kind: 'cardio', session })}
++                      onBlur={() => setHover(null)}
++                    >
++                      <rect
++                        x={cardioX}
++                        y={nodeY}
++                        width={ACTIVITY_W}
++                        height={nodeHeight}
++                        rx={4}
++                        fill={colors.bg.surface}
++                        stroke={activityColor}
++                        strokeWidth={0.75}
++                      />
++                      <rect x={cardioX} y={nodeY} width={3} height={nodeHeight} fill={activityColor} />
++                      <text
++                        x={cardioX + 10}
++                        y={nodeY + nodeHeight / 2}
++                        dominantBaseline="middle"
++                        style={{ fontSize: nodeHeight < 14 ? 8 : 11, fill: colors.text.primary, fontWeight: 600 }}
++                      >
++                        {label}
++                      </text>
++                    </g>
++                  );
++                });
++              })}
++
++            {/* Strength stays directly beside its soreness lanes and is the
++                only activity type that can own a spawn connector. */}
+             {layout
+               .filter((r) => r.kind === 'date')
+-              .map((r) =>
+-                (workoutsByDate.get(r.date) || []).map((w, i) => {
+-                  const dim = hover && hover.workoutId !== w.id;
+-                  const c = dayColor(w.daySlug);
++              .map((r) => {
++                const dayWorkouts = workoutsByDate.get(r.date) || [];
++                const availableHeight = ROW_H - 6;
++                const gap = dayWorkouts.length > 1 ? 2 : 0;
++                const nodeHeight = dayWorkouts.length
++                  ? Math.max(7, (availableHeight - gap * (dayWorkouts.length - 1)) / dayWorkouts.length)
++                  : availableHeight;
++
++                return dayWorkouts.map((workout, i) => {
++                  const dim = hover?.kind === 'soreness' && hover.workoutId !== workout.id;
++                  const c = dayColor(workout.daySlug);
++                  const nodeY = r.y - ROW_H / 2 + 2 + i * (nodeHeight + gap);
++                  const label = `D${pad2(workout.dayNumber)} · ${describeLoggedDay(workout).slice(0, 15)}`;
+                   return (
+                     <g
+-                      key={w.id}
++                      key={workout.id}
+                       opacity={dim ? 0.3 : 1}
++                      role={onOpenWorkout ? 'button' : undefined}
++                      tabIndex={onOpenWorkout ? 0 : undefined}
++                      aria-label={onOpenWorkout ? `View strength workout ${label} from ${workout.date}` : undefined}
+                       style={{ cursor: onOpenWorkout ? 'pointer' : 'default' }}
+-                      onClick={() => onOpenWorkout?.(w)}
++                      onClick={() => onOpenWorkout?.(workout)}
++                      onKeyDown={(event) => {
++                        if (event.key === 'Enter' || event.key === ' ') {
++                          event.preventDefault();
++                          onOpenWorkout?.(workout);
++                        }
++                      }}
+                     >
+                       <rect
+-                        x={WO_X + i * 5}
+-                        y={r.y - ROW_H / 2 + 2}
+-                        width={WO_W - i * 5}
+-                        height={ROW_H - 6}
++                        x={workoutX}
++                        y={nodeY}
++                        width={ACTIVITY_W}
++                        height={nodeHeight}
+                         rx={4}
+                         fill={colors.bg.surface}
+                         stroke={c}
+                         strokeWidth={0.75}
+                       />
+-                      <rect x={WO_X + i * 5} y={r.y - ROW_H / 2 + 2} width={3} height={ROW_H - 6} fill={c} />
++                      <rect x={workoutX} y={nodeY} width={3} height={nodeHeight} fill={c} />
+                       <text
+-                        x={WO_X + 10 + i * 5}
+-                        y={r.y + 4}
+-                        style={{ fontSize: 11, fill: colors.text.primary, fontWeight: 600 }}
++                        x={workoutX + 10}
++                        y={nodeY + nodeHeight / 2}
++                        dominantBaseline="middle"
++                        style={{ fontSize: nodeHeight < 14 ? 8 : 11, fill: colors.text.primary, fontWeight: 600 }}
+                       >
+-                        D{pad2(w.dayNumber)} · {describeLoggedDay(w).slice(0, 15)}
++                        {label}
+                       </text>
+                     </g>
+                   );
+-                }),
+-              )}
++                });
++              })}
+           </svg>
+         </div>
+ 
+@@ -496,6 +629,42 @@ function HoverPanel({ hover, narrow }) {
+   // chart, and dropping it outright would reflow the chart on every hover.
+   if (!hover) return narrow ? null : <div style={{ width: 200, flexShrink: 0 }} />;
+ 
++  if (hover.kind === 'cardio') {
++    const session = hover.session;
++    const activityColor = cardioColor(session.activity);
++    return (
++      <div
++        style={{
++          width: narrow ? '100%' : 200,
++          boxSizing: 'border-box',
++          flexShrink: 0,
++          padding: 12,
++          borderRadius: 10,
++          background: colors.bg.raised,
++          border: `1px solid ${activityColor}47`,
++          ...(narrow ? {} : { position: 'sticky', top: 12 }),
++        }}
++      >
++        <div style={{ color: activityColor, fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
++          Cardio session
++        </div>
++        <div style={{ marginTop: 5, color: colors.text.primary, fontSize: 13, fontWeight: 700 }}>
++          {cardioName(session.activity)}
++        </div>
++        <div style={{ marginTop: 3, color: colors.text.tertiary, fontSize: 11 }}>
++          {weekday(session.date)} {shortDate(session.date)}{session.time ? ` · ${session.time}` : ''}
++        </div>
++        <div style={{ marginTop: 9, color: colors.text.secondary, fontFamily: 'monospace', fontSize: 12 }}>
++          {session.durationMinutes || '—'} min
++          {session.activity === 'bike' && session.bike?.distanceMiles ? ` · ${session.bike.distanceMiles} mi` : ''}
++        </div>
++        <div style={{ marginTop: 8, color: colors.text.disabled, fontSize: 10, lineHeight: 1.4 }}>
++          Cardio records do not create recovery lanes.
++        </div>
++      </div>
++    );
++  }
++
+   return (
+     <div
+       style={{
+@@ -534,9 +703,40 @@ function HoverPanel({ hover, narrow }) {
+   );
+ }
+ 
+-function Controls({ group, setGroup, gaps, setGaps, order, setOrder, quiet, setQuiet, windowDays, setWindowDays }) {
++function LegendMark({ color, label }) {
+   return (
+-    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', maxWidth: '100%', minWidth: 0 }}>
++    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
++      <span style={{ width: 10, height: 4, borderRadius: 2, background: color }} />
++      {label}
++    </span>
++  );
++}
++
++function Controls({
++  group, setGroup, gaps, setGaps, order, setOrder, quiet, setQuiet,
++  windowDays, setWindowDays, activityContext, setActivityContext, narrow,
++}) {
++  return (
++    <div
++      style={{
++        display: 'flex',
++        gap: 12,
++        flexWrap: 'wrap',
++        alignItems: 'flex-end',
++        width: narrow ? 340 : '100%',
++        maxWidth: '100%',
++        minWidth: 0,
++      }}
++    >
++      <Seg
++        label="Activities"
++        value={activityContext}
++        onChange={setActivityContext}
++        opts={[
++          { id: 'all', label: 'Strength + cardio' },
++          { id: 'weights', label: 'Strength only' },
++        ]}
++      />
+       <Seg
+         label="Stripe per"
+         value={group}
+@@ -589,7 +789,7 @@ function Controls({ group, setGroup, gaps, setGaps, order, setOrder, quiet, setQ
+ 
+ function Seg({ label, value, onChange, opts }) {
+   return (
+-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
++    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+       <span style={{ fontSize: 9, letterSpacing: '0.06em', textTransform: 'uppercase', color: colors.text.disabled }}>
+         {label}
+       </span>
+@@ -609,6 +809,7 @@ function Seg({ label, value, onChange, opts }) {
+             <button
+               key={o.id}
+               onClick={() => onChange(o.id)}
++              aria-pressed={active}
+               style={{
+                 padding: '4px 9px',
+                 borderRadius: 5,
+diff --git a/frontend/src/components/SorenessTab.jsx b/frontend/src/components/SorenessTab.jsx
+index 7def4a99..776b81f7 100644
+--- a/frontend/src/components/SorenessTab.jsx
++++ b/frontend/src/components/SorenessTab.jsx
+@@ -100,17 +100,26 @@ function useIsMobile(breakpoint = 640) {
+   return mobile;
+ }
+ 
+-export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed }) {
++export function SorenessTab({
++  isAdmin,
++  view = 'lanes',
++  viewToggle,
++  initialSource = null,
++  onSourceConsumed,
++  initialEditEntry = null,
++  onEditConsumed,
++  onOpenWorkout,
++  onOpenCardio,
++  onOpenSoreness,
++}) {
+   const [entries, setEntries] = useState([]);
+   const [workouts, setWorkouts] = useState([]);
++  const [cardioSessions, setCardioSessions] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState(null);
+-  const { fetchSoreness, fetchWorkouts, isReady } = useDataSource();
++  const { fetchSoreness, fetchWorkouts, fetchCardioSessions, isReady } = useDataSource();
+   const isMobile = useIsMobile();
+ 
+-  const [view, setView] = useState('lanes'); // 'lanes' | 'journal' | 'timeline'
+-  const [workoutDetail, setWorkoutDetail] = useState(null);
+-
+   // Editor state
+   const [editing, setEditing] = useState(false);
+   const [editorStep, setEditorStep] = useState('source'); // 'source' | 'muscles'
+@@ -136,7 +145,8 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+   const [pinnedMuscle, setPinnedMuscle] = useState(null); // { group, muscle }
+   const [listHover, setListHover] = useState(null); // { group, muscle }
+ 
+-  // Fetch entries and workouts (workouts drive the source picker and timeline)
++  // Fetch the recovery records and the strength/cardio activity that gives
++  // them context on the shared date rail.
+   useEffect(() => {
+     if (!isReady) return;
+     loadData();
+@@ -145,9 +155,14 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+   async function loadData() {
+     try {
+       setLoading(true);
+-      const [sorenessData, workoutData] = await Promise.all([fetchSoreness(), fetchWorkouts()]);
++      const [sorenessData, workoutData, cardioData] = await Promise.all([
++        fetchSoreness(),
++        fetchWorkouts(),
++        fetchCardioSessions(),
++      ]);
+       setEntries(sorenessData.entries || []);
+       setWorkouts(workoutData.workouts || []);
++      setCardioSessions(cardioData.sessions || []);
+     } catch (err) {
+       setError(err.message);
+     } finally {
+@@ -164,13 +179,28 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+   // Arriving from "Log soreness" on a workout elsewhere in the app: open the
+   // editor straight onto that workout, skipping the source picker.
+   const consumedSource = useRef(null);
++  const sourceConsumedCallback = useRef(onSourceConsumed);
++  const beginCreateCallback = useRef(beginCreateForWorkout);
++  sourceConsumedCallback.current = onSourceConsumed;
++  beginCreateCallback.current = beginCreateForWorkout;
+   useEffect(() => {
+     if (!initialSource || consumedSource.current === initialSource) return;
+     consumedSource.current = initialSource;
+-    setWorkoutDetail(initialSource);
+-    beginCreateForWorkout(initialSource);
+-    onSourceConsumed?.();
+-  }, [initialSource, entries]);
++    beginCreateCallback.current(initialSource);
++    sourceConsumedCallback.current?.();
++  }, [initialSource]);
++
++  const consumedEdit = useRef(null);
++  const editConsumedCallback = useRef(onEditConsumed);
++  const startEditCallback = useRef(startEdit);
++  editConsumedCallback.current = onEditConsumed;
++  startEditCallback.current = startEdit;
++  useEffect(() => {
++    if (!initialEditEntry || consumedEdit.current === initialEditEntry) return;
++    consumedEdit.current = initialEditEntry;
++    startEditCallback.current(initialEditEntry);
++    editConsumedCallback.current?.();
++  }, [initialEditEntry]);
+ 
+   // Search results, restricted to the source day's groups unless overridden
+   const visibleGroups = useMemo(() => {
+@@ -187,7 +217,6 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+   // The global Add action opens the workout browser. Choosing a workout is
+   // navigation to its detail page, never an implicit create or edit command.
+   function startNew() {
+-    setWorkoutDetail(null);
+     setChangingSource(false);
+     setEditorStep('source');
+     setEditing(true);
+@@ -195,10 +224,10 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+   }
+ 
+   function showWorkout(workout) {
+-    setWorkoutDetail(workout);
+     setEditing(false);
+     setChangingSource(false);
+     resetPicker();
++    onOpenWorkout?.(workout);
+   }
+ 
+   // Only the explicit Add soreness command on a workout detail page reaches
+@@ -344,20 +373,6 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+   // the hovered muscle's group (hovered takes priority for search results).
+   const diagramGroup = hoveredMuscle?.group || expandedGroup;
+ 
+-  // ── Workout detail (read-only until an explicit Add/Edit command) ─────
+-  if (workoutDetail && !editing) {
+-    return (
+-      <SorenessWorkoutDetail
+-        workout={workoutDetail}
+-        entries={entries.filter((entry) => entry.sourceWorkoutId === workoutDetail.id)}
+-        isAdmin={isAdmin}
+-        onBack={() => setWorkoutDetail(null)}
+-        onAdd={() => beginCreateForWorkout(workoutDetail)}
+-        onEdit={startEdit}
+-      />
+-    );
+-  }
+-
+   // ── Source picker step ───────────────────────────────────────────────
+   if (editing && isAdmin && editorStep === 'source') {
+     return (
+@@ -634,17 +649,19 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+   const header = (
+     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+       <div>
+-        <h2 style={styles.heading}>Soreness Journal</h2>
++        <h2 style={styles.heading}>
++          {view === 'lanes' ? 'Activity & Recovery' : view === 'timeline' ? 'Recovery Timeline' : 'Soreness Journal'}
++        </h2>
+         <p style={{ color: colors.text.tertiary, fontSize: 12, margin: '4px 0 0 0' }}>
+           {view === 'journal'
+             ? 'Soreness logged per workout'
+             : view === 'lanes'
+-              ? 'Each workout and how long its soreness ran'
++              ? 'Strength, cardio, and recovery over time'
+               : 'Each workout and the soreness it caused'}
+         </p>
+       </div>
+       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+-        <ViewToggle view={view} onChange={setView} />
++        {viewToggle}
+         {isAdmin && (
+           <button onClick={startNew} style={styles.addBtn}>
+             + Add soreness
+@@ -657,13 +674,15 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+   // ── Lanes view ───────────────────────────────────────────────────────
+   if (view === 'lanes') {
+     return (
+-      <div style={{ maxWidth: 1200 }}>
++      <div style={{ width: '100%', maxWidth: 1200, minWidth: 0, boxSizing: 'border-box' }}>
+         {header}
+         {error && <p style={{ color: colors.accent.red, fontSize: 12, marginBottom: 12 }}>{error}</p>}
+         <SorenessLanes
+           entries={entries}
+           workouts={workoutsByDate}
++          cardioSessions={cardioSessions}
+           onOpenWorkout={showWorkout}
++          onOpenCardio={onOpenCardio}
+         />
+       </div>
+     );
+@@ -672,7 +691,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+   // ── Timeline view ────────────────────────────────────────────────────
+   if (view === 'timeline') {
+     return (
+-      <div style={{ maxWidth: 1000 }}>
++      <div style={{ width: '100%', maxWidth: 1000, minWidth: 0, boxSizing: 'border-box' }}>
+         {header}
+         {error && <p style={{ color: colors.accent.red, fontSize: 12, marginBottom: 12 }}>{error}</p>}
+         <RecoveryTimeline
+@@ -681,6 +700,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+           isAdmin={isAdmin}
+           isMobile={isMobile}
+           onOpenWorkout={showWorkout}
++          onOpenSoreness={onOpenSoreness}
+           onEditEntry={startEdit}
+         />
+       </div>
+@@ -710,8 +730,18 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+                 return (
+                   <div
+                     key={entry.id || sorenessDocId(entry.date, entry.sourceWorkoutId)}
++                    role={onOpenSoreness ? 'button' : undefined}
++                    tabIndex={onOpenSoreness ? 0 : undefined}
++                    onClick={() => onOpenSoreness?.(entry)}
++                    onKeyDown={(event) => {
++                      if (onOpenSoreness && (event.key === 'Enter' || event.key === ' ')) {
++                        event.preventDefault();
++                        onOpenSoreness(entry);
++                      }
++                    }}
+                     style={{
+                       ...styles.entryRow,
++                      cursor: onOpenSoreness ? 'pointer' : 'default',
+                       ...(isMobile ? { flexDirection: 'column', alignItems: 'flex-start', gap: 8, padding: '10px 12px' } : {}),
+                     }}
+                   >
+@@ -724,7 +754,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+                       </div>
+                       {isAdmin && (
+                         <button
+-                          onClick={() => startEdit(entry)}
++                          onClick={(event) => { event.stopPropagation(); startEdit(entry); }}
+                           style={styles.editIconBtn}
+                           title="Edit soreness"
+                         >
+@@ -763,7 +793,10 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+                         return (
+                           <div
+                             key={`${m.group}-${m.muscle || 'group'}`}
+-                            onClick={() => setPinnedMuscle(isPinned ? null : { group: m.group, muscle: m.muscle })}
++                            onClick={(event) => {
++                              event.stopPropagation();
++                              setPinnedMuscle(isPinned ? null : { group: m.group, muscle: m.muscle });
++                            }}
+                             onMouseEnter={() => setListHover({ group: m.group, muscle: m.muscle })}
+                             onMouseLeave={() => setListHover(null)}
+                             style={{
+@@ -836,129 +869,10 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+ // ---------------------------------------------------------------------------
+ // Timeline — workout history and the soreness each workout caused, side by side
+ // ---------------------------------------------------------------------------
+-
+-function SorenessWorkoutDetail({ workout, entries, isAdmin, onBack, onAdd, onEdit }) {
+-  const color = dayColor(workout.daySlug);
+-  const sortedEntries = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+-
+-  return (
+-    <div style={{ maxWidth: 900 }}>
+-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+-        <button onClick={onBack} style={styles.backBtn}>
+-          <ChevronLeft size={13} style={{ verticalAlign: -2 }} /> Back
+-        </button>
+-        <div style={{ minWidth: 0 }}>
+-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+-            <span style={{ ...styles.dayChip, borderColor: color }}>
+-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
+-              D{pad2(workout.dayNumber)}
+-            </span>
+-            <h2 style={styles.heading}>{describeLoggedDay(workout)}</h2>
+-          </div>
+-          <div style={{ marginTop: 4, color: colors.text.tertiary, fontSize: 12 }}>
+-            {formatDate(workout.date)}{workout.time ? ` · ${workout.time}` : ''}
+-          </div>
+-        </div>
+-      </div>
+-
+-      {(workout.exercises || []).length > 0 && (
+-        <div style={{ ...styles.timelineCard, marginBottom: 18 }}>
+-          <div style={styles.fieldLabel}>Workout</div>
+-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+-            {workout.exercises.map((exercise, index) => (
+-              <div key={`${exercise.name}-${index}`} style={{ color: colors.text.secondary, fontSize: 13 }}>
+-                <span style={{ color: colors.text.primary, fontWeight: 600 }}>{exercise.name}</span>
+-                {exercise.variation ? ` · ${exercise.variation}` : ''}
+-                {exercise.sets && exercise.reps ? ` · ${exercise.sets} × ${exercise.reps}` : ''}
+-              </div>
+-            ))}
+-          </div>
+-        </div>
+-      )}
+-
+-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
+-        <div>
+-          <h3 style={{ ...styles.heading, fontSize: 16 }}>Soreness records</h3>
+-          <div style={{ marginTop: 3, color: colors.text.tertiary, fontSize: 11 }}>
+-            {sortedEntries.length} record{sortedEntries.length === 1 ? '' : 's'} associated with this workout
+-          </div>
+-        </div>
+-        {isAdmin && (
+-          <button onClick={onAdd} style={styles.addBtn}>+ Add soreness</button>
+-        )}
+-      </div>
+-
+-      {sortedEntries.length === 0 ? (
+-        <div style={{ ...styles.timelineCard, color: colors.text.tertiary, fontSize: 13 }}>
+-          No soreness records for this workout.
+-        </div>
+-      ) : (
+-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+-          {sortedEntries.map((entry) => {
+-            const level = entryLevel(entry);
+-            return (
+-              <div key={entry.id || `${entry.date}-${entry.updatedAt || ''}`} style={styles.entryRow}>
+-                <div style={{ minWidth: 120 }}>
+-                  <div style={{ color: colors.text.primary, fontSize: 13, fontWeight: 600 }}>{formatDate(entry.date)}</div>
+-                  <div style={{ color: colors.text.disabled, fontSize: 10 }}>{entry.date}</div>
+-                </div>
+-                <div style={{ flex: 1, minWidth: 180 }}>
+-                  <div style={{ color: level ? getLevelColor(level) : colors.accent.amber, fontSize: 13, fontWeight: 700 }}>
+-                    {level ? `Intensity ${level} · ${getLevelLabel(level)}` : 'Intensity not recorded'}
+-                  </div>
+-                  <div style={{ marginTop: 2, color: colors.text.tertiary, fontSize: 11 }}>
+-                    {entry.muscles.length
+-                      ? entry.muscles.map((m) => m.muscle || m.group).join(' · ')
+-                      : 'No muscles specified'}
+-                  </div>
+-                </div>
+-                {isAdmin && (
+-                  <button onClick={() => onEdit(entry)} style={styles.editIconBtn}>
+-                    <Wrench size={13} /> Edit
+-                  </button>
+-                )}
+-              </div>
+-            );
+-          })}
+-        </div>
+-      )}
+-    </div>
+-  );
+-}
+-
+-function ViewToggle({ view, onChange }) {
+-  const opts = [
+-    { id: 'journal', label: 'Journal' },
+-    { id: 'timeline', label: 'Timeline' },
+-    { id: 'lanes', label: 'Lanes' },
+-  ];
+-  return (
+-    <div style={{ display: 'flex', gap: 4, padding: 4, background: colors.bg.raised, border: `1px solid ${colors.border.subtle}`, borderRadius: 8 }}>
+-      {opts.map((o) => {
+-        const active = o.id === view;
+-        return (
+-          <button
+-            key={o.id}
+-            onClick={() => onChange(o.id)}
+-            style={{
+-              padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+-              border: 'none', cursor: 'pointer',
+-              color: active ? colors.text.primary : colors.text.tertiary,
+-              background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
+-            }}
+-          >
+-            {o.label}
+-          </button>
+-        );
+-      })}
+-    </div>
+-  );
+-}
+-
+ // Every workout in reverse-chronological order with its recovery curve beneath
+ // it. Workouts with nothing logged are still listed — the gaps are part of the
+ // picture, and they double as the entry point for logging.
+-function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onOpenWorkout, onEditEntry }) {
++function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onOpenWorkout, onOpenSoreness, onEditEntry }) {
+   const curves = useMemo(() => buildRecoveryCurves(entries), [entries]);
+   const unattributed = useMemo(
+     () => entries.filter((e) => !e.sourceWorkoutId),
+@@ -989,7 +903,19 @@ function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onOpenWorkout,
+           </p>
+           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+             {unattributed.map((e) => (
+-              <div key={e.id || e.date} style={{ ...styles.entryRow, gap: 12 }}>
++              <div
++                key={e.id || e.date}
++                role={onOpenSoreness ? 'button' : undefined}
++                tabIndex={onOpenSoreness ? 0 : undefined}
++                onClick={() => onOpenSoreness?.(e)}
++                onKeyDown={(event) => {
++                  if (onOpenSoreness && (event.key === 'Enter' || event.key === ' ')) {
++                    event.preventDefault();
++                    onOpenSoreness(e);
++                  }
++                }}
++                style={{ ...styles.entryRow, gap: 12, cursor: onOpenSoreness ? 'pointer' : 'default' }}
++              >
+                 <span style={{ fontSize: 12, color: colors.text.secondary, fontWeight: 600, minWidth: 110 }}>
+                   {formatDate(e.date)}
+                 </span>
+@@ -999,7 +925,7 @@ function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onOpenWorkout,
+                   {e.muscles.length ? e.muscles.map((m) => m.muscle || m.group).join(' · ') : 'No muscles specified'}
+                 </span>
+                 {isAdmin && (
+-                  <button onClick={() => onEditEntry(e)} style={styles.editIconBtn} title="Edit entry">
++                  <button onClick={(event) => { event.stopPropagation(); onEditEntry(e); }} style={styles.editIconBtn} title="Edit entry">
+                     <Wrench size={13} /> Edit
+                   </button>
+                 )}
+diff --git a/frontend/src/components/WorkoutDrawer.jsx b/frontend/src/components/WorkoutDrawer.jsx
+index 7ff94646..71ee61ac 100644
+--- a/frontend/src/components/WorkoutDrawer.jsx
++++ b/frontend/src/components/WorkoutDrawer.jsx
+@@ -16,7 +16,7 @@ import { apiFetch } from '../api/client.js';
+ import { todayLocal, nowLocalTime } from '../utils/dateUtils';
+ import { useDataSource } from '../api/snapshotContext.jsx';
+ import { getTotalDuration } from '../utils/cardioTemplates.js';
+-import { CARDIO_CONFIG } from '../utils/cardioConfig.js';
++import { CARDIO_CONFIG, cardioColor } from '../utils/cardioConfig.js';
+ 
+ const buildWeightEntries = (variation = {}, savedWeights = []) => {
+   const savedByKey = new Map(
+@@ -1025,7 +1025,7 @@ export function LogTab({
+       {logStep === 'form' && logType === 'cardio' && (<>
+         {/* Cardio Header */}
+         <div className="mb-6">
+-          <h2 className="text-4xl font-black uppercase tracking-wide mb-2" style={{ color: CARDIO_CONFIG[cardioActivity]?.color || '#10b981' }}>
++          <h2 className="text-4xl font-black uppercase tracking-wide mb-2" style={{ color: cardioColor(cardioActivity) }}>
+             {isCardioEditMode ? 'Edit Cardio' : 'Log Cardio'}
+           </h2>
+           {isCardioEditMode ? (
+diff --git a/frontend/src/index.css b/frontend/src/index.css
+index c9c3fa1f..5f150e5b 100644
+--- a/frontend/src/index.css
++++ b/frontend/src/index.css
+@@ -241,6 +241,8 @@
+   max-width: 1100px !important;
+   margin: 0 auto;
+   padding: 32px 32px 80px;
++  box-sizing: border-box;
++  min-width: 0;
+   font-family: var(--font-primary);
+ }
+ 
+@@ -281,6 +283,8 @@
+ 
+   .list-tab-page {
+     width: 100%;
++    box-sizing: border-box;
++    min-width: 0;
+     padding: 16px 16px 104px !important;
+     gap: 20px !important;
+   }
+@@ -312,6 +316,8 @@
+   .date-group {
+     flex-direction: column;
+     gap: 8px !important;
++    width: 100%;
++    min-width: 0;
+   }
+ 
+   .date-group > :first-child {
+@@ -320,4 +326,27 @@
+     align-items: baseline;
+     gap: 10px !important;
+   }
++
++  .date-group > :nth-child(2) {
++    width: 100%;
++    min-width: 0;
++    overflow: hidden;
++  }
++
++  .date-group > :nth-child(2) > * {
++    width: 100%;
++    max-width: 100%;
++    min-width: 0;
++    box-sizing: border-box;
++  }
++
++  .activity-detail-header {
++    align-items: flex-start !important;
++  }
++
++  .activity-detail-actions {
++    flex: 1 0 100%;
++    padding-left: 58px;
++    box-sizing: border-box;
++  }
+ }
+diff --git a/frontend/src/utils/cardioConfig.js b/frontend/src/utils/cardioConfig.js
+index 7dd210c9..cc7067dd 100644
+--- a/frontend/src/utils/cardioConfig.js
++++ b/frontend/src/utils/cardioConfig.js
+@@ -1,6 +1,8 @@
+ // Cardio activity metadata — parallel to DAY_CONFIG but for non-cycle activities.
+ // Used by HistoryTab (color coding, filter legend) and LogTab (cardio form).
+ 
++import { DAY_DESIGN, SORENESS_TIER_COLORS } from './dayDesign';
++
+ export const CARDIO_CONFIG = {
+   treadmill: {
+     name: 'Treadmill',
+@@ -13,3 +15,30 @@ export const CARDIO_CONFIG = {
+     label: 'Bike',
+   },
+ };
++
++export const cardioColor = (activity) => CARDIO_CONFIG[activity]?.color || '#9b9b9b';
++export const cardioLabel = (activity) => CARDIO_CONFIG[activity]?.label || activity || 'Cardio';
++export const cardioName = (activity) => CARDIO_CONFIG[activity]?.name || cardioLabel(activity);
++
++// Colors are semantic data here: day colors identify strength workouts,
++// soreness colors identify intensity, and cardio colors identify activities.
++// Fail during development/build if those namespaces ever collide.
++const normalize = (color) => color.toLowerCase();
++const reservedNonCardioColors = new Set([
++  ...Object.values(DAY_DESIGN).map(({ color }) => normalize(color)),
++  ...Object.values(SORENESS_TIER_COLORS).map(normalize),
++]);
++const cardioColors = Object.entries(CARDIO_CONFIG).map(
++  ([activity, config]) => [activity, normalize(config.color)],
++);
++const repeatedCardioColor = cardioColors.find(([, color], index) =>
++  cardioColors.some(([, other], otherIndex) => otherIndex !== index && other === color)
++);
++const overlappingColor = cardioColors.find(([, color]) => reservedNonCardioColors.has(color));
++
++if (repeatedCardioColor) {
++  throw new Error(`Cardio palette collision: ${repeatedCardioColor[0]} reuses another cardio color.`);
++}
++if (overlappingColor) {
++  throw new Error(`Cardio palette collision: ${overlappingColor[0]} reuses a strength or soreness color.`);
++}
+diff --git a/frontend/src/utils/dayDesign.js b/frontend/src/utils/dayDesign.js
+index 5d185dfb..df7f7e78 100644
+--- a/frontend/src/utils/dayDesign.js
++++ b/frontend/src/utils/dayDesign.js
+@@ -41,11 +41,21 @@ export const dayWarns = (daySlug) => DAY_DESIGN[daySlug]?.warn === true;
+ export const anatomyUrl = (slug) => `/anatomy/deltoids/training/bodyworks/cropped/${slug}.png`;
+ export const pad2 = (n) => String(n).padStart(2, '0');
+ 
++// Soreness colors are exported as a palette so other semantic color systems
++// can verify they do not accidentally reuse one of these meanings.
++export const SORENESS_TIER_COLORS = {
++  mild: '#7fb98a',
++  noticeable: '#67e8f9',
++  moderate: '#f0c560',
++  significant: '#f59e6f',
++  severe: '#ef6f6f',
++};
++
+ // Soreness 1-10 → tier color (matches design's sorenessColor scale).
+ export const sorenessTierColor = (level) => {
+-  if (level <= 2) return '#7fb98a';
+-  if (level <= 4) return '#67e8f9';
+-  if (level <= 6) return '#f0c560';
+-  if (level <= 8) return '#f59e6f';
+-  return '#ef6f6f';
++  if (level <= 2) return SORENESS_TIER_COLORS.mild;
++  if (level <= 4) return SORENESS_TIER_COLORS.noticeable;
++  if (level <= 6) return SORENESS_TIER_COLORS.moderate;
++  if (level <= 8) return SORENESS_TIER_COLORS.significant;
++  return SORENESS_TIER_COLORS.severe;
+ };

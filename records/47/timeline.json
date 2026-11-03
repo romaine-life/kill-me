@@ -1,0 +1,169 @@
+[
+  {
+    "author": {
+      "date": "2026-06-16T20:42:29Z",
+      "email": "290467558+tank-operator-host[bot]@users.noreply.github.com",
+      "name": "tank-operator-host[bot]"
+    },
+    "committer": {
+      "date": "2026-06-16T20:42:29Z",
+      "email": "noreply@github.com",
+      "name": "GitHub"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/d100b630430e750f28144ffe3be95828eed93738",
+    "message": "ci: publish full-SHA-tagged image from pre-merge docker-build-check\n\nAdopt pre-merge SHA-tagged image publishing so the test-slot\ndeploy-to-image flow can resolve a verified, not-yet-merged commit to\nits CI-built image.\n\nOn same-repo PRs and workflow_dispatch, docker-build-check now logs in\nto Azure (OIDC) and ACR using the exact wiring proven in\nbuild-and-deploy.yaml, then builds and pushes\nromainecr.azurecr.io/kill-me:\u003cfull github.sha\u003e. The full commit SHA is\nused (not the short-7 form) because the deploy-to-image resolver\nresolves git_ref to the full SHA.\n\nFork PRs stay build-only: the Azure/ACR login steps and the push are\ngated on the PR head repo matching this repository, so untrusted forks\nnever touch OIDC or ACR and the existing fork-safe build is preserved.\n\nFor workflow_dispatch with a git_ref, the resolved commit SHA is used as\nthe tag so deploy-to-image can find the image for the exact requested\ncommit.\n\nMirrors the sibling pre-merge image-build pattern from tank-operator\n#1256.\n\nCo-Authored-By: Claude Opus 4.8 \u003cnoreply@anthropic.com\u003e",
+    "node_id": "C_kwDORV0mMdoAKGQxMDBiNjMwNDMwZTc1MGYyODE0NGZmZTNiZTk1ODI4ZWVkOTM3Mzg",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/2a673cbd01c850be2be8f2514addb8faa087cb5b",
+        "sha": "2a673cbd01c850be2be8f2514addb8faa087cb5b",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/2a673cbd01c850be2be8f2514addb8faa087cb5b"
+      }
+    ],
+    "sha": "d100b630430e750f28144ffe3be95828eed93738",
+    "tree": {
+      "sha": "8ddf0a053dbf9433e8b1806c64068675e767d741",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/8ddf0a053dbf9433e8b1806c64068675e767d741"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/d100b630430e750f28144ffe3be95828eed93738",
+    "verification": {
+      "payload": "tree 8ddf0a053dbf9433e8b1806c64068675e767d741\nparent 2a673cbd01c850be2be8f2514addb8faa087cb5b\nauthor tank-operator-host[bot] \u003c290467558+tank-operator-host[bot]@users.noreply.github.com\u003e 1781642549 +0000\ncommitter GitHub \u003cnoreply@github.com\u003e 1781642549 +0000\n\nci: publish full-SHA-tagged image from pre-merge docker-build-check\n\nAdopt pre-merge SHA-tagged image publishing so the test-slot\ndeploy-to-image flow can resolve a verified, not-yet-merged commit to\nits CI-built image.\n\nOn same-repo PRs and workflow_dispatch, docker-build-check now logs in\nto Azure (OIDC) and ACR using the exact wiring proven in\nbuild-and-deploy.yaml, then builds and pushes\nromainecr.azurecr.io/kill-me:\u003cfull github.sha\u003e. The full commit SHA is\nused (not the short-7 form) because the deploy-to-image resolver\nresolves git_ref to the full SHA.\n\nFork PRs stay build-only: the Azure/ACR login steps and the push are\ngated on the PR head repo matching this repository, so untrusted forks\nnever touch OIDC or ACR and the existing fork-safe build is preserved.\n\nFor workflow_dispatch with a git_ref, the resolved commit SHA is used as\nthe tag so deploy-to-image can find the image for the exact requested\ncommit.\n\nMirrors the sibling pre-merge image-build pattern from tank-operator\n#1256.\n\nCo-Authored-By: Claude Opus 4.8 \u003cnoreply@anthropic.com\u003e",
+      "reason": "valid",
+      "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJqMbU1CRC1aQ7uu5UhlAAAUe0QAEiEtmYF/+ha+06VeyDTkZKy\nzvvqvcn4Vb6z76L/9nhbzI5IrZtTUukgEUG6bo8STg0TQFqkLfKZbh2qYNgYj94a\nbRAJ5/YYJ1AGcC2Mx03UCIwvpKjRHeF0RvG29WnL3w5iPZ2slc7PCNekL3u86QUl\nmx+HwKShX8rO4rFK675uwAVjhS+AZc9UgIuFGL4SeyuTrXF1FiYASMs3pec2hDSO\nS5A532qIofBjbW3XHzo4+cqrSHnExCdooLIIYw1Ie75xkv/nelaLT5Eesg7zmK3X\n+EZRcM2EVxuEAb4YMDCXDGHulAmtCkeTgqPh8ktyLfEgPZSilTYdtAieFtOIqunE\nZD+z6dL/oxx4ugwxj1T1BRNdKuKhzAK+3l+Ji/GCaIlyWsH1I09OEmFOWOB5iBEk\nBNtDW9ZQBVuyX1HmcW4g59paFIK6IOSlU1NV0ooZYeiAcvo/wzvpmPAjLbDl/XdY\nF7QHz2Hvdy/mk1aaSeW1wrciQJkHIhy+zzzDAUAjQVEi+hd+GtaSenDWBprE/0Ed\n5zFKgsOOk0U6xYzXQ6MS++f4PWxJX7Gg5fDw2SzxnGycAF7BhaTGXz+FcRAGD4xW\n2i5oXY3Wa3yHitv6NjCgGNVpma/KowsCF7ZF4hG0rNPzccr95/rGZG5MlTm5AOI/\n2xFIR4EweNgk0NnarhyM\n=G2Iz\n-----END PGP SIGNATURE-----\n",
+      "verified": true,
+      "verified_at": "2026-06-16T20:42:29Z"
+    }
+  },
+  {
+    "author": {
+      "date": "2026-06-16T20:49:34Z",
+      "email": "290467558+tank-operator-host[bot]@users.noreply.github.com",
+      "name": "tank-operator-host[bot]"
+    },
+    "committer": {
+      "date": "2026-06-16T20:49:34Z",
+      "email": "noreply@github.com",
+      "name": "GitHub"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/3bbdda91b78f97b01774de256fdaf4154f72c8ae",
+    "message": "Tag the PR head sha, not the merge commit\n\nThe deploy-to-image resolver resolves git_ref to the PR HEAD commit sha, and\ntank-operator #1256 / glimmung / ambience all tag\n`github.event.pull_request.head.sha || github.sha`. On a pull_request event\n`github.sha` is the synthetic merge commit, which the resolver never sees — so\ndefault IMAGE_TAG to head.sha so the deployed image is findable. The\nworkflow_dispatch git_ref override (resolved full sha) is unchanged.\n\nCo-Authored-By: Claude Opus 4.8 \u003cnoreply@anthropic.com\u003e",
+    "node_id": "C_kwDORV0mMdoAKDNiYmRkYTkxYjc4Zjk3YjAxNzc0ZGUyNTZmZGFmNDE1NGY3MmM4YWU",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/d100b630430e750f28144ffe3be95828eed93738",
+        "sha": "d100b630430e750f28144ffe3be95828eed93738",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/d100b630430e750f28144ffe3be95828eed93738"
+      }
+    ],
+    "sha": "3bbdda91b78f97b01774de256fdaf4154f72c8ae",
+    "tree": {
+      "sha": "b23e40494a5221ca0dd212aeea83090019adb94f",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/b23e40494a5221ca0dd212aeea83090019adb94f"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/3bbdda91b78f97b01774de256fdaf4154f72c8ae",
+    "verification": {
+      "payload": "tree b23e40494a5221ca0dd212aeea83090019adb94f\nparent d100b630430e750f28144ffe3be95828eed93738\nauthor tank-operator-host[bot] \u003c290467558+tank-operator-host[bot]@users.noreply.github.com\u003e 1781642974 +0000\ncommitter GitHub \u003cnoreply@github.com\u003e 1781642974 +0000\n\nTag the PR head sha, not the merge commit\n\nThe deploy-to-image resolver resolves git_ref to the PR HEAD commit sha, and\ntank-operator #1256 / glimmung / ambience all tag\n`github.event.pull_request.head.sha || github.sha`. On a pull_request event\n`github.sha` is the synthetic merge commit, which the resolver never sees — so\ndefault IMAGE_TAG to head.sha so the deployed image is findable. The\nworkflow_dispatch git_ref override (resolved full sha) is unchanged.\n\nCo-Authored-By: Claude Opus 4.8 \u003cnoreply@anthropic.com\u003e",
+      "reason": "valid",
+      "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJqMbbeCRC1aQ7uu5UhlAAAJQkQAI9j2E5OmsiKWUzItgSGrSrw\n4pFrveTT7XSAWzHlJeeVIq8zobVVMATQ57R9jZp8yrsIy8Z57tYnhqbTBHNGHIKm\nkG4BgCOC111SrclidVzQC8F+0gr8eGhN2CHoDhsbiA/QVxBlR2XhtU+W4pO3kR2F\n+1JzS4z4O2nCBjfd/23CDvkhSe5VOYBoj9lYJEiO7ixTPDDrlKdrxputzrNhwYEk\nkM4DI8uQaQ4eW6Ufeo0OT6eisStylBJKX1Nec7Po/UKwBKhDx7VId/jZNT3y7v4a\nWmhltJZevEHW+BJmF3+MBswBwXhsR/1/knt8FJ+9e0lTnfbw/FWHj+6mKz5geXk9\nvY9LZ5MhGff8+dIzbJOtamM84nsyX7Fch8TPgC/Qf5aGIxAwSovSEr+o8a7wvwJq\naOJ68TxTnk3YDjUqAznk5fRrGt9fHH+hQHzjkahwXXgbxzkkfsS4vVhYEVJRkU0f\n/8VdH75PyCewsfwHGwVFJRloB/iTnReavQS4AjnBu+foFnd19spqbpkuk2nQG7QU\nI+xwIlGvhmGvFWj1qyaCDoCb1JxoE4xzqlCVDf09KUKE4XetBnD4gooS7JyXtDR2\n0LyeJkltvQnQuCMj1kVLcU9PwSEXquUqGF2FeAiD0wsviMXBcIcCpM6cxBr31+fR\n6JEKwspERo5ywBWvysf5\n=BmP6\n-----END PGP SIGNATURE-----\n",
+      "verified": true,
+      "verified_at": "2026-06-16T20:49:34Z"
+    }
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": "13fcbd3ed454fe984e0d78cd482ccdcd07465462",
+    "commit_url": "https://api.github.com/repos/romaine-life/kill-me/commits/13fcbd3ed454fe984e0d78cd482ccdcd07465462",
+    "created_at": "2026-06-16T20:52:13Z",
+    "event": "merged",
+    "id": 26828898057,
+    "node_id": "ME_lADORV0mMc8AAAABFtDfbs8AAAAGPyB_CQ",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/26828898057"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-06-16T20:52:14Z",
+    "event": "closed",
+    "id": 26828898121,
+    "intent": null,
+    "node_id": "CE_lADORV0mMc8AAAABFtDfbs8AAAAGPyB_SQ",
+    "performed_via_github_app": null,
+    "state_reason": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/26828898121"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-06-16T20:52:16Z",
+    "event": "head_ref_deleted",
+    "id": 26828899205,
+    "node_id": "HRDE_lADORV0mMc8AAAABFtDfbs8AAAAGPyCDhQ",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/26828899205"
+  }
+]

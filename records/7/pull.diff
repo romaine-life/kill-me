@@ -1,0 +1,26 @@
+diff --git a/.github/workflows/build-and-deploy.yml b/.github/workflows/build-and-deploy.yml
+index 4d0f0f40..72061649 100644
+--- a/.github/workflows/build-and-deploy.yml
++++ b/.github/workflows/build-and-deploy.yml
+@@ -31,7 +31,7 @@ jobs:
+           fetch-depth: 0
+ 
+       - name: Azure Login (OIDC)
+-        uses: azure/login@v2
++        uses: azure/login@v3
+         with:
+           client-id: ${{ vars.ARM_CLIENT_ID }}
+           tenant-id: ${{ vars.ARM_TENANT_ID }}
+diff --git a/.github/workflows/snapshot.yml b/.github/workflows/snapshot.yml
+index 9375e65f..228fb0a7 100644
+--- a/.github/workflows/snapshot.yml
++++ b/.github/workflows/snapshot.yml
+@@ -31,7 +31,7 @@ jobs:
+           node-version: '20'
+ 
+       - name: Azure Login via OIDC
+-        uses: azure/login@v2
++        uses: azure/login@v3
+         with:
+           client-id: ${{ vars.ARM_CLIENT_ID }}
+           tenant-id: ${{ vars.ARM_TENANT_ID }}

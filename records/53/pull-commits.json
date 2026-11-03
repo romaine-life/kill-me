@@ -1,0 +1,86 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/b8d6cddd47763441a6fd12e7e5f632ca512609b2/comments",
+    "commit": {
+      "author": {
+        "date": "2026-06-17T07:29:21Z",
+        "email": "tank-operator@romaine.life",
+        "name": "Tank Operator"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-06-17T07:29:21Z",
+        "email": "tank-operator@romaine.life",
+        "name": "Tank Operator"
+      },
+      "message": "Tank session 1065 start",
+      "tree": {
+        "sha": "a107efbd03cbe5474593c883d51edca37178678e",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/a107efbd03cbe5474593c883d51edca37178678e"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/b8d6cddd47763441a6fd12e7e5f632ca512609b2",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/b8d6cddd47763441a6fd12e7e5f632ca512609b2",
+    "node_id": "C_kwDORV0mMdoAKGI4ZDZjZGRkNDc3NjM0NDFhNmZkMTJlN2U1ZjYzMmNhNTEyNjA5YjI",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/1160d1c789c2c5d2d12186ed4f250bcaf57f5e08",
+        "sha": "1160d1c789c2c5d2d12186ed4f250bcaf57f5e08",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/1160d1c789c2c5d2d12186ed4f250bcaf57f5e08"
+      }
+    ],
+    "sha": "b8d6cddd47763441a6fd12e7e5f632ca512609b2",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/b8d6cddd47763441a6fd12e7e5f632ca512609b2"
+  },
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/c1b672506b325f29e62d7105f53b64692fb2dec7/comments",
+    "commit": {
+      "author": {
+        "date": "2026-06-17T07:32:31Z",
+        "email": "tank-operator-codex@romaine.life",
+        "name": "tank-operator-codex[bot]"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-06-17T07:32:31Z",
+        "email": "tank-operator-codex@romaine.life",
+        "name": "tank-operator-codex[bot]"
+      },
+      "message": "ci: wire Azure OIDC jobs to environments",
+      "tree": {
+        "sha": "b79e49ddbae9e290a1aadecccc52eaeec1343f60",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/b79e49ddbae9e290a1aadecccc52eaeec1343f60"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/c1b672506b325f29e62d7105f53b64692fb2dec7",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/c1b672506b325f29e62d7105f53b64692fb2dec7",
+    "node_id": "C_kwDORV0mMdoAKGMxYjY3MjUwNmIzMjVmMjllNjJkNzEwNWY1M2I2NDY5MmZiMmRlYzc",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/b8d6cddd47763441a6fd12e7e5f632ca512609b2",
+        "sha": "b8d6cddd47763441a6fd12e7e5f632ca512609b2",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/b8d6cddd47763441a6fd12e7e5f632ca512609b2"
+      }
+    ],
+    "sha": "c1b672506b325f29e62d7105f53b64692fb2dec7",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/c1b672506b325f29e62d7105f53b64692fb2dec7"
+  }
+]

@@ -1,0 +1,29 @@
+diff --git a/tofu/keyvault.tf b/tofu/keyvault.tf
+index 36ea1826..396f471f 100644
+--- a/tofu/keyvault.tf
++++ b/tofu/keyvault.tf
+@@ -15,9 +15,3 @@ resource "azurerm_key_vault_secret" "jwt_signing_secret" {
+   value        = random_password.jwt_signing_secret.result
+   key_vault_id = data.azurerm_key_vault.main.id
+ }
+-
+-# TODO: Remove after first successful apply (needed by auth0 provider for teardown)
+-data "azurerm_key_vault_secret" "auth0_client_secret" {
+-  name         = "auth0-client-secret"
+-  key_vault_id = data.azurerm_key_vault.main.id
+-}
+diff --git a/tofu/provider.tf b/tofu/provider.tf
+index 2700b583..829561dd 100644
+--- a/tofu/provider.tf
++++ b/tofu/provider.tf
+@@ -13,10 +13,3 @@ provider "azurerm" {
+ provider "azuread" {
+   use_oidc = true
+ }
+-
+-# TODO: Remove after first successful apply (lets tofu destroy Auth0 resources in state)
+-provider "auth0" {
+-  domain        = "dev-gtdi5x5p0nmticqd.us.auth0.com"
+-  client_id     = "7qsN7zrBAh7TwhjEUcgtU46yOSs9TXbg"
+-  client_secret = data.azurerm_key_vault_secret.auth0_client_secret.value
+-}

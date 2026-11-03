@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/e11556634bbb24aeb0cab4d3e934ad814c3c752e/.github%2Fworkflows%2Fdocker-build-check.yaml",
+    "changes": 31,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fdocker-build-check.yaml?ref=e11556634bbb24aeb0cab4d3e934ad814c3c752e",
+    "deletions": 31,
+    "filename": ".github/workflows/docker-build-check.yaml",
+    "patch": "@@ -127,37 +127,6 @@ jobs:\n             type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app,mode=max\n             type=gha,mode=max,scope=app\n \n-      - name: Compute ACR lookup tag\n-        id: lookup\n-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository\n-        shell: bash\n-        env:\n-          PR_NUMBER: ${{ github.event.pull_request.number || '' }}\n-          SOURCE_SHA: ${{ steps.source.outputs.sha }}\n-        run: |\n-          set -euo pipefail\n-          if [[ -n \"${PR_NUMBER}\" ]]; then\n-            lookup_tag=\"ci-pr-${PR_NUMBER}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}\"\n-          else\n-            ref_hash=\"$(printf '%s' \"${SOURCE_SHA}\" | sha256sum | cut -c1-12)\"\n-            lookup_tag=\"ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}\"\n-          fi\n-          echo \"tag=${lookup_tag}\" \u003e\u003e\"${GITHUB_OUTPUT}\"\n-          echo \"Computed lookup tag ${lookup_tag}\"\n-\n-      - name: Create ACR lookup tag\n-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository\n-        shell: bash\n-        run: |\n-          set -euo pipefail\n-          canonical='${{ steps.fingerprint.outputs.proof_tag }}'\n-          lookup='${{ steps.lookup.outputs.tag }}'\n-          az acr import --name romainecr \\\n-            --source \"romainecr.azurecr.io/kill-me:${canonical}\" \\\n-            --image \"kill-me:${lookup}\" \\\n-            --force\n-          echo \"Tagged romainecr.azurecr.io/kill-me:${lookup} -\u003e ${canonical}\"\n-\n       - name: Tag app image by commit\n         # Commit-addressed alias of the fingerprint manifest so Glimmung's\n         # deploy-image resolver looks the image up by the verified commit SHA.",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/e11556634bbb24aeb0cab4d3e934ad814c3c752e/.github%2Fworkflows%2Fdocker-build-check.yaml",
+    "sha": "1147e72319ad0a418721354b719fb09c66b4df4a",
+    "status": "modified"
+  },
+  {
+    "additions": 3,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/e11556634bbb24aeb0cab4d3e934ad814c3c752e/scripts%2Fcheck-image-fingerprint-config.mjs",
+    "changes": 5,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/scripts%2Fcheck-image-fingerprint-config.mjs?ref=e11556634bbb24aeb0cab4d3e934ad814c3c752e",
+    "deletions": 2,
+    "filename": "scripts/check-image-fingerprint-config.mjs",
+    "patch": "@@ -21,8 +21,9 @@ function assertNotIncludes(text, needle, label) {\n assertIncludes(dockerBuildCheck, \"scripts/image-fingerprint.sh\", \"docker-build-check\");\n assertIncludes(dockerBuildCheck, \"steps.fingerprint.outputs.proof_tag\", \"docker-build-check\");\n assertIncludes(dockerBuildCheck, \"romainecr.azurecr.io/kill-me:${{ steps.fingerprint.outputs.proof_tag }}\", \"docker-build-check\");\n-assertIncludes(dockerBuildCheck, \"ci-pr-${PR_NUMBER}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}\", \"docker-build-check\");\n-assertIncludes(dockerBuildCheck, \"ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}\", \"docker-build-check\");\n+assertIncludes(dockerBuildCheck, \"sha-${{ steps.source.outputs.sha }}\", \"docker-build-check\");\n+assertNotIncludes(dockerBuildCheck, \"ci-pr-\", \"docker-build-check\");\n+assertNotIncludes(dockerBuildCheck, \"ci-ref-\", \"docker-build-check\");\n assertIncludes(dockerBuildCheck, \"az acr import --name romainecr\", \"docker-build-check\");\n assertNotIncludes(dockerBuildCheck, \"IMAGE_TAG:\", \"docker-build-check\");\n assertNotIncludes(dockerBuildCheck, \"romainecr.azurecr.io/kill-me:${{ env.IMAGE_TAG }}\", \"docker-build-check\");",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/e11556634bbb24aeb0cab4d3e934ad814c3c752e/scripts%2Fcheck-image-fingerprint-config.mjs",
+    "sha": "cfcc1bc78b537134290764c4e2a3ee7a79ba4d3e",
+    "status": "modified"
+  }
+]

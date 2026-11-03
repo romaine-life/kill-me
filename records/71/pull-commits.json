@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/in/29110?v=4",
+      "events_url": "https://api.github.com/users/dependabot%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/dependabot%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/dependabot%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/dependabot%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/dependabot",
+      "id": 49699333,
+      "login": "dependabot[bot]",
+      "node_id": "MDM6Qm90NDk2OTkzMzM=",
+      "organizations_url": "https://api.github.com/users/dependabot%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/dependabot%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/dependabot%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/dependabot%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/dependabot%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/dependabot%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/b025f24ab5809c455ed88a73e4dfc40a1575bf99/comments",
+    "commit": {
+      "author": {
+        "date": "2026-07-29T10:09:59Z",
+        "email": "49699333+dependabot[bot]@users.noreply.github.com",
+        "name": "dependabot[bot]"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-07-29T10:09:59Z",
+        "email": "noreply@github.com",
+        "name": "GitHub"
+      },
+      "message": "build(deps-dev): Bump brace-expansion from 1.1.12 to 1.1.16 in /frontend\n\nBumps [brace-expansion](https://github.com/juliangruber/brace-expansion) from 1.1.12 to 1.1.16.\n- [Release notes](https://github.com/juliangruber/brace-expansion/releases)\n- [Commits](https://github.com/juliangruber/brace-expansion/compare/v1.1.12...v1.1.16)\n\n---\nupdated-dependencies:\n- dependency-name: brace-expansion\n  dependency-version: 1.1.16\n  dependency-type: indirect\n...\n\nSigned-off-by: dependabot[bot] \u003csupport@github.com\u003e",
+      "tree": {
+        "sha": "b409c19fe13f91c2b82fc01bf5eebb8ae0666cc1",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/b409c19fe13f91c2b82fc01bf5eebb8ae0666cc1"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/b025f24ab5809c455ed88a73e4dfc40a1575bf99",
+      "verification": {
+        "payload": "tree b409c19fe13f91c2b82fc01bf5eebb8ae0666cc1\nparent 311594d24102c3c5d0e6890201f28b4ba7803233\nauthor dependabot[bot] \u003c49699333+dependabot[bot]@users.noreply.github.com\u003e 1785319799 +0000\ncommitter GitHub \u003cnoreply@github.com\u003e 1785319799 +0000\n\nbuild(deps-dev): Bump brace-expansion from 1.1.12 to 1.1.16 in /frontend\n\nBumps [brace-expansion](https://github.com/juliangruber/brace-expansion) from 1.1.12 to 1.1.16.\n- [Release notes](https://github.com/juliangruber/brace-expansion/releases)\n- [Commits](https://github.com/juliangruber/brace-expansion/compare/v1.1.12...v1.1.16)\n\n---\nupdated-dependencies:\n- dependency-name: brace-expansion\n  dependency-version: 1.1.16\n  dependency-type: indirect\n...\n\nSigned-off-by: dependabot[bot] \u003csupport@github.com\u003e",
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJqadF3CRC1aQ7uu5UhlAAAnawQAClirzsSMStATL5m3ssTjIzd\nmDsuj/vdpgdDwKmmz/3I/zAQBfxKUp4HFuUZEjbzoJiNKm7C1ExZ72AQXd86Hm9W\nfl3sycGKoiaSJuT7x8riFlK337xasb0zjZCoichmG03OHpM7WLwydv192AqKgurB\nL8OYJVpg1ek7I5T5XaAayZ1Z+PYH/GPzWvsU9hzdxxwigRq+2PzYDs3LM2pknlTZ\n+dwHRBWrJcM9ZbTsngvrix+qHSoRWJ/llS/doJE2hIwweBNCQ3C7gWyICEx86AUj\nT23nWhSfQUHwkZUU/DA8NlxOfCtoUxAk+E+Hf1NoCrhd0iXMJbV+VGXgxLnzGDGr\nxuDQlVpb1ZAwZC4VG6JUZn4DD44SLtX2I2vxXjFElXrpIuzOatrpiyTnNtSeZcGo\nZoHatpUVsQLo7S+cZKjxMfgsemV+jgoumf96jZOjc+aoM7RwOSr0FpM7AEBz12T/\nC4z80HVsIkYc45tRYpGbb+lipF025k6NylZwmgF7CANfCig9QdFGRj4HS4aAdSZV\nRH5gUj6nuk9biWW1Utdekwhz6pvYWQ/Fo6yjGxJOMglket4ZwCm9Q0uWe7Pb/yMp\nAE/d0yiaqnwr+xICOmVf/9L/cuunENtEnfWlMJH1m+RVUOfiaXDc+FgRZqGaEbM1\n2sBq7rBa7feZz3uAzJQB\n=Wl9m\n-----END PGP SIGNATURE-----\n",
+        "verified": true,
+        "verified_at": "2026-07-29T10:10:00Z"
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/web-flow",
+      "id": 19864447,
+      "login": "web-flow",
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/web-flow",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/b025f24ab5809c455ed88a73e4dfc40a1575bf99",
+    "node_id": "C_kwDORV0mMdoAKGIwMjVmMjRhYjU4MDljNDU1ZWQ4OGE3M2U0ZGZjNDBhMTU3NWJmOTk",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/311594d24102c3c5d0e6890201f28b4ba7803233",
+        "sha": "311594d24102c3c5d0e6890201f28b4ba7803233",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/311594d24102c3c5d0e6890201f28b4ba7803233"
+      }
+    ],
+    "sha": "b025f24ab5809c455ed88a73e4dfc40a1575bf99",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/b025f24ab5809c455ed88a73e4dfc40a1575bf99"
+  }
+]

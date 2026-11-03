@@ -1,0 +1,169 @@
+[
+  {
+    "author": {
+      "date": "2026-05-04T02:13:43Z",
+      "email": "codex@openai.com",
+      "name": "codex"
+    },
+    "committer": {
+      "date": "2026-05-04T02:13:43Z",
+      "email": "codex@openai.com",
+      "name": "codex"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/0a71f1f51dfcd38df4fea75fb8fe5f9719c8134e",
+    "message": "ci: add docker build check workflow",
+    "node_id": "C_kwDORV0mMdoAKDBhNzFmMWY1MWRmY2QzOGRmNGZlYTc1ZmI4ZmU1Zjk3MTljODEzNGU",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/0582db134d2e4161c5db5b86d6104c1517825857",
+        "sha": "0582db134d2e4161c5db5b86d6104c1517825857",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/0582db134d2e4161c5db5b86d6104c1517825857"
+      }
+    ],
+    "sha": "0a71f1f51dfcd38df4fea75fb8fe5f9719c8134e",
+    "tree": {
+      "sha": "959dad030056834bc1fc7213d261d20623a18609",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/959dad030056834bc1fc7213d261d20623a18609"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/0a71f1f51dfcd38df4fea75fb8fe5f9719c8134e",
+    "verification": {
+      "payload": null,
+      "reason": "unsigned",
+      "signature": null,
+      "verified": false,
+      "verified_at": null
+    }
+  },
+  {
+    "author": {
+      "date": "2026-05-04T02:16:46Z",
+      "email": "codex@openai.com",
+      "name": "codex"
+    },
+    "committer": {
+      "date": "2026-05-04T02:16:46Z",
+      "email": "codex@openai.com",
+      "name": "codex"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/3a74ed9cecea45da4c92a7eabf443eea04ab34ec",
+    "message": "ci: align docker build check workflow naming",
+    "node_id": "C_kwDORV0mMdoAKDNhNzRlZDljZWNlYTQ1ZGE0YzkyYTdlYWJmNDQzZWVhMDRhYjM0ZWM",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/0a71f1f51dfcd38df4fea75fb8fe5f9719c8134e",
+        "sha": "0a71f1f51dfcd38df4fea75fb8fe5f9719c8134e",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/0a71f1f51dfcd38df4fea75fb8fe5f9719c8134e"
+      }
+    ],
+    "sha": "3a74ed9cecea45da4c92a7eabf443eea04ab34ec",
+    "tree": {
+      "sha": "485390dcf333fa8f1579849aefadb128a8e82664",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/485390dcf333fa8f1579849aefadb128a8e82664"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/3a74ed9cecea45da4c92a7eabf443eea04ab34ec",
+    "verification": {
+      "payload": null,
+      "reason": "unsigned",
+      "signature": null,
+      "verified": false,
+      "verified_at": null
+    }
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/in/3274450?v=4",
+      "events_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/romaine-life-app",
+      "id": 273583127,
+      "login": "romaine-life-app[bot]",
+      "node_id": "BOT_kgDOEE6MFw",
+      "organizations_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/romaine-life-app%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": "425e192d9b75bc56727b1b2f829ea05e3d23a384",
+    "commit_url": "https://api.github.com/repos/romaine-life/kill-me/commits/425e192d9b75bc56727b1b2f829ea05e3d23a384",
+    "created_at": "2026-05-04T02:38:53Z",
+    "event": "merged",
+    "id": 25116255701,
+    "node_id": "ME_lADORV0mMc8AAAABBLCmYM8AAAAF2Qul1Q",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/25116255701"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/in/3274450?v=4",
+      "events_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/romaine-life-app",
+      "id": 273583127,
+      "login": "romaine-life-app[bot]",
+      "node_id": "BOT_kgDOEE6MFw",
+      "organizations_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/romaine-life-app%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-05-04T02:38:53Z",
+    "event": "closed",
+    "id": 25116255725,
+    "intent": null,
+    "node_id": "CE_lADORV0mMc8AAAABBLCmYM8AAAAF2Qul7Q",
+    "performed_via_github_app": null,
+    "state_reason": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/25116255725"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/in/3274450?v=4",
+      "events_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/romaine-life-app",
+      "id": 273583127,
+      "login": "romaine-life-app[bot]",
+      "node_id": "BOT_kgDOEE6MFw",
+      "organizations_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/romaine-life-app%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/romaine-life-app%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-05-04T02:38:55Z",
+    "event": "head_ref_deleted",
+    "id": 25116255989,
+    "node_id": "HRDE_lADORV0mMc8AAAABBLCmYM8AAAAF2Qum9Q",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/25116255989"
+  }
+]

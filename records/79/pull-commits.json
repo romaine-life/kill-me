@@ -1,0 +1,173 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/81847?v=4",
+      "events_url": "https://api.github.com/users/claude/events{/privacy}",
+      "followers_url": "https://api.github.com/users/claude/followers",
+      "following_url": "https://api.github.com/users/claude/following{/other_user}",
+      "gists_url": "https://api.github.com/users/claude/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/claude",
+      "id": 81847,
+      "login": "claude",
+      "node_id": "MDQ6VXNlcjgxODQ3",
+      "organizations_url": "https://api.github.com/users/claude/orgs",
+      "received_events_url": "https://api.github.com/users/claude/received_events",
+      "repos_url": "https://api.github.com/users/claude/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/claude/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/claude/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/claude",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/c47e11882d5e2cde5fc12538008d600cc995be74/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-21T08:34:48Z",
+        "email": "noreply@anthropic.com",
+        "name": "Claude"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-21T08:34:48Z",
+        "email": "noreply@anthropic.com",
+        "name": "Claude"
+      },
+      "message": "Expand the cycle from 12 to 16 days\n\nSplits the Torso day apart and adds Knee, Neck, and Hips days. The old Torso\nday was doing three unrelated jobs at once, and its two hip machines had no\nreal home there — they are single-joint hip isolation, not torso work.\n\nCycle changes:\n- Torso dissolves into Transverse (rotation + anti-rotation) and Back (spinal\n  extension); its Situps move to the Abs day\n- New Knee day, defined by intent — slow eccentrics, isometric holds, tendon\n  loading — so it does not become a second leg day. Leg Extension moves here\n- New Neck day (retraction device, four-way isometrics)\n- New Hips day covering all four hip actions, placed last so it primes the\n  hips the day before Day 1 squats, mirroring how Pecs Mobility primes Push\n- Ankle work joins the Calves day; Day 3 is renamed Stretching to match what\n  it has always actually contained\n- Compounds move to days 1 / 6 / 12, spaced 5-6-5 including the wrap. Grip\n  now sits 8 days clear of Pulls and Bicep so forearm loading never stacks\n\nSessions run 1-3 exercises in practice regardless of how many a day lists, so\nevery day is now a short fixed list rather than a menu — spreading the same\ncoverage over more days keeps anything from being left out.\n\nCode changes: cycle length is now derived from DAY_CONFIG rather than written\nas a literal in five places. The cycle dial computes its own segment count,\nExercisesTab builds day filters from the config, the API bounds come from the\nseeded day definitions, and the brand string tracks the day count.\n\nCo-Authored-By: Claude Opus 5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_011s6dYuiZLzHpccJwwRhAoh",
+      "tree": {
+        "sha": "5bed038793593d6a21f70d762e2423eb3a8c8c0b",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/5bed038793593d6a21f70d762e2423eb3a8c8c0b"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/c47e11882d5e2cde5fc12538008d600cc995be74",
+      "verification": {
+        "payload": "tree 5bed038793593d6a21f70d762e2423eb3a8c8c0b\nparent 06c2f74d3fa00729a6efa5fdb9571b0bacfbc999\nauthor Claude \u003cnoreply@anthropic.com\u003e 1787301288 +0000\ncommitter Claude \u003cnoreply@anthropic.com\u003e 1787301288 +0000\n\nExpand the cycle from 12 to 16 days\n\nSplits the Torso day apart and adds Knee, Neck, and Hips days. The old Torso\nday was doing three unrelated jobs at once, and its two hip machines had no\nreal home there — they are single-joint hip isolation, not torso work.\n\nCycle changes:\n- Torso dissolves into Transverse (rotation + anti-rotation) and Back (spinal\n  extension); its Situps move to the Abs day\n- New Knee day, defined by intent — slow eccentrics, isometric holds, tendon\n  loading — so it does not become a second leg day. Leg Extension moves here\n- New Neck day (retraction device, four-way isometrics)\n- New Hips day covering all four hip actions, placed last so it primes the\n  hips the day before Day 1 squats, mirroring how Pecs Mobility primes Push\n- Ankle work joins the Calves day; Day 3 is renamed Stretching to match what\n  it has always actually contained\n- Compounds move to days 1 / 6 / 12, spaced 5-6-5 including the wrap. Grip\n  now sits 8 days clear of Pulls and Bicep so forearm loading never stacks\n\nSessions run 1-3 exercises in practice regardless of how many a day lists, so\nevery day is now a short fixed list rather than a menu — spreading the same\ncoverage over more days keeps anything from being left out.\n\nCode changes: cycle length is now derived from DAY_CONFIG rather than written\nas a literal in five places. The cycle dial computes its own segment count,\nExercisesTab builds day filters from the config, the API bounds come from the\nseeded day definitions, and the brand string tracks the day count.\n\nCo-Authored-By: Claude Opus 5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_011s6dYuiZLzHpccJwwRhAoh\n",
+        "reason": "valid",
+        "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgrLzsfFISF4by8Q+FKz27YpkK1USsBB+m\namu1QkJnbDsAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5AAAAQI1Eiblv\nXJujkRRPxDRm2vFfBH1l2YufmG1KXNG1WQLS+AAWsp/mq3lObdnSce2I70bA/lucSU5rFSdcNk5k\nsQ0=\n-----END SSH SIGNATURE-----",
+        "verified": true,
+        "verified_at": "2026-08-21T08:35:03Z"
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/81847?v=4",
+      "events_url": "https://api.github.com/users/claude/events{/privacy}",
+      "followers_url": "https://api.github.com/users/claude/followers",
+      "following_url": "https://api.github.com/users/claude/following{/other_user}",
+      "gists_url": "https://api.github.com/users/claude/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/claude",
+      "id": 81847,
+      "login": "claude",
+      "node_id": "MDQ6VXNlcjgxODQ3",
+      "organizations_url": "https://api.github.com/users/claude/orgs",
+      "received_events_url": "https://api.github.com/users/claude/received_events",
+      "repos_url": "https://api.github.com/users/claude/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/claude/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/claude/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/claude",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/c47e11882d5e2cde5fc12538008d600cc995be74",
+    "node_id": "C_kwDORV0mMdoAKGM0N2UxMTg4MmQ1ZTJjZGU1ZmMxMjUzODAwOGQ2MDBjYzk5NWJlNzQ",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/06c2f74d3fa00729a6efa5fdb9571b0bacfbc999",
+        "sha": "06c2f74d3fa00729a6efa5fdb9571b0bacfbc999",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/06c2f74d3fa00729a6efa5fdb9571b0bacfbc999"
+      }
+    ],
+    "sha": "c47e11882d5e2cde5fc12538008d600cc995be74",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/c47e11882d5e2cde5fc12538008d600cc995be74"
+  },
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/ed2473c4a62616983639f96e4600568c7b0254de/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-22T00:54:16Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-22T00:54:16Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "Identify days by slug and make cycle changes migrations\n\nThe cycle was addressed positionally in three places that could disagree — a\nbundled DAY_CONFIG, a bundled DAY_DESIGN, and loose workout-day-definition\ndocuments — so moving a day silently repointed every exercise and every logged\nworkout at whichever day took its slot. Changing it meant clicking an admin\nbutton that deleted all the data and reinserted it from seed-data.js, with no\nrecord of what ran or whether it finished.\n\nDays now have a permanent slug. The number is only a day's position in one\nversion of the model, so reordering the cycle changes numbers and nothing else.\n\n- The cycle is a `workout-model` document, one per generation, exactly one\n  active. Retiring rather than deleting means a workout logged under Torso in\n  2025 still resolves to Torso\n- Logs record daySlug, dayNumber, dayName and modelVersion as they were on the\n  day. Nothing later edits them — not a rename, not a reorder, not a new model\n- dayDesign.js keys colors and anatomy by slug, retired days included, so\n  history stops repainting itself when the cycle moves\n\nMigrations replace the seed step. They are numbered, forward-only, ship in the\nsame image as the code that expects them, and run at pod startup before any\nroute is mounted; a failure exits the process and fails the rollout. Cosmos has\nno cross-document transaction, so each one is written to survive being retried\nfrom the top, and `npm run migrate:dry-run` checks exactly that by replaying\nagainst the already-migrated result.\n\nThey auto-apply only in the cluster. Local development points at the live\ndatabase, so `npm run dev` reports what is pending rather than applying it —\notherwise starting a dev server on a branch would push a half-written migration\nto production.\n\n001 introduces the model and backfills slugs, changing no behaviour. 002 is the\n12→16 expansion, which is now ordinary data rather than a schema rewrite.\n\nDeletes seed-data.js, seed-soreness.js, seed-cardio-templates.js, the admin\nroute package, and the DatabaseInit panel. Day override survives as DayOverride,\nthe only control there that was ever a decision rather than a missing mechanism.\n\nsnapshot.db is regenerated in this commit because it is baked into the image;\nleft on the old schema, anonymous visitors would read a snapshot the new\nfrontend cannot parse until the 4-hourly cron caught up.\n\nAlso fixes the auto-advance wrap, which was a hardcoded 12 and would have\nstranded the pointer on day 12 of 16, and the stale \"Day 8 Shoulder Safety\"\ncallout, which now reads its day numbers off the model.\n\nCo-Authored-By: Claude Opus 5 \u003cnoreply@anthropic.com\u003e",
+      "tree": {
+        "sha": "900bf487f760354ec7272107ee86c12f7381050c",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/900bf487f760354ec7272107ee86c12f7381050c"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/ed2473c4a62616983639f96e4600568c7b0254de",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/ed2473c4a62616983639f96e4600568c7b0254de",
+    "node_id": "C_kwDORV0mMdoAKGVkMjQ3M2M0YTYyNjE2OTgzNjM5Zjk2ZTQ2MDA1NjhjN2IwMjU0ZGU",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/c47e11882d5e2cde5fc12538008d600cc995be74",
+        "sha": "c47e11882d5e2cde5fc12538008d600cc995be74",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/c47e11882d5e2cde5fc12538008d600cc995be74"
+      }
+    ],
+    "sha": "ed2473c4a62616983639f96e4600568c7b0254de",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/ed2473c4a62616983639f96e4600568c7b0254de"
+  },
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/73a2c1a20fa4854e4bbc9313577295795b3f5c01/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-22T00:59:55Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-22T00:59:55Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "Merge main, and carry soreness attribution onto day slugs\n\nMain added soreness→workout attribution (#78) while this branch was moving day\nidentity off positional numbers, so the new feature arrived keyed the old way.\n\n`sourceWorkoutDay` alone identified the day that caused the soreness, and the\nrecovery lanes coloured and named days from it. Entries now also carry\n`sourceWorkoutDaySlug`; the number stays as the label the day had at the time,\nwhich is the same rule logged workouts follow.\n\n`DAY_MUSCLE_GROUPS` in sorenessLink.js was keyed by the old twelve numbers, so\nit was already going to be wrong under a sixteen-day cycle regardless of this\nbranch — Day 5 would have offered pulling groups for the new Knee day. It is now\nkeyed by slug, covers all sixteen days, and keeps an entry for retired Torso.\nNeck has no matching taxonomy group and deliberately falls through to the full\nlist rather than an empty one.\n\n001 backfills the slug onto existing attributed entries.\n\nResolves the snapshot.db conflict by regenerating it, and drops admin-routes.js,\nwhich main had edited and this branch deletes.",
+      "tree": {
+        "sha": "ddbb249b6be547a59bdad11fe9fe05a7be31c5cd",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/ddbb249b6be547a59bdad11fe9fe05a7be31c5cd"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/73a2c1a20fa4854e4bbc9313577295795b3f5c01",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/73a2c1a20fa4854e4bbc9313577295795b3f5c01",
+    "node_id": "C_kwDORV0mMdoAKDczYTJjMWEyMGZhNDg1NGU0YmJjOTMxMzU3NzI5NTc5NWIzZjVjMDE",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/ed2473c4a62616983639f96e4600568c7b0254de",
+        "sha": "ed2473c4a62616983639f96e4600568c7b0254de",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/ed2473c4a62616983639f96e4600568c7b0254de"
+      },
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/8d66fd6a2af0908e28bd987e5ed2384d33117c22",
+        "sha": "8d66fd6a2af0908e28bd987e5ed2384d33117c22",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/8d66fd6a2af0908e28bd987e5ed2384d33117c22"
+      }
+    ],
+    "sha": "73a2c1a20fa4854e4bbc9313577295795b3f5c01",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/73a2c1a20fa4854e4bbc9313577295795b3f5c01"
+  }
+]

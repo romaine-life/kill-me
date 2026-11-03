@@ -1,0 +1,569 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index f4913d60..ff2fcb48 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -63,7 +63,7 @@ frontend/          React 19 SPA (Vite + Tailwind CSS 4)
+   └── Calls backend API with Bearer tokens
+ 
+ snapshot/          SQLite snapshot generator (Node 20)
+-  ├── Queries Cosmos DB for all public document types (6 tables)
++  ├── Queries Cosmos DB for all public document types (7 tables)
+   ├── Writes a SQLite .db file consumed by the frontend
+   └── Runs every 4 hours via GitHub Actions cron
+ 
+@@ -132,6 +132,7 @@ distinguished by a `type` field:
+ | `exercise` | Exercise library entries per day | `dayNumber`, `name`, `equipment`, `tags[]`, `variations[]` (`{name, default, targetWeight/Reps/Sets}`) |
+ | `logged-workout` | A completed workout session | `userId`, `dayNumber`, `date`, `time` (HH:MM, nullable), `mode` (quick/detailed), `exercises[]` (`{name, variation, weight, reps, sets}`) |
+ | `cardio-session` | A completed cardio session | `userId`, `date`, `time` (HH:MM, nullable), `activity` (treadmill/bike), `durationMinutes`, `treadmill{}`, `bike{}` |
++| `cardio-template` | Shared treadmill interval template (library) | `userId` (`shared`), `templateId`, `name`, `description`, `activity`, `intervals[]` (`{type, speedMph, durationMinutes}`), `sortOrder` |
+ | `soreness-entry` | Daily soreness journal entry | `userId`, `date`, `muscles[]` (`{group, muscle, level}`) |
+ | `settings` | Per-user settings (current day) | `userId`, `currentDay` |
+ | `account` | Microsoft auth account record | `userId`, `provider`, `name`, `email`, `role` |
+diff --git a/backend/routes/admin/admin-routes.js b/backend/routes/admin/admin-routes.js
+index 3fa7a190..8640372e 100644
+--- a/backend/routes/admin/admin-routes.js
++++ b/backend/routes/admin/admin-routes.js
+@@ -3,6 +3,7 @@ import { CosmosClient } from '@azure/cosmos';
+ import { DefaultAzureCredential } from '@azure/identity';
+ import { workoutDays, loggedWorkouts, exercises } from '../data/seed-data.js';
+ import { sorenessSeedData } from '../data/seed-soreness.js';
++import { cardioTemplates } from '../data/seed-cardio-templates.js';
+ 
+ const LEGACY_USER_ID = 'cf57d57d-1411-4f59-b517-e9a8600b140a';
+ 
+@@ -32,7 +33,7 @@ export function createAdminRoutes({ container, cosmosDbEndpoint, databaseName, c
+         partitionKey: { paths: ['/userId'] }
+       });
+ 
+-      const seededData = { workoutDays: 0, loggedWorkouts: 0, exercises: 0 };
++      const seededData = { workoutDays: 0, loggedWorkouts: 0, exercises: 0, cardioTemplates: 0 };
+ 
+       // Clean up old workout day definitions
+       try {
+@@ -110,6 +111,34 @@ export function createAdminRoutes({ container, cosmosDbEndpoint, databaseName, c
+         }
+       }
+ 
++      // Delete old cardio-template documents then re-seed (idempotent)
++      try {
++        const { resources: oldTemplates } = await newContainer.items
++          .query('SELECT c.id, c.userId FROM c WHERE c.type = "cardio-template"')
++          .fetchAll();
++        for (const old of oldTemplates) {
++          try { await newContainer.item(old.id, old.userId ?? undefined).delete(); } catch { /* ignore */ }
++        }
++      } catch (cleanupErr) {
++        console.error('Cardio template cleanup failed (non-fatal):', cleanupErr.message);
++      }
++
++      for (const template of cardioTemplates) {
++        try {
++          const templateDoc = {
++            id: `cardio-template-${template.templateId}`,
++            type: 'cardio-template',
++            userId: 'shared',
++            ...template,
++            createdAt: new Date().toISOString()
++          };
++          await newContainer.items.upsert(templateDoc);
++          seededData.cardioTemplates++;
++        } catch (err) {
++          console.error(`Failed to seed cardio template ${template.templateId}:`, err.message);
++        }
++      }
++
+       res.json({
+         success: true,
+         message: 'Database initialized and seeded successfully',
+diff --git a/backend/routes/data/seed-cardio-templates.js b/backend/routes/data/seed-cardio-templates.js
+new file mode 100644
+index 00000000..72fa02bc
+--- /dev/null
++++ b/backend/routes/data/seed-cardio-templates.js
+@@ -0,0 +1,60 @@
++// Seed data for treadmill interval templates (cardio-template document type).
++//
++// These are shared library documents (userId: 'shared'), seeded by
++// /api/admin/init-database alongside the exercise library and day definitions.
++// A logged cardio-session stores the full interval array at log time, so
++// editing or removing a template here never rewrites history.
++//
++// `templateId` is the stable slug the frontend and logged sessions reference.
++// `sortOrder` controls dropdown order; the lowest sortOrder is the default.
++//
++// The frontend keeps a static mirror of these in
++// frontend/src/utils/cardioTemplates.js as an offline fallback (same pattern as
++// dayConfig.js mirroring the workout-day-definition seed). Keep the two in sync.
++
++export const cardioTemplates = [
++  {
++    templateId: 'walk-jog-5x-60',
++    activity: 'treadmill',
++    name: 'Walk/Jog 5×6.0 + 1×7.0',
++    description: '2 min walk / 4 min jog @ 6.0 mph × 5, then 4 min @ 7.0, cooldown',
++    sortOrder: 0,
++    intervals: [
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 7.0, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++    ],
++  },
++  {
++    templateId: 'walk-jog-5x-54',
++    activity: 'treadmill',
++    name: 'Walk/Jog 5×5.4 + 1×6.0',
++    description: '2 min walk / 4 min jog @ 5.4 mph × 5, then 4 min @ 6.0, cooldown',
++    sortOrder: 1,
++    intervals: [
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 5.4, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 5.4, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 5.4, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 5.4, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 5.4, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++    ],
++  },
++];
+diff --git a/backend/routes/routes/cardio.js b/backend/routes/routes/cardio.js
+index 7896f348..18706e1b 100644
+--- a/backend/routes/routes/cardio.js
++++ b/backend/routes/routes/cardio.js
+@@ -1,19 +1,35 @@
+ import { Router } from 'express';
+ 
+ /**
+- * Cardio session routes.
++ * Cardio session + treadmill template routes.
+  *
+  * Public:
+  *   GET    /api/cardio-sessions
++ *   GET    /api/cardio-templates
+  *
+  * Admin:
+  *   POST   /api/cardio-sessions
+  *   PUT    /api/cardio-sessions/:id
+  *   DELETE /api/cardio-sessions/:id
++ *   POST   /api/cardio-templates
++ *   PUT    /api/cardio-templates/:templateId
++ *   DELETE /api/cardio-templates/:templateId
+  */
+ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
+   const router = Router();
+ 
++  // Shape a cardio-template document into the frontend contract: the stable
++  // `templateId` slug is exposed as `id` (what the dropdown and logged sessions
++  // reference), alongside name/description/intervals.
++  const shapeTemplate = (doc) => ({
++    id: doc.templateId,
++    activity: doc.activity || 'treadmill',
++    name: doc.name,
++    description: doc.description || '',
++    intervals: Array.isArray(doc.intervals) ? doc.intervals : [],
++    sortOrder: doc.sortOrder ?? 0,
++  });
++
+   // Get all cardio sessions (public).
+   router.get('/api/cardio-sessions', async (req, res) => {
+     try {
+@@ -135,5 +151,124 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
+     }
+   });
+ 
++  // Get all treadmill templates (public), ordered for the dropdown.
++  router.get('/api/cardio-templates', async (req, res) => {
++    try {
++      const querySpec = {
++        query: 'SELECT * FROM c WHERE c.type = @type ORDER BY c.sortOrder',
++        parameters: [
++          { name: '@type', value: 'cardio-template' }
++        ]
++      };
++
++      const { resources } = await container.items.query(querySpec).fetchAll();
++      res.json({ templates: resources.map(shapeTemplate) });
++    } catch (error) {
++      console.error('Error fetching cardio templates:', error);
++      res.status(500).json({ error: 'Failed to fetch cardio templates', message: error.message });
++    }
++  });
++
++  // Create or replace a treadmill template (admin only). Keyed on templateId so
++  // re-submitting the same slug edits in place. Templates are shared library
++  // documents (userId: 'shared'), like the exercise library.
++  router.post('/api/cardio-templates', requireAuth, requireAdmin, async (req, res) => {
++    try {
++      const { templateId, name, description, intervals, activity, sortOrder } = req.body;
++
++      if (!templateId || !name) {
++        return res.status(400).json({ error: 'Missing required fields: templateId and name' });
++      }
++      if (!Array.isArray(intervals) || intervals.length === 0) {
++        return res.status(400).json({ error: 'intervals must be a non-empty array' });
++      }
++
++      const doc = {
++        id: `cardio-template-${templateId}`,
++        type: 'cardio-template',
++        userId: 'shared',
++        templateId,
++        activity: activity || 'treadmill',
++        name,
++        description: description || '',
++        intervals,
++        sortOrder: sortOrder ?? 0,
++        updatedAt: new Date().toISOString(),
++      };
++
++      const { resource } = await container.items.upsert(doc);
++      res.status(201).json({ template: shapeTemplate(resource) });
++    } catch (error) {
++      console.error('Error creating cardio template:', error);
++      res.status(500).json({ error: 'Failed to create cardio template', message: error.message });
++    }
++  });
++
++  // Update fields on an existing treadmill template (admin only).
++  router.put('/api/cardio-templates/:templateId', requireAuth, requireAdmin, async (req, res) => {
++    try {
++      const { templateId } = req.params;
++      const { name, description, intervals, activity, sortOrder } = req.body;
++
++      const { resources } = await container.items.query({
++        query: 'SELECT * FROM c WHERE c.type = @type AND c.templateId = @templateId',
++        parameters: [
++          { name: '@type', value: 'cardio-template' },
++          { name: '@templateId', value: templateId }
++        ]
++      }).fetchAll();
++
++      if (resources.length === 0) {
++        return res.status(404).json({ error: 'Cardio template not found' });
++      }
++
++      const existing = resources[0];
++      const updated = {
++        ...existing,
++        ...(name !== undefined && { name }),
++        ...(description !== undefined && { description }),
++        ...(intervals !== undefined && { intervals }),
++        ...(activity !== undefined && { activity }),
++        ...(sortOrder !== undefined && { sortOrder }),
++        updatedAt: new Date().toISOString(),
++      };
++
++      const { resource } = await container.item(existing.id, existing.userId).replace(updated);
++      res.json({ template: shapeTemplate(resource) });
++    } catch (error) {
++      console.error('Error updating cardio template:', error);
++      res.status(500).json({ error: 'Failed to update cardio template', message: error.message });
++    }
++  });
++
++  // Delete a treadmill template (admin only). Logged sessions are unaffected —
++  // they store their own interval snapshot.
++  router.delete('/api/cardio-templates/:templateId', requireAuth, requireAdmin, async (req, res) => {
++    try {
++      const { templateId } = req.params;
++
++      const { resources } = await container.items.query({
++        query: 'SELECT * FROM c WHERE c.type = @type AND c.templateId = @templateId',
++        parameters: [
++          { name: '@type', value: 'cardio-template' },
++          { name: '@templateId', value: templateId }
++        ]
++      }).fetchAll();
++
++      if (resources.length === 0) {
++        return res.status(404).json({ error: 'Cardio template not found' });
++      }
++
++      await container.item(resources[0].id, resources[0].userId).delete();
++      res.status(204).send();
++    } catch (error) {
++      if (error.code === 404) {
++        return res.status(404).json({ error: 'Cardio template not found' });
++      }
++      console.error('Error deleting cardio template:', error);
++      res.status(500).json({ error: 'Failed to delete cardio template', message: error.message });
++    }
++  });
++
+   return router;
+ }
+diff --git a/frontend/src/api/snapshot.js b/frontend/src/api/snapshot.js
+index 87595a37..c35706c3 100644
+--- a/frontend/src/api/snapshot.js
++++ b/frontend/src/api/snapshot.js
+@@ -154,6 +154,27 @@ export function getCardioSessions(db) {
+   return { sessions };
+ }
+ 
++// Get all treadmill templates, ordered for the dropdown
++export function getCardioTemplates(db) {
++  const result = db.exec(
++    'SELECT template_id, activity, name, description, intervals, sort_order FROM cardio_templates ORDER BY sort_order'
++  );
++
++  if (result.length === 0) {
++    return { templates: [] };
++  }
++
++  const templates = result[0].values.map(([id, activity, name, description, intervals]) => ({
++    id,
++    activity,
++    name,
++    description,
++    intervals: intervals ? JSON.parse(intervals) : [],
++  }));
++
++  return { templates };
++}
++
+ // Get snapshot metadata (generated_at timestamp)
+ export function getSnapshotMeta(db) {
+   const result = db.exec('SELECT key, value FROM snapshot_meta');
+diff --git a/frontend/src/api/snapshotContext.jsx b/frontend/src/api/snapshotContext.jsx
+index bbdebc78..a385f7a1 100644
+--- a/frontend/src/api/snapshotContext.jsx
++++ b/frontend/src/api/snapshotContext.jsx
+@@ -19,6 +19,7 @@ import {
+   getLoggedWorkouts,
+   getSorenessEntries,
+   getCardioSessions,
++  getCardioTemplates,
+ } from './snapshot.js';
+ 
+ const SnapshotContext = createContext(null);
+@@ -138,6 +139,11 @@ export function useDataSource() {
+     return getCardioSessions(db);
+   }
+ 
++  async function fetchCardioTemplates() {
++    if (isLive) return apiFetch('/api/cardio-templates');
++    return getCardioTemplates(db);
++  }
++
+   return {
+     fetchCurrentDay,
+     fetchWorkoutDay,
+@@ -146,6 +152,7 @@ export function useDataSource() {
+     fetchWorkouts,
+     fetchSoreness,
+     fetchCardioSessions,
++    fetchCardioTemplates,
+     isLive,
+     isReady,
+   };
+diff --git a/frontend/src/components/WorkoutDrawer.jsx b/frontend/src/components/WorkoutDrawer.jsx
+index 40f8c9e3..6f6b24e4 100644
+--- a/frontend/src/components/WorkoutDrawer.jsx
++++ b/frontend/src/components/WorkoutDrawer.jsx
+@@ -62,6 +62,10 @@ export function LogTab({
+   const [cardioActivity, setCardioActivity] = useState('treadmill');
+   const [cardioDate, setCardioDate] = useState(todayLocal());
+   const [cardioTime, setCardioTime] = useState(nowLocalTime());
++  // Treadmill templates come from the data source (Cosmos via API, or the
++  // snapshot for anonymous visitors). TREADMILL_TEMPLATES is only an offline
++  // fallback for when neither is available (same role as dayConfig.js).
++  const [templates, setTemplates] = useState(TREADMILL_TEMPLATES);
+   const [cardioTemplateId, setCardioTemplateId] = useState(TREADMILL_TEMPLATES[0]?.id || '');
+   const [cardioNotes, setCardioNotes] = useState('');
+   const [cardioSubmitting, setCardioSubmitting] = useState(false);
+@@ -84,7 +88,7 @@ export function LogTab({
+ 
+   const dateInputRef = useRef(null);
+   const cardioDateRef = useRef(null);
+-  const { fetchWorkouts: fetchWorkoutsFromSource, fetchCardioSessions, isReady } = useDataSource();
++  const { fetchWorkouts: fetchWorkoutsFromSource, fetchCardioSessions, fetchCardioTemplates, isReady } = useDataSource();
+ 
+   const dayInfo = getDayInfo(selectedDay);
+ 
+@@ -135,6 +139,28 @@ export function LogTab({
+     }
+   }, [selectedDay, viewWorkout]);
+ 
++  // Load treadmill templates from the data source. Falls back to the static
++  // list if the source is empty or errors, so the dropdown is never blank.
++  useEffect(() => {
++    if (!isReady) return;
++    fetchCardioTemplates()
++      .then((data) => {
++        const list = data?.templates?.length ? data.templates : TREADMILL_TEMPLATES;
++        setTemplates(list);
++        // In create mode, keep the default pointed at the first (lowest sortOrder)
++        // template unless the current selection is still valid.
++        if (!viewCardio) {
++          setCardioTemplateId((prev) =>
++            list.some((t) => t.id === prev) ? prev : (list[0]?.id || '')
++          );
++        }
++      })
++      .catch((err) => {
++        console.warn('Cardio template load failed, using static fallback:', err);
++        setTemplates(TREADMILL_TEMPLATES);
++      });
++  }, [isReady, viewCardio]);
++
+   // Switch logType when viewCardio/viewWorkout changes
+   useEffect(() => {
+     if (viewCardio) setLogType('cardio');
+@@ -362,7 +388,7 @@ export function LogTab({
+   const handleCardioSubmit = async () => {
+     setCardioSubmitting(true);
+     try {
+-      const selectedTemplate = TREADMILL_TEMPLATES.find(t => t.id === cardioTemplateId);
++      const selectedTemplate = templates.find(t => t.id === cardioTemplateId);
+ 
+       const body = {
+         date: cardioDate,
+@@ -439,7 +465,7 @@ export function LogTab({
+   // Render — one form, always
+   // ─────────────────────────────────────────────
+ 
+-  const selectedTemplate = TREADMILL_TEMPLATES.find(t => t.id === cardioTemplateId);
++  const selectedTemplate = templates.find(t => t.id === cardioTemplateId);
+ 
+   return (
+     <div className="max-w-2xl">
+@@ -983,7 +1009,7 @@ export function LogTab({
+                 onChange={(e) => setCardioTemplateId(e.target.value)}
+                 className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
+               >
+-                {TREADMILL_TEMPLATES.map(t => (
++                {templates.map(t => (
+                   <option key={t.id} value={t.id} className="bg-slate-800">
+                     {t.name}
+                   </option>
+diff --git a/frontend/src/utils/cardioTemplates.js b/frontend/src/utils/cardioTemplates.js
+index 93b2af52..1fbc8487 100644
+--- a/frontend/src/utils/cardioTemplates.js
++++ b/frontend/src/utils/cardioTemplates.js
+@@ -1,14 +1,37 @@
+-// Treadmill interval templates — frontend constants for phase 1.
++// Treadmill interval templates — OFFLINE FALLBACK ONLY.
++//
++// Templates now live in Cosmos DB as `cardio-template` documents and are loaded
++// at runtime via useDataSource().fetchCardioTemplates() (live API when signed
++// in, SQLite snapshot for anonymous visitors). This array is a static mirror of
++// backend/routes/data/seed-cardio-templates.js, used only when the data source
++// is empty or errors so the dropdown is never blank (same role dayConfig.js
++// plays for workout-day-definition). Keep it in sync with the seed file.
+ //
+ // Each template defines a sequence of walk/jog intervals. The full interval
+ // array is stored in each logged cardio-session document so history remains
+-// self-contained even if templates change later.
+-//
+-// templateId is stored in the Cosmos document for forward compatibility —
+-// when templates move to the database, historical sessions still work because
+-// they store the full interval array, not just a reference.
++// self-contained even if templates change or are deleted later.
+ 
+ export const TREADMILL_TEMPLATES = [
++  {
++    id: 'walk-jog-5x-60',
++    name: 'Walk/Jog 5×6.0 + 1×7.0',
++    description: '2 min walk / 4 min jog @ 6.0 mph × 5, then 4 min @ 7.0, cooldown',
++    intervals: [
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 6.0, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++      { type: 'jog',  speedMph: 7.0, durationMinutes: 4 },
++      { type: 'walk', speedMph: 2.0, durationMinutes: 2 },
++    ],
++  },
+   {
+     id: 'walk-jog-5x-54',
+     name: 'Walk/Jog 5×5.4 + 1×6.0',
+diff --git a/snapshot/generate-snapshot.js b/snapshot/generate-snapshot.js
+index dc871b0b..7f0ab49c 100644
+--- a/snapshot/generate-snapshot.js
++++ b/snapshot/generate-snapshot.js
+@@ -45,7 +45,7 @@ async function getCosmosEndpoint(credential) {
+   return setting.value;
+ }
+ 
+-// Schema DDL — mirrors the five public document types from Cosmos DB
++// Schema DDL — mirrors the public document types from Cosmos DB
+ const SCHEMA = `
+   CREATE TABLE workout_days (
+     day_number    INTEGER PRIMARY KEY,
+@@ -105,6 +105,15 @@ const SCHEMA = `
+   );
+   CREATE INDEX idx_cardio_date ON cardio_sessions(date DESC);
+ 
++  CREATE TABLE cardio_templates (
++    template_id   TEXT PRIMARY KEY,
++    activity      TEXT,
++    name          TEXT NOT NULL,
++    description   TEXT,
++    intervals     TEXT NOT NULL,
++    sort_order    INTEGER
++  );
++
+   CREATE TABLE snapshot_meta (
+     key   TEXT PRIMARY KEY,
+     value TEXT NOT NULL
+@@ -128,7 +137,7 @@ async function main() {
+   const containerName = process.env.COSMOS_DB_CONTAINER_NAME || 'workouts';
+   const container = cosmosClient.database(databaseName).container(containerName);
+ 
+-  // Query all five public document types
++  // Query all public document types
+   console.log('Querying Cosmos DB...');
+ 
+   const queries = {
+@@ -138,6 +147,7 @@ async function main() {
+     settings: 'SELECT * FROM c WHERE c.type = "settings"',
+     soreness: 'SELECT * FROM c WHERE c.type = "soreness-entry" ORDER BY c.date DESC',
+     cardioSessions: 'SELECT * FROM c WHERE c.type = "cardio-session" ORDER BY c.date DESC',
++    cardioTemplates: 'SELECT * FROM c WHERE c.type = "cardio-template" ORDER BY c.sortOrder',
+   };
+ 
+   const results = {};
+@@ -244,6 +254,21 @@ async function main() {
+       );
+     }
+ 
++    // Cardio templates (shared treadmill interval library)
++    const insertTemplate = db.prepare(
++      'INSERT INTO cardio_templates (template_id, activity, name, description, intervals, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
++    );
++    for (const doc of results.cardioTemplates) {
++      insertTemplate.run(
++        doc.templateId,
++        doc.activity || 'treadmill',
++        doc.name,
++        doc.description || null,
++        JSON.stringify(Array.isArray(doc.intervals) ? doc.intervals : []),
++        doc.sortOrder ?? 0,
++      );
++    }
++
+     // Snapshot metadata
+     const insertMeta = db.prepare('INSERT INTO snapshot_meta (key, value) VALUES (?, ?)');
+     insertMeta.run('generated_at', new Date().toISOString());

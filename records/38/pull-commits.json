@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/e2bc31d572e52b334e0a789a6f697dc65fe1e374/comments",
+    "commit": {
+      "author": {
+        "date": "2026-05-16T08:22:26Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-05-16T08:22:26Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "message": "fix(tofu): pin federated cred issuer to current cluster URL (cross-sub workaround)\n\nFollow-up to #37. That PR switched the federated identity credential's\n`issuer` to `data.azurerm_kubernetes_cluster.infra.oidc_issuer_url`,\nexpecting to read the live value from the cluster. But the AKS cluster\nlives in subscription 606a1ca1 (\"romaine-life\"), while this tofu stack\nauthenticates to aee0cbd2 (\"Azure subscription 1\"); the data source\n404s and apply fails — same failure as diagrams/tofu has been hitting\nsince 2026-04-30.\n\nCross-sub Reader on the CI principal is the right long-term fix, owned\nby infra-bootstrap. Until then, restore the variable and update its\ndefault to the cluster's current value (`…/5aced6d5-…`). Apply now\nsucceeds and the federated cred gets re-issued with the correct URL,\nunblocking pod startup.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) \u003cnoreply@anthropic.com\u003e",
+      "tree": {
+        "sha": "2d312977ef47bce08817193818ddd873536c11cc",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/2d312977ef47bce08817193818ddd873536c11cc"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/e2bc31d572e52b334e0a789a6f697dc65fe1e374",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/e2bc31d572e52b334e0a789a6f697dc65fe1e374",
+    "node_id": "C_kwDORV0mMdoAKGUyYmMzMWQ1NzJlNTJiMzM0ZTBhNzg5YTZmNjk3ZGM2NWZlMWUzNzQ",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/e4ce43a640149adc98d2b4098e335642365e5691",
+        "sha": "e4ce43a640149adc98d2b4098e335642365e5691",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/e4ce43a640149adc98d2b4098e335642365e5691"
+      }
+    ],
+    "sha": "e2bc31d572e52b334e0a789a6f697dc65fe1e374",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/e2bc31d572e52b334e0a789a6f697dc65fe1e374"
+  }
+]

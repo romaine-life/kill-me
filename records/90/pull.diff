@@ -1,0 +1,773 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index a66106d0..1207a40d 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -1,6 +1,6 @@
+ # kill-me — Workout Tracker
+ 
+-Personal workout tracker built around a custom 16-day training cycle called **Synergy 16**.
++Personal workout tracker built around a custom 17-day training cycle called **Synergy 17**.
+ 
+ The repo name comes from a Tom Platz video where he screams "KILL ME" during an
+ agonizing set of leg extensions under hypnotherapy coaching.
+@@ -15,7 +15,7 @@ content-fingerprint tag (`romainecr.azurecr.io/kill-me:app-<sha256>`); fork PRs
+ stay build-only with `push: false`. Release/deploy workflows publish or reuse
+ that same fingerprint tag and bump `k8s/values.yaml` to it.
+ 
+-## The 16-Day Synergy System
++## The 17-Day Synergy System
+ 
+ The cycle is Nelson's own design, optimized for **consistent daily activity** rather
+ than traditional rest-heavy programming. Four guiding principles:
+@@ -27,8 +27,8 @@ than traditional rest-heavy programming. Four guiding principles:
+    not progressive overload. Nelson's muscles grow readily; the priority is controlled
+    movement and avoiding excessive bulk.
+ 3. **CNS-aware sequencing** — only three days (1, 6, 12) are systemically taxing compound
+-   lifts. They are evenly spaced (5, 6, 5 apart including the wrap) with isolation and
+-   recovery work between them to avoid stacking central nervous system fatigue.
++   lifts. Day 15 is a short, one-exercise vertical press rather than a fourth systemic
++   session. Isolation and recovery work keep the major compound days from stacking.
+ 4. **Coverage over optimization** — the cycle exists to prevent atrophy, not to optimize
+    any one adaptation. Its job is making sure nothing gets left out. Traditional splits
+    drop the peripheral work (ankles, neck, hip rotation, grip) because a four-day week
+@@ -37,7 +37,7 @@ than traditional rest-heavy programming. Four guiding principles:
+ ### Short days are the design, not an oversight
+ 
+ Nelson works ~12-hour days. Logged sessions run 1-3 exercises regardless of how many the
+-day lists, so **every day is a fixed, fully specified list of 2-4 exercises requiring zero
++day lists, so **every day is a fixed, fully specified list of 1-4 exercises requiring zero
+ decisions** — open the app, do what today says. Two consequences worth preserving:
+ 
+ - **More days means shorter days, not more work.** The same coverage distributed into
+@@ -60,9 +60,13 @@ The day ordering is not arbitrary — each placement accounts for what came befo
+ - **Day 11 (Pecs Mobility)** primes the shoulder capsule for Day 12's heavy pressing —
+   light flys, holds, and stretches only
+ - **Day 12 (Compound Push)** is where dips and heavy pressing belong — never on Day 11
+-- **Day 15 (Grip)** sits 8 days clear of Day 6 (Pulls) and Day 7 (Bicep) so forearm
++- **Day 14 (Deltoid + Shoulder Prep)** primes the shoulder for Day 15 — light rear/side
++  delt and rotator-cuff work only, always well short of failure
++- **Day 15 (Shoulder Press)** is one focused vertical-push exercise. It uses challenging
++  working sets, not 1RM tests or grinding, and still requires same-session ramp-up sets
++- **Day 16 (Grip)** sits well clear of Day 6 (Pulls) and Day 7 (Bicep) so forearm
+   loading never stacks on consecutive days
+-- **Day 16 (Hips)** primes the hips the day before Day 1 squats, mirroring how Day 11
++- **Day 17 (Hips)** primes the hips the day before Day 1 squats, mirroring how Day 11
+   primes Day 12
+ 
+ ### Day 11 shoulder safety
+@@ -72,6 +76,21 @@ well but have underlying limitations. Day 11's strict "no heavy pressing" rule p
+ the shoulder joint by keeping pec work light and mobility-focused before compound push
+ day. Dips are fine on Day 12 (assisted machine at -90 lbs), but never on Day 11.
+ 
++### Day 14-15 shoulder sequencing
++
++Day 14 is preparation, not a second hard shoulder workout. Its reverse fly, lateral
++raise, and rotator-cuff movements stay light and controlled so they improve readiness
++for Day 15 rather than creating fatigue. Day 15 contains only the Dumbbell + Cable
++Shoulder Press. Dumbbell and cable loads are logged separately, and working sets stop
++before the press path or torso position breaks down. The complete rationale and rejected
++alternatives are recorded in `docs/decisions/0002-add-dedicated-vertical-press-day.md`.
++
++## Decision records
++
++Consequential program and architecture decisions live in `docs/decisions/`. They are
++append-only historical records: `CLAUDE.md` describes the current state, migrations
++implement it, and decision records preserve why it exists and when it should be revisited.
++
+ ### Known gap: no hip hinge
+ 
+ The cycle contains no deadlift, RDL, or good morning. Squats are knee-dominant, leg curl
+diff --git a/backend/migrations/004-synergy-17-shoulder-press.js b/backend/migrations/004-synergy-17-shoulder-press.js
+new file mode 100644
+index 00000000..7883747a
+--- /dev/null
++++ b/backend/migrations/004-synergy-17-shoulder-press.js
+@@ -0,0 +1,193 @@
++// Synergy 16 -> Synergy 17.
++//
++// Adds a one-exercise Shoulder Press day after Deltoid. Deltoid becomes a true
++// low-fatigue shoulder primer, so its redundant front raises are removed and its
++// remaining exercises explicitly stay short of failure. The dumbbell-only press
++// leaves Compound: Push; the new day uses separately logged dumbbell and cable
++// resistance.
++//
++// Decision: docs/decisions/0002-add-dedicated-vertical-press-day.md
++//
++// Re-runnable: the model and exercise have deterministic ids, model retirement is
++// conditional, exercise updates are deterministic, and removals tolerate 404.
++
++const SHARED = 'shared';
++const PREVIOUS_MODEL_ID = 'workout-model-2';
++const MODEL_VERSION = 3;
++const MODEL_ID = `workout-model-${MODEL_VERSION}`;
++const PRESS_DAY_SLUG = 'shoulder-press';
++const PRESS_EXERCISE_ID = 'exercise-shoulder-press-dumbbell-cable-shoulder-press';
++
++const REMOVED_EXERCISE_IDS = [
++  'exercise-compound-push-shoulder-press',
++  'exercise-deltoid-front-deltoid-raises--bottom-to-top-',
++  'exercise-deltoid-front-deltoid-raises--top-to-bottom-',
++];
++
++const PRIMER_NOTES = {
++  'Reverse Delt Cable Fly': 'Shoulder primer only. Smooth, pain-free range; stop well short of failure so tomorrow\'s press stays fresh.',
++  'Side Delt Cable Raises': 'Shoulder primer only. Use a light, controlled load and stop well short of failure.',
++  'Rotator Cuff Work': 'Light preparation, not fatigue work. Controlled pain-free range in both directions.',
++};
++const query = async (container, sql, parameters = []) => {
++  const { resources } = await container.items.query({ query: sql, parameters }).fetchAll();
++  return resources;
++};
++
++const remove = async (container, id) => {
++  try {
++    await container.item(id, SHARED).delete();
++    return true;
++  } catch (error) {
++    if (error.code === 404) return false;
++    throw error;
++  }
++};
++
++const buildSynergy17 = (previousDays) => {
++  const days = [];
++
++  for (const previous of previousDays) {
++    if (previous.slug === 'deltoid') {
++      days.push({
++        ...previous,
++        name: 'Deltoid + Shoulder Prep',
++        focus: 'The Primer. Light deltoid, rotator-cuff, and range-of-motion work. No failure.',
++        description: 'Low-fatigue shoulder preparation for the dedicated vertical press the next day',
++        muscleGroups: ['shoulders', 'delts', 'rotator-cuff'],
++        safetyNotes: 'Keep every movement light and controlled. Stop well short of failure; this day must improve readiness for Shoulder Press.',
++      });
++
++      days.push({
++        slug: PRESS_DAY_SLUG,
++        number: 0,
++        name: 'Shoulder Press',
++        focus: 'Main Lift: Dumbbell + Cable Shoulder Press. Challenging working sets, not a 1RM test.',
++        description: 'A short, dedicated vertical-push session performed with fresh attention',
++        muscleGroups: ['shoulders', 'delts', 'triceps', 'serratus'],
++        safetyNotes: 'Use same-session ramp-up sets. Stop when another repetition would change the press path or require uncontrolled compensation.',
++      });
++      continue;
++    }
++
++    days.push(previous);
++  }
++
++  // Number is position in this model, never identity. Renumbering here moves Grip
++  // and Hips while their permanent slugs and all historical logs stay unchanged.
++  return days.map((day, index) => ({ ...day, number: index + 1 }));
++};
++
++export default {
++  version: 4,
++  name: 'Synergy 17 dedicated shoulder press day',
++
++  async up({ container }) {
++    const [previous] = await query(
++      container,
++      'SELECT * FROM c WHERE c.type = @type AND c.id = @id',
++      [{ name: '@type', value: 'workout-model' }, { name: '@id', value: PREVIOUS_MODEL_ID }],
++    );
++    if (!previous?.days?.length) {
++      throw new Error(`Cannot build Synergy 17 without ${PREVIOUS_MODEL_ID}`);
++    }
++
++    const [existingModel] = await query(
++      container,
++      'SELECT * FROM c WHERE c.type = @type AND c.id = @id',
++      [{ name: '@type', value: 'workout-model' }, { name: '@id', value: MODEL_ID }],
++    );
++    const days = existingModel?.days ?? buildSynergy17(previous.days);
++
++    if (!existingModel || !existingModel.active) {
++      await container.items.upsert({
++        ...(existingModel ?? {}),
++        id: MODEL_ID,
++        type: 'workout-model',
++        userId: SHARED,
++        version: MODEL_VERSION,
++        name: 'Synergy 17',
++        active: true,
++        days,
++        createdAt: existingModel?.createdAt ?? new Date().toISOString(),
++      });
++    }
++
++    if (previous.active) {
++      await container.items.upsert({
++        ...previous,
++        active: false,
++        retiredAt: previous.retiredAt ?? new Date().toISOString(),
++      });
++    }
++
++    const dayNumberBySlug = new Map(days.map((day) => [day.slug, day.number]));
++    const exercises = await query(
++      container,
++      'SELECT * FROM c WHERE c.type = @type',
++      [{ name: '@type', value: 'exercise' }],
++    );
++
++    let moved = 0;
++    let primerUpdated = 0;
++    for (const exercise of exercises) {
++      if (REMOVED_EXERCISE_IDS.includes(exercise.id)) continue;
++
++      const nextDayNumber = dayNumberBySlug.get(exercise.daySlug);
++      const primerNote = exercise.daySlug === 'deltoid' ? PRIMER_NOTES[exercise.name] : null;
++      if (nextDayNumber === undefined && !primerNote) continue;
++
++      const numberChanged = nextDayNumber !== undefined && exercise.dayNumber !== nextDayNumber;
++      const noteChanged = primerNote != null && exercise.notes !== primerNote;
++      if (!numberChanged && !noteChanged) continue;
++
++      await container.items.upsert({
++        ...exercise,
++        dayNumber: nextDayNumber ?? exercise.dayNumber,
++        notes: primerNote ?? exercise.notes,
++      });
++      if (numberChanged) moved++;
++      if (noteChanged) primerUpdated++;
++    }
++
++    const existingPress = exercises.find((exercise) => exercise.id === PRESS_EXERCISE_ID);
++    await container.items.upsert({
++      ...(existingPress ?? {}),
++      id: PRESS_EXERCISE_ID,
++      type: 'exercise',
++      userId: SHARED,
++      daySlug: PRESS_DAY_SLUG,
++      dayNumber: dayNumberBySlug.get(PRESS_DAY_SLUG),
++      name: 'Dumbbell + Cable Shoulder Press',
++      equipment: 'Dumbbells + Cable Machine',
++      location: 'Home',
++      notes: 'Primary lift. Perform same-session ramp-up sets, then stop each working set before the press path or torso position breaks down.',
++      tags: ['compound', 'press', 'dumbbell', 'cable', 'shoulders', 'front-delt', 'side-delt', 'triceps', 'serratus'],
++      variations: [{
++        name: 'Seated',
++        default: true,
++        weightFields: [
++          { key: 'dumbbell', label: 'Dumbbell', targetWeight: 15 },
++          { key: 'cable', label: 'Cable', targetWeight: 5 },
++        ],
++        targetReps: '8-15',
++        targetSets: 3,
++      }],
++      createdAt: existingPress?.createdAt ?? new Date().toISOString(),
++    });
++
++    let removed = 0;
++    for (const id of REMOVED_EXERCISE_IDS) {
++      if (await remove(container, id)) removed++;
++    }
++
++    return {
++      modelVersion: MODEL_VERSION,
++      days: days.length,
++      pressCreated: !existingPress,
++      moved,
++      primerUpdated,
++      removed,
++    };
++  },
++};
+diff --git a/backend/migrations/apply.js b/backend/migrations/apply.js
+index b9b792c2..80f29af9 100644
+--- a/backend/migrations/apply.js
++++ b/backend/migrations/apply.js
+@@ -10,6 +10,7 @@
+ // live one. Run `npm run migrate:dry-run` first; it reads the same data and prints
+ // exactly what this will change.
+ 
++import 'dotenv/config';
+ import { CosmosClient } from '@azure/cosmos';
+ import { DefaultAzureCredential } from '@azure/identity';
+ import { fetchConfig } from '../config.js';
+diff --git a/backend/migrations/dry-run.js b/backend/migrations/dry-run.js
+index 1dfe1141..baf2acce 100644
+--- a/backend/migrations/dry-run.js
++++ b/backend/migrations/dry-run.js
+@@ -7,11 +7,12 @@
+ // Run this before merging anything that adds a migration. It reads production, so it
+ // needs the same Cosmos access the pod has (locally: `az login`).
+ //
+-// It also re-runs every migration a second time against the already-migrated result,
+-// because the runner has no transaction to fall back on: a migration that dies partway
+-// gets retried from the top, and one that isn't safe to repeat will corrupt data when
+-// that happens. The second pass must report no creates and no deletes.
++// It also re-runs every migration that was pending at the start against the
++// already-migrated result. That mirrors a partial production failure: receipts for
++// older migrations remain, while the interrupted migration has no receipt and is
++// retried from the top. The second pass must report no creates and no deletes.
+ 
++import 'dotenv/config';
+ import { CosmosClient } from '@azure/cosmos';
+ import { DefaultAzureCredential } from '@azure/identity';
+ import { fetchConfig } from '../config.js';
+@@ -36,7 +37,7 @@ async function main() {
+   const { runMigrations } = await import('./runner.js');
+   const { container, store, operations } = memoryContainer(documents);
+ 
+-  await runMigrations({ container });
++  const { applied: previewedVersions } = await runMigrations({ container });
+ 
+   const tally = operations.reduce((acc, [kind]) => ({ ...acc, [kind]: (acc[kind] ?? 0) + 1 }), {});
+   console.log('\nWould perform:', tally);
+@@ -55,11 +56,15 @@ async function main() {
+     if (stranded.length) console.log(`\n  Exercises left on days the model no longer has: ${stranded.join(', ')}`);
+   }
+ 
+-  // Second pass: prove the migrations survive being retried.
++  // Second pass: prove the migrations just previewed survive being retried. Keep
++  // historical receipts because a failure in a new migration does not erase them.
+   const beforeReplay = stable(store);
+   operations.length = 0;
+-  const applied = [...store.values()].filter((doc) => doc.type === 'schema-migration');
+-  for (const record of applied) store.delete(record.id);
++  const previewed = new Set(previewedVersions);
++  const receipts = [...store.values()].filter(
++    (doc) => doc.type === 'schema-migration' && previewed.has(doc.version),
++  );
++  for (const record of receipts) store.delete(record.id);
+ 
+   await runMigrations({ container, log: { info: () => {} } });
+ 
+diff --git a/docs/decisions/0001-synergy-16-program-architecture.md b/docs/decisions/0001-synergy-16-program-architecture.md
+new file mode 100644
+index 00000000..5da9d8ae
+--- /dev/null
++++ b/docs/decisions/0001-synergy-16-program-architecture.md
+@@ -0,0 +1,101 @@
++# 0001: Adopt the Synergy 16 program architecture
++
++- Status: Accepted
++- Date: 2026-08-21
++- Deciders: Nelson
++
++## Context
++
++Synergy 12 combined unrelated functions on a Torso day, omitted several
++peripheral movement categories, and addressed days by mutable position. Nelson
++works approximately twelve-hour days and consistently completes one to three
++exercises per session. Long sessions and optional accessories are therefore
++unreliable: work appended to another day is the first work omitted.
++
++The program's goal is daily activity, joint awareness, and broad coverage rather
++than maximizing hypertrophy or any single lift. A longer cycle with deliberately
++short days is more sustainable than a conventional weekly split for this use
++case.
++
++## Decision
++
++Adopt Synergy 16 as a daily, coverage-first cycle:
++
++- Keep each day short, fixed, and conceptually coherent.
++- Alternate demanding compound work with isolation, mobility, and recovery work.
++- Place the three systemically demanding compound days at Days 1, 6, and 12.
++- Split the former Torso day into Transverse, Back, and Hips responsibilities.
++- Add dedicated Knee and Neck days and place ankle work with Calves.
++- Place Pecs Mobility immediately before Compound Push and Hips immediately
++  before the cycle returns to Compound Legs.
++- Identify a day permanently by slug; treat its number only as its position in a
++  particular model version.
++- Publish cycle changes through forward-only, retry-safe migrations. Retire old
++  workout models rather than rewriting historical logs.
++
++## Rationale
++
++More days mean shorter days, not more total work. A named slot makes peripheral
++work visible and actionable, while alternating intensity preserves the daily
++habit without making every day systemically demanding. Stable slugs and model
++versions ensure that changing the present cycle cannot change what a historical
++workout meant.
++
++## Alternatives considered
++
++### Conventional three- or four-day weekly split
++
++Rejected because it concentrates too much work into sessions that do not fit the
++available time and makes peripheral work optional.
++
++### Keep Synergy 12 and lengthen existing days
++
++Rejected because Torso already mixed unrelated movements and longer exercise
++lists are not completed consistently.
++
++### Add a hip-hinge day
++
++Deferred. A deadlift, Romanian deadlift, or good-morning day would be the most
++demanding addition and the most likely session to be skipped. The missing hinge
++pattern remains a known gap rather than being hidden inside another day.
++
++### Continue identifying days by number
++
++Rejected because reordering the cycle silently rebound exercises and historical
++records to different days.
++
++## Consequences
++
++- The cycle is longer than a calendar week and is not intended to optimize
++  training frequency for a single adaptation.
++- Current-state rationale belongs in `CLAUDE.md`; historical rationale belongs
++  in this directory.
++- Exercise and log documents use permanent day slugs.
++- Historical models and presentation mappings for retired slugs must remain
++  readable.
++- Any future cycle change requires a new workout-model version and migration.
++
++## Safety constraints
++
++Both shoulders have old, healed injuries with residual limitations. Pecs
++Mobility must remain light and must not contain dips or heavy pressing. Compound
++Push follows it as the dedicated heavy chest session.
++
++## Revisit when
++
++- Short sessions are routinely skipped despite their size.
++- Recovery data shows that the compound-day spacing is insufficient.
++- Available time changes enough to make a hip-hinge day sustainable.
++- A movement category is repeatedly omitted because its day is incoherent or
++  overloaded.
++
++## Evidence and references
++
++- [ACSM 2026 resistance-training position stand](https://pubmed.ncbi.nlm.nih.gov/41843416/)
++
++## Related work
++
++- [PR #79: Expand the cycle to 16 days and identify days by slug](https://github.com/romaine-life/kill-me/pull/79)
++- [Original design conversation](https://claude.ai/code/session_011s6dYuiZLzHpccJwwRhAoh)
++- `backend/migrations/001-workout-model.js`
++- `backend/migrations/002-synergy-16.js`
+diff --git a/docs/decisions/0002-add-dedicated-vertical-press-day.md b/docs/decisions/0002-add-dedicated-vertical-press-day.md
+new file mode 100644
+index 00000000..f5332e7d
+--- /dev/null
++++ b/docs/decisions/0002-add-dedicated-vertical-press-day.md
+@@ -0,0 +1,126 @@
++# 0002: Add a dedicated vertical-press day
++
++- Status: Accepted
++- Date: 2026-08-26
++- Deciders: Nelson
++
++## Context
++
++Compound Push is functionally a chest-weight day. Nelson deliberately spends the
++session's physical and mental effort on challenging pec work and does not find a
++second maximal-focus press productive afterward. The existing Shoulder Press
++entry on Compound Push is consequently unlikely to be performed with useful
++attention.
++
++The rest of the cycle already covers the anterior deltoids through chest
++pressing, the lateral and posterior deltoids through raises and pulling, the
++triceps directly, and the rotator cuff directly. A shoulder press therefore does
++not fill a missing-muscle hole comparable to the pectoralis major. Its distinct
++value is the integrated vertical-push pattern: loaded humeral elevation,
++scapular upward rotation, elbow extension, and trunk stabilization.
++
++For a desk-based lifestyle and a program whose purpose is varied stimulus and
++atrophy prevention, preserving that force direction is useful even though
++maximizing the lift is not an independent program goal.
++
++## Decision
++
++Advance the active program to Synergy 17:
++
++- Keep Day 12 Compound Push chest-focused and remove Shoulder Press from it.
++- Make Day 14 `Deltoid + Shoulder Prep`, a genuinely low-fatigue primer with
++  reverse cable flyes, side cable raises, and rotator-cuff work.
++- Remove the two direct front-raise entries from Day 14. Chest pressing already
++  loads the anterior deltoids, the new press day loads them directly, and hard
++  front-raise work would compromise the primer's purpose.
++- Insert Day 15 `Shoulder Press`, containing one primary exercise: Dumbbell +
++  Cable Shoulder Press.
++- Use three controlled working sets in an 8-15 repetition range. Challenge the
++  sets while normally retaining one or two technically sound repetitions rather
++  than testing a one-repetition maximum or grinding through altered mechanics.
++- Perform movement-specific ramp-up sets during the press session. The preceding
++  primer day does not replace an acute warm-up.
++- Shift Grip and Hips to Days 16 and 17 without changing their permanent slugs.
++
++## Rationale
++
++A separate day fits the program's established rule that adding a short day is
++cheaper and more reliable than appending work to an exhausting session. It lets
++the vertical press receive fresh attention without pretending the movement
++trains a large, otherwise neglected anatomical unit. The one-exercise day adds a
++distinct force direction and coordination demand while keeping total work small.
++
++The absolute dumbbell load does not determine whether an effort is maximal for
++the person performing it. The program therefore treats the press as challenging
++working practice, not as a safer one-repetition maximum merely because the
++number on the dumbbell is modest.
++
++## Alternatives considered
++
++### Keep Shoulder Press on Compound Push
++
++Rejected because chest work consumes the energy and attention Nelson wants to
++devote to the lift. In practice, work appended there is likely to be omitted or
++performed poorly.
++
++### Perform a hard press on the existing Deltoid day
++
++Rejected because that would combine a preparation/shoulder-care session with a
++fatiguing compound effort and would make the day's intent ambiguous.
++
++### Omit vertical pressing entirely
++
++Anatomically acceptable, because the involved muscles are otherwise covered,
++but rejected because it leaves loaded vertical pushing as the one upper-body
++force direction the program does not directly practice.
++
++### Create a true maximal-strength shoulder day
++
++Rejected. Heavy singles and repeated failure are unnecessary for the wellness
++and coverage goal and add fatigue without unique muscular coverage.
++
++## Consequences
++
++- The cycle becomes Synergy 17.
++- Day 15 is a focused compound movement but is not classified with the three
++  systemically taxing compound days.
++- Day 14 must remain easy enough that it improves readiness rather than creating
++  soreness or fatigue for Day 15.
++- The press will improve slowly at once per cycle; rapid overhead-strength
++  development is explicitly not the goal.
++- The exercise records dumbbell load and cable tension separately because they
++  are independent resistance sources and should not be reported as a fake total.
++
++## Safety constraints
++
++- Use pain-free range and stop for sharp pain, pinching, sudden weakness, or
++  increasing left/right asymmetry.
++- Stop a working set when another repetition would materially change the press
++  path or require uncontrolled torso compensation.
++- Preserve same-session ramp-up sets even after completing Day 14.
++- Day 14 exercises stay well short of failure.
++
++## Revisit when
++
++- Shoulder symptoms increase during or after pressing.
++- Day 14 produces fatigue that degrades Day 15.
++- The new day is repeatedly skipped or adds no perceived value after several
++  cycles.
++- Recovery records show interference with chest, triceps, grip, or the return to
++  Compound Legs.
++- Overhead strength becomes a primary performance goal, which would require a
++  different frequency and loading design.
++
++## Evidence and references
++
++- [ACSM 2026 resistance-training position stand](https://pubmed.ncbi.nlm.nih.gov/41843416/)
++- [Task specificity of dynamic resistance training](https://pubmed.ncbi.nlm.nih.gov/40314751/)
++- [Higher- and lower-load resistance training adaptations](https://pubmed.ncbi.nlm.nih.gov/33874848/)
++- [Failure versus non-failure training](https://pubmed.ncbi.nlm.nih.gov/33497853/)
++- [Shoulder press and deltoid activation](https://pmc.ncbi.nlm.nih.gov/articles/PMC7706677/)
++
++## Related work
++
++- Supersedes the Shoulder Press placement established by
++  `backend/migrations/002-synergy-16.js`.
++- Implemented by `backend/migrations/004-synergy-17-shoulder-press.js`.
+diff --git a/docs/decisions/README.md b/docs/decisions/README.md
+new file mode 100644
+index 00000000..4d038948
+--- /dev/null
++++ b/docs/decisions/README.md
+@@ -0,0 +1,31 @@
++# Decision Records
++
++This directory is the durable history of consequential product, program, and
++architecture decisions for `kill-me`. The format is inspired by Architecture
++Decision Records, but the scope includes the Synergy training model itself.
++
++`CLAUDE.md` describes the current system. Migrations implement changes. Decision
++records explain why a choice was made, which alternatives were rejected, and
++what would cause the choice to be revisited.
++
++## Index
++
++| Record | Status | Decision |
++| --- | --- | --- |
++| [0001](0001-synergy-16-program-architecture.md) | Accepted | Adopt the Synergy 16 coverage-first program architecture |
++| [0002](0002-add-dedicated-vertical-press-day.md) | Accepted | Add a dedicated vertical-press day and advance to Synergy 17 |
++
++## Process
++
++1. Copy `template.md` and use the next unused four-digit number.
++2. Write the record while the decision is being made, not after its context has
++   faded.
++3. Include the record in the same change as the migration or implementation.
++4. Link supporting discussions, research, pull requests, and migrations, but
++   make the record understandable without those links.
++5. Do not rewrite an accepted record to make history look cleaner. Add a new
++   record that supersedes it and update the old record's status and link.
++
++Small reversible implementation choices do not need records. A record is
++warranted when a choice changes the training model, data model, safety rules,
++operational architecture, or a constraint future work needs to understand.
+diff --git a/docs/decisions/template.md b/docs/decisions/template.md
+new file mode 100644
+index 00000000..2d93e249
+--- /dev/null
++++ b/docs/decisions/template.md
+@@ -0,0 +1,45 @@
++# NNNN: Decision title
++
++- Status: Proposed
++- Date: YYYY-MM-DD
++- Deciders: Nelson
++
++## Context
++
++What problem or opportunity requires a decision? Include the constraints that
++make the choice non-obvious.
++
++## Decision
++
++State the decision concretely enough that its implementation can be checked.
++
++## Rationale
++
++Explain why this choice best fits the program or product.
++
++## Alternatives considered
++
++### Alternative
++
++Explain why it was not selected.
++
++## Consequences
++
++Document benefits, costs, risks, and any new rules future work must preserve.
++
++## Safety constraints
++
++Record applicable health, data, deployment, or operational boundaries. Write
++`None` when there are none.
++
++## Revisit when
++
++List observable conditions that should cause the decision to be reconsidered.
++
++## Evidence and references
++
++Link research and authoritative guidance that informed the decision.
++
++## Related work
++
++Link conversations, pull requests, migrations, issues, and superseded records.
+diff --git a/frontend/public/snapshot.db b/frontend/public/snapshot.db
+index d15d5529..28474d02 100644
+Binary files a/frontend/public/snapshot.db and b/frontend/public/snapshot.db differ
+diff --git a/frontend/src/components/CycleTab.jsx b/frontend/src/components/CycleTab.jsx
+index 1de09549..427b2312 100644
+--- a/frontend/src/components/CycleTab.jsx
++++ b/frontend/src/components/CycleTab.jsx
+@@ -2,14 +2,14 @@
+ // recovery sequencing rationale, and CNS-aware compound day highlighting.
+ //
+ // The day list and cycle length come from the active workout model; only the
+-// compound-day set and the recovery notes are curated here.
++// systemic-day set and the recovery notes are curated here.
+ //
+ // Both are keyed by day slug rather than number, so reordering the cycle moves the
+ // notes with their days instead of leaving them pointing at whoever moved in.
+ 
+ import { getDays, getDayInfo, getTotalDays } from '../utils/dayConfig';
+ 
+-const COMPOUND_DAYS = new Set(['compound-legs', 'compound-pulls', 'compound-push']);
++const SYSTEMIC_DAYS = new Set(['compound-legs', 'compound-pulls', 'compound-push']);
+ 
+ const RECOVERY_NOTES = {
+   'compound-legs': 'Starts the cycle — systemic leg strength sets the recovery baseline',
+@@ -17,7 +17,9 @@ const RECOVERY_NOTES = {
+   back: 'The only loaded spinal extension, placed 8 days clear of Day 1 to spare the lower back for squats',
+   'pecs-mobility': 'Primes the shoulder capsule for heavy pressing the next day — light work only',
+   'compound-push': 'Dips and heavy pressing belong here, never on the mobility day before it',
+-  grip: 'Sits 8 days clear of Pulls and Bicep so forearm loading never stacks',
++  deltoid: 'A low-fatigue primer for the dedicated vertical press the next day — preparation, not a hard delt session',
++  'shoulder-press': 'One focused vertical-push movement, performed with fresh attention but without 1RM testing or grinding',
++  grip: 'Sits well clear of Pulls and Bicep so forearm loading never stacks',
+   hips: 'Primes the hips the day before Day 1 squats, mirroring how Pecs Mobility primes Push',
+ };
+ 
+@@ -61,7 +63,7 @@ export function CycleTab({ currentDay }) {
+           <Principle
+             number={3}
+             title="CNS-aware sequencing"
+-            text="Only three days (1, 6, 12) are systemically taxing compound lifts. They are evenly spaced with isolation and recovery work between them to avoid stacking central nervous system fatigue."
++            text="Only three days (1, 6, 12) are designed as systemically taxing compound sessions. Day 15 is deliberately a short, one-exercise vertical press rather than a fourth systemic session."
+           />
+           <Principle
+             number={4}
+@@ -78,7 +80,7 @@ export function CycleTab({ currentDay }) {
+         </h3>
+         <div className="space-y-2">
+           {days.map((day) => {
+-            const isCompound = COMPOUND_DAYS.has(day.slug);
++            const isSystemic = SYSTEMIC_DAYS.has(day.slug);
+             const isCurrent = day.slug === currentDay;
+             const recoveryNote = RECOVERY_NOTES[day.slug];
+ 
+@@ -88,7 +90,7 @@ export function CycleTab({ currentDay }) {
+                 className={`rounded-xl border p-4 transition-all ${
+                   isCurrent
+                     ? 'bg-green-500/10 border-green-500/50 ring-1 ring-green-500/30'
+-                    : isCompound
++                    : isSystemic
+                       ? 'bg-cyan-500/10 border-cyan-500/40'
+                       : 'bg-slate-800/30 border-slate-700/50'
+                 }`}
+@@ -99,7 +101,7 @@ export function CycleTab({ currentDay }) {
+                     className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center font-black text-lg ${
+                       isCurrent
+                         ? 'bg-green-500/30 text-green-300'
+-                        : isCompound
++                        : isSystemic
+                           ? 'bg-cyan-500/30 text-cyan-300'
+                           : 'bg-slate-700/60 text-slate-400'
+                     }`}
+@@ -115,9 +117,9 @@ export function CycleTab({ currentDay }) {
+                           Next
+                         </span>
+                       )}
+-                      {isCompound && (
++                      {isSystemic && (
+                         <span className="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">
+-                          Compound
++                          Systemic
+                         </span>
+                       )}
+                     </div>
+diff --git a/frontend/src/utils/dayDesign.js b/frontend/src/utils/dayDesign.js
+index df7f7e78..174e8a04 100644
+--- a/frontend/src/utils/dayDesign.js
++++ b/frontend/src/utils/dayDesign.js
+@@ -26,6 +26,7 @@ export const DAY_DESIGN = {
+   'compound-push': { color: '#f59e6f', muscle: 'pectoralis-major-anterior' },
+   triceps:         { color: '#67e8f9', muscle: 'biceps-brachii-anterior' },
+   deltoid:         { color: '#a06ff5', muscle: 'deltoid-lateral' },
++  'shoulder-press': { color: '#d078f0', muscle: 'deltoid-lateral' },
+   grip:            { color: '#c8e85e', muscle: 'biceps-brachii-anterior' },
+   hips:            { color: '#e08fd0', muscle: 'gluteus-maximus' },
+ 
+diff --git a/frontend/src/utils/sorenessLink.js b/frontend/src/utils/sorenessLink.js
+index 2464c8fd..2f73212b 100644
+--- a/frontend/src/utils/sorenessLink.js
++++ b/frontend/src/utils/sorenessLink.js
+@@ -37,6 +37,7 @@ export const DAY_MUSCLE_GROUPS = {
+   'compound-push':  ['Pecs', 'Deltoids', 'Triceps'],
+   triceps:          ['Triceps', 'Deltoids'],
+   deltoid:          ['Deltoids', 'Lats & Back'],
++  'shoulder-press': ['Deltoids', 'Triceps', 'Pecs', 'Lats & Back'],
+   grip:             ['Forearms & Grip', 'Biceps'],
+   hips:             ['Hip & Adductors', 'Glutes'],
+ 

@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 21,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/875938fb239a79cb0f415cd8442247e9482ef568/frontend%2Fpackage-lock.json",
+    "changes": 28,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fpackage-lock.json?ref=875938fb239a79cb0f415cd8442247e9482ef568",
+    "deletions": 7,
+    "filename": "frontend/package-lock.json",
+    "patch": "@@ -518,29 +518,43 @@\n       }\n     },\n     \"node_modules/@humanfs/core\": {\n-      \"version\": \"0.19.1\",\n-      \"resolved\": \"https://registry.npmjs.org/@humanfs/core/-/core-0.19.1.tgz\",\n-      \"integrity\": \"sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==\",\n+      \"version\": \"0.19.2\",\n+      \"resolved\": \"https://registry.npmjs.org/@humanfs/core/-/core-0.19.2.tgz\",\n+      \"integrity\": \"sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==\",\n       \"dev\": true,\n       \"license\": \"Apache-2.0\",\n+      \"dependencies\": {\n+        \"@humanfs/types\": \"^0.15.0\"\n+      },\n       \"engines\": {\n         \"node\": \"\u003e=18.18.0\"\n       }\n     },\n     \"node_modules/@humanfs/node\": {\n-      \"version\": \"0.16.7\",\n-      \"resolved\": \"https://registry.npmjs.org/@humanfs/node/-/node-0.16.7.tgz\",\n-      \"integrity\": \"sha512-/zUx+yOsIrG4Y43Eh2peDeKCxlRt/gET6aHfaKpuq267qXdYDFViVHfMaLyygZOnl0kGWxFIgsBy8QFuTLUXEQ==\",\n+      \"version\": \"0.16.8\",\n+      \"resolved\": \"https://registry.npmjs.org/@humanfs/node/-/node-0.16.8.tgz\",\n+      \"integrity\": \"sha512-gE1eQNZ3R++kTzFUpdGlpmy8kDZD/MLyHqDwqjkVQI0JMdI1D51sy1H958PNXYkM2rAac7e5/CnIKZrHtPh3BQ==\",\n       \"dev\": true,\n       \"license\": \"Apache-2.0\",\n       \"dependencies\": {\n-        \"@humanfs/core\": \"^0.19.1\",\n+        \"@humanfs/core\": \"^0.19.2\",\n+        \"@humanfs/types\": \"^0.15.0\",\n         \"@humanwhocodes/retry\": \"^0.4.0\"\n       },\n       \"engines\": {\n         \"node\": \"\u003e=18.18.0\"\n       }\n     },\n+    \"node_modules/@humanfs/types\": {\n+      \"version\": \"0.15.0\",\n+      \"resolved\": \"https://registry.npmjs.org/@humanfs/types/-/types-0.15.0.tgz\",\n+      \"integrity\": \"sha512-ZZ1w0aoQkwuUuC7Yf+7sdeaNfqQiiLcSRbfI08oAxqLtpXQr9AIVX7Ay7HLDuiLYAaFPu8oBYNq/QIi9URHJ3Q==\",\n+      \"dev\": true,\n+      \"license\": \"Apache-2.0\",\n+      \"engines\": {\n+        \"node\": \"\u003e=18.18.0\"\n+      }\n+    },\n     \"node_modules/@humanwhocodes/module-importer\": {\n       \"version\": \"1.0.1\",\n       \"resolved\": \"https://registry.npmjs.org/@humanwhocodes/module-importer/-/module-importer-1.0.1.tgz\",",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/875938fb239a79cb0f415cd8442247e9482ef568/frontend%2Fpackage-lock.json",
+    "sha": "1e06f2fa8ebf1405910be271961dc68c6f008ade",
+    "status": "modified"
+  }
+]

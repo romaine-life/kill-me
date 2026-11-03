@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/bb5dde7594da0fe531840efc18554dbd20fa0271/.github%2Fworkflows%2Fpublish-routes.yml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fpublish-routes.yml?ref=bb5dde7594da0fe531840efc18554dbd20fa0271",
+    "deletions": 1,
+    "filename": ".github/workflows/publish-routes.yml",
+    "patch": "@@ -31,7 +31,7 @@ jobs:\n           echo \"version=$(node -p \"require('./package.json').version\")\" \u003e\u003e $GITHUB_OUTPUT\n \n       - name: Trigger API rebuild\n-        uses: peter-evans/repository-dispatch@v3\n+        uses: peter-evans/repository-dispatch@v4\n         with:\n           token: ${{ secrets.DISPATCH_TOKEN }}\n           repository: nelsong6/api",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/bb5dde7594da0fe531840efc18554dbd20fa0271/.github%2Fworkflows%2Fpublish-routes.yml",
+    "sha": "0c910a50641b6d10902b8416ec9d3485428ab4f5",
+    "status": "modified"
+  }
+]

@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/12d84d484afbe77894384e7c092814dca7cf79c5/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-24T02:12:20Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-24T02:12:20Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "Show weekday on the soreness lanes date rail\n\nThe rail is read to answer \"was that a weekend?\" about as often as \"what\ndate was that?\", and the weekday was left to be inferred. Print it with\nthe date instead, widening the date column from 56 to 74 to fit and\nlifting the label from #666 to #8a8a8a so it is legible at 10px.\n\nAlso drop the hover panel's empty state — the hint text and the\nstripe/lane counts were permanent furniture for a one-time instruction.\nThe panel now renders only while a stripe is hovered: null on a phone,\nwhere it sits below the chart, and an equal-width spacer on desktop,\nwhere removing the column outright would reflow the chart on every hover.",
+      "tree": {
+        "sha": "0640b9952cef5369eecf92c943e54288fdab16e2",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/0640b9952cef5369eecf92c943e54288fdab16e2"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/12d84d484afbe77894384e7c092814dca7cf79c5",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/12d84d484afbe77894384e7c092814dca7cf79c5",
+    "node_id": "C_kwDORV0mMdoAKDEyZDg0ZDQ4NGFmYmU3Nzg5NDM4NGU3YzA5MjgxNGRjYTdjZjc5YzU",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/4ef3d647216143fa87fcb436795c923edc114a01",
+        "sha": "4ef3d647216143fa87fcb436795c923edc114a01",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/4ef3d647216143fa87fcb436795c923edc114a01"
+      }
+    ],
+    "sha": "12d84d484afbe77894384e7c092814dca7cf79c5",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/12d84d484afbe77894384e7c092814dca7cf79c5"
+  }
+]

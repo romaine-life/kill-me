@@ -1,0 +1,107 @@
+diff --git a/.github/workflows/docker-build-check.yaml b/.github/workflows/docker-build-check.yaml
+new file mode 100644
+index 00000000..8e8273e1
+--- /dev/null
++++ b/.github/workflows/docker-build-check.yaml
+@@ -0,0 +1,63 @@
++name: Docker Build Check
++
++on:
++  pull_request:
++  workflow_dispatch:
++    inputs:
++      git_ref:
++        description: "Git ref or commit SHA to build. Leave blank to build the dispatch revision."
++        required: false
++        type: string
++
++permissions:
++  contents: read
++
++concurrency:
++  group: docker-build-check-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.git_ref || '' }}
++  cancel-in-progress: true
++
++jobs:
++  build:
++    name: Build app image
++    runs-on: ubuntu-latest
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v4
++        with:
++          fetch-depth: 0
++
++      - name: Resolve requested ref
++        if: github.event_name == 'workflow_dispatch' && inputs.git_ref != ''
++        env:
++          INPUT_REF: ${{ inputs.git_ref }}
++        run: |
++          set -euo pipefail
++          git fetch --force --tags origin '+refs/heads/*:refs/remotes/origin/*'
++          if full_sha="$(git rev-parse --verify "${INPUT_REF}^{commit}" 2>/dev/null)"; then
++            :
++          elif git show-ref --verify --quiet "refs/remotes/origin/${INPUT_REF}"; then
++            full_sha="$(git rev-parse "refs/remotes/origin/${INPUT_REF}^{commit}")"
++          elif git show-ref --verify --quiet "refs/tags/${INPUT_REF}"; then
++            full_sha="$(git rev-parse "refs/tags/${INPUT_REF}^{commit}")"
++          else
++            echo "::error::Unable to resolve git_ref '${INPUT_REF}' to a commit."
++            exit 1
++          fi
++          git checkout --detach "$full_sha"
++          echo "Resolved ${INPUT_REF} -> ${full_sha}"
++
++      - name: Set up Buildx
++        uses: docker/setup-buildx-action@v3
++
++      - name: Build image without pushing
++        uses: docker/build-push-action@v6
++        with:
++          context: .
++          file: Dockerfile
++          push: false
++          load: false
++          build-args: |
++            BUILD_NUMBER=docker-build-check
++            VITE_MICROSOFT_CLIENT_ID=docker-build-check
++          cache-from: type=gha
++          cache-to: type=gha,mode=max
+diff --git a/AGENTS.md b/AGENTS.md
+new file mode 100644
+index 00000000..329b26cf
+--- /dev/null
++++ b/AGENTS.md
+@@ -0,0 +1,12 @@
++# kill-me
++
++Read `CLAUDE.md` for the project architecture and domain notes.
++
++## Container Build Verification
++
++Agent pods are not expected to have Docker. Do not report missing local Docker
++as a blocker. Run available repo checks first, then use PR CI as the normal
++container build gate: `.github/workflows/docker-build-check.yml` performs a
++throwaway Docker build with `push: false`. If image-packaging feedback is
++needed before a PR is ready, manually dispatch that workflow with `git_ref`.
++Release/deploy workflows are the only path that publishes images.
+diff --git a/CLAUDE.md b/CLAUDE.md
+index f5be90bb..18de6207 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -5,6 +5,15 @@ Personal workout tracker built around a custom 12-day training cycle called **Sy
+ The repo name comes from a Tom Platz video where he screams "KILL ME" during an
+ agonizing set of leg extensions under hypnotherapy coaching.
+ 
++## Container Build Verification
++
++Agent pods are not expected to have Docker. Do not report missing local Docker
++as a blocker. Run available repo checks first, then use PR CI as the normal
++container build gate: `.github/workflows/docker-build-check.yml` performs a
++throwaway Docker build with `push: false`. If image-packaging feedback is
++needed before a PR is ready, manually dispatch that workflow with `git_ref`.
++Release/deploy workflows are the only path that publishes images.
++
+ ## The 12-Day Synergy System
+ 
+ The cycle is Nelson's own design, optimized for **consistent daily activity** rather

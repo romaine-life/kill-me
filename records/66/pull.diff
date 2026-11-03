@@ -1,0 +1,35 @@
+diff --git a/.github/workflows/lint.yaml b/.github/workflows/lint.yaml
+index 9ad899ab..e90a0085 100644
+--- a/.github/workflows/lint.yaml
++++ b/.github/workflows/lint.yaml
+@@ -20,7 +20,7 @@ jobs:
+     runs-on: ubuntu-latest
+     steps:
+       - uses: actions/checkout@v7
+-      - uses: actions/setup-node@v6
++      - uses: actions/setup-node@v7
+         with:
+           node-version: '20'
+       - name: Guard against MSAL/legacy-auth reintroduction
+@@ -31,7 +31,7 @@ jobs:
+     runs-on: ubuntu-latest
+     steps:
+       - uses: actions/checkout@v7
+-      - uses: actions/setup-node@v6
++      - uses: actions/setup-node@v7
+         with:
+           node-version: '20'
+       - name: Guard image tag identity
+diff --git a/.github/workflows/snapshot.yaml b/.github/workflows/snapshot.yaml
+index e6d9aea4..656c3f20 100644
+--- a/.github/workflows/snapshot.yaml
++++ b/.github/workflows/snapshot.yaml
+@@ -33,7 +33,7 @@ jobs:
+           ssh-key: ${{ secrets.MAIN_PUSH_DEPLOY_KEY }}
+ 
+       - name: Setup Node.js
+-        uses: actions/setup-node@v6
++        uses: actions/setup-node@v7
+         with:
+           node-version: '20'
+ 

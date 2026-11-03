@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/5322b765cf903b997ffbf4bfb1d5142b5ba49d31/comments",
+    "commit": {
+      "author": {
+        "date": "2026-07-17T07:57:31Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-07-17T07:57:31Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "feat: move treadmill templates to a cardio-template DB type\n\nTreadmill interval templates were hardcoded frontend constants, so adding\nor editing a variant required a code change and redeploy. Promote them to\na first-class `cardio-template` Cosmos document type (userId: 'shared',\nsame shared-library model as exercises and workout-day-definitions).\n\n- New default template \"Walk/Jog 5x6.0 + 1x7.0\" (jogs 6x6.0 then 7.0,\n  38 min); the old 5x5.4+1x6.0 stays available as the second option.\n- backend: public GET /api/cardio-templates + admin POST/PUT/DELETE;\n  init-database seeds from seed-cardio-templates.js (idempotent).\n- snapshot: new cardio_templates table so anonymous visitors get templates.\n- frontend: WorkoutDrawer loads templates via useDataSource().\n  cardioTemplates.js is retained only as an offline fallback (mirrors the\n  seed), so the dropdown is never blank if the source is empty or errors.\n\nLogged sessions are unaffected — they store their own interval snapshot.",
+      "tree": {
+        "sha": "7d77233d25f90820378c84bfb1e18ab0d4855bdc",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/7d77233d25f90820378c84bfb1e18ab0d4855bdc"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/5322b765cf903b997ffbf4bfb1d5142b5ba49d31",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/5322b765cf903b997ffbf4bfb1d5142b5ba49d31",
+    "node_id": "C_kwDORV0mMdoAKDUzMjJiNzY1Y2Y5MDNiOTk3ZmZiZjRiZmIxZDUxNDJiNWJhNDlkMzE",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/560d692a70f07d67c502838c4996d4e1c1d42e7a",
+        "sha": "560d692a70f07d67c502838c4996d4e1c1d42e7a",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/560d692a70f07d67c502838c4996d4e1c1d42e7a"
+      }
+    ],
+    "sha": "5322b765cf903b997ffbf4bfb1d5142b5ba49d31",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/5322b765cf903b997ffbf4bfb1d5142b5ba49d31"
+  }
+]

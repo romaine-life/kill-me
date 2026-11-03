@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/a19a9f2918d687371d896583d3ffc8f9b8842f96/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-25T20:06:58Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-25T20:07:24Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "fix: make soreness logging explicit",
+      "tree": {
+        "sha": "535b6947f8b8345047a63f53351df783adc6eafd",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/535b6947f8b8345047a63f53351df783adc6eafd"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/a19a9f2918d687371d896583d3ffc8f9b8842f96",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/a19a9f2918d687371d896583d3ffc8f9b8842f96",
+    "node_id": "C_kwDORV0mMdoAKGExOWE5ZjI5MThkNjg3MzcxZDg5NjU4M2QzZmZjOGY5Yjg4NDJmOTY",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/d1d74b7f5f845975e0ea06438cf4b88927a79862",
+        "sha": "d1d74b7f5f845975e0ea06438cf4b88927a79862",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/d1d74b7f5f845975e0ea06438cf4b88927a79862"
+      }
+    ],
+    "sha": "a19a9f2918d687371d896583d3ffc8f9b8842f96",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/a19a9f2918d687371d896583d3ffc8f9b8842f96"
+  }
+]

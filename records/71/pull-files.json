@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 3,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/b025f24ab5809c455ed88a73e4dfc40a1575bf99/frontend%2Fpackage-lock.json",
+    "changes": 6,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fpackage-lock.json?ref=b025f24ab5809c455ed88a73e4dfc40a1575bf99",
+    "deletions": 3,
+    "filename": "frontend/package-lock.json",
+    "patch": "@@ -1473,9 +1473,9 @@\n       }\n     },\n     \"node_modules/brace-expansion\": {\n-      \"version\": \"1.1.12\",\n-      \"resolved\": \"https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.12.tgz\",\n-      \"integrity\": \"sha512-9T9UjW3r0UW5c1Q7GTwllptXwhvYmEzFhzMfZ9H7FQWt+uZePjZPjBP/W1ZEyZ1twGWom5/56TF4lPcqjnDHcg==\",\n+      \"version\": \"1.1.16\",\n+      \"resolved\": \"https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.16.tgz\",\n+      \"integrity\": \"sha512-IDw48K2/2kRkg9LdJxurvq3lV3aBgq0REY89duEqFRthjlPdXHKMj7EnQOXVckxzgisinf3nHfrcE2FufFLXMw==\",\n       \"dev\": true,\n       \"license\": \"MIT\",\n       \"dependencies\": {",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/b025f24ab5809c455ed88a73e4dfc40a1575bf99/frontend%2Fpackage-lock.json",
+    "sha": "2fcb63572448895e32747352d22fa06b482fb66c",
+    "status": "modified"
+  }
+]

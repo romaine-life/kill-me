@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/d050122e5e30a44e3021cc31963ff142546f16c1/comments",
+    "commit": {
+      "author": {
+        "date": "2026-05-16T00:41:01Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-05-16T00:41:01Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "message": "Migrate auth to auth.romaine.life (drop MSAL + shared HS256 JWT)\n\nBackend now verifies JWTs against auth.romaine.life's JWKS endpoint\n(RS256, signed by Better Auth's JWT plugin) instead of self-signing\nwith the shared `api-jwt-signing-secret`. Auth-related Cosmos upserts\ngo away — identity lives entirely in the auth service's Postgres.\n\nDeleted:\n- backend/microsoft-routes.js — entire Microsoft-token-exchange + JWT\n  issuance is now auth.romaine.life's job\n- frontend/src/auth/msal.js — no more MSAL on the frontend; sign-in is\n  a plain redirect to the auth service\n\nChanged:\n- backend/auth.js — `jsonwebtoken`/`jwks-rsa` swapped for `jose`\n  (`createRemoteJWKSet` + `jwtVerify`). `createRequireAuth` no longer\n  takes a `jwtSecret` arg\n- backend/config.js — drops the Key Vault fetch of\n  `api-jwt-signing-secret` and the enumeration of Microsoft client IDs.\n  Now only reads `cosmos_db_endpoint` from App Configuration\n- backend/server.js — drops the Microsoft routes mount; passes nothing\n  to `createRequireAuth()`\n- backend/package.json — `jsonwebtoken`, `jwks-rsa`,\n  `@azure/keyvault-secrets` out; `jose` in\n- frontend/src/auth/AuthContext.jsx — rewritten:\n  - On mount, fetches a JWT from auth.romaine.life/api/auth/token\n    (the session cookie on `.romaine.life` is auto-attached)\n  - Schedules a silent refresh 60 s before `exp`\n  - `signIn()` redirects to auth.romaine.life/api/auth/sign-in/social/microsoft\n  - `signOut()` clears the cookie via auth.romaine.life/api/auth/sign-out\n  - Same exported shape as before (`useAuth()` returns\n    `{user, token, loading, isAdmin, signIn, signOut, logout}`) so\n    callers don't need updates\n- frontend/src/api/client.js + frontend/src/components/UserProfile.jsx\n  — replace `loginWithMicrosoft` imports with the redirect / `signIn`\n  hook\n- frontend/package.json — `@azure/msal-browser` out\n- Dockerfile + .github/workflows/build-and-deploy.yaml — drop the\n  `VITE_MICROSOFT_CLIENT_ID` build arg and the App Configuration fetch\n  that fed it\n- k8s/deployment.yaml — drop `KEY_VAULT_URL` env (no Key Vault reads\n  from the pod anymore)\n\nUser data note: existing Cosmos records keyed by `microsoft|\u003cMS-sub\u003e`\nwill no longer match (auth.romaine.life's JWT carries a Better-Auth\nrandom user.id). For a single-user system this is a clean reset\nrather than a migration concern. If history matters later, can map\nby email at the boundary on first call.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) \u003cnoreply@anthropic.com\u003e",
+      "tree": {
+        "sha": "553114f9151aec5ffe15e12fd68fe0d39b52b2ce",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/553114f9151aec5ffe15e12fd68fe0d39b52b2ce"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/d050122e5e30a44e3021cc31963ff142546f16c1",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/d050122e5e30a44e3021cc31963ff142546f16c1",
+    "node_id": "C_kwDORV0mMdoAKGQwNTAxMjJlNWUzMGE0NGUzMDIxY2MzMTk2M2ZmMTQyNTQ2ZjE2YzE",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/b03bde4b3192da5e719a987f91992f0709ad6bc7",
+        "sha": "b03bde4b3192da5e719a987f91992f0709ad6bc7",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/b03bde4b3192da5e719a987f91992f0709ad6bc7"
+      }
+    ],
+    "sha": "d050122e5e30a44e3021cc31963ff142546f16c1",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/d050122e5e30a44e3021cc31963ff142546f16c1"
+  }
+]

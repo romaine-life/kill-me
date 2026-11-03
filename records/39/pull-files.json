@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/9003f0499819533b7ce7315f9ad85b8f0c3fcb38/tofu%2Fidentity.tf",
+    "changes": 12,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/tofu%2Fidentity.tf?ref=9003f0499819533b7ce7315f9ad85b8f0c3fcb38",
+    "deletions": 11,
+    "filename": "tofu/identity.tf",
+    "patch": "@@ -23,16 +23,6 @@ data \"azurerm_resource_group\" \"infra\" {\n   name = local.infra.resource_group_name\n }\n \n-# Live cluster OIDC issuer URL. Previously pinned via var.cluster_oidc_issuer_url\n-# default — that drifted silently when infra-bootstrap rebuilt the AKS cluster\n-# and the federated cred kept presenting the old issuer (AADSTS700211). Reading\n-# it from the cluster directly keeps the credential in lockstep with the\n-# current cluster — matches diagrams/tofu/identity.tf.\n-data \"azurerm_kubernetes_cluster\" \"infra\" {\n-  name                = \"infra-aks\"\n-  resource_group_name = local.infra.resource_group_name\n-}\n-\n resource \"azurerm_user_assigned_identity\" \"kill_me\" {\n   name                = \"kill-me-identity\"\n   resource_group_name = data.azurerm_resource_group.infra.name\n@@ -66,7 +56,7 @@ resource \"azurerm_federated_identity_credential\" \"kill_me\" {\n   resource_group_name = local.infra.resource_group_name\n   parent_id           = azurerm_user_assigned_identity.kill_me.id\n   audience            = [\"api://AzureADTokenExchange\"]\n-  issuer              = data.azurerm_kubernetes_cluster.infra.oidc_issuer_url\n+  issuer              = local.aks_oidc_issuer_url\n   subject             = \"system:serviceaccount:kill-me:infra-shared\"\n }\n ",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/9003f0499819533b7ce7315f9ad85b8f0c3fcb38/tofu%2Fidentity.tf",
+    "sha": "8222ab900dc41fbd3c9d3e15b24d99d330d1c365",
+    "status": "modified"
+  },
+  {
+    "additions": 22,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/9003f0499819533b7ce7315f9ad85b8f0c3fcb38/tofu%2Fremote-state.tf",
+    "changes": 22,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/tofu%2Fremote-state.tf?ref=9003f0499819533b7ce7315f9ad85b8f0c3fcb38",
+    "deletions": 0,
+    "filename": "tofu/remote-state.tf",
+    "patch": "@@ -18,3 +18,25 @@ data \"azurerm_app_configuration\" \"infra\" {\n   name                = \"infra-appconfig\"\n   resource_group_name = local.infra.resource_group_name\n }\n+\n+# AKS cluster OIDC issuer URL comes from infra-bootstrap's state output.\n+# Can't read it directly from `data \"azurerm_kubernetes_cluster\"` here:\n+# the cluster lives in a dedicated subscription and our CI principal only\n+# has access to the app subscription — the data source 404s. The tfstate\n+# blob, on the other hand, is in this subscription's storage account and\n+# is already in our principal's reach. Pattern matches glimmung/tofu/remote-state.tf.\n+data \"terraform_remote_state\" \"infra_bootstrap\" {\n+  backend = \"azurerm\"\n+\n+  config = {\n+    resource_group_name  = \"infra\"\n+    storage_account_name = \"nelsontofu\"\n+    container_name       = \"tfstate\"\n+    key                  = \"infra-bootstrap.tfstate\"\n+    use_oidc             = true\n+  }\n+}\n+\n+locals {\n+  aks_oidc_issuer_url = data.terraform_remote_state.infra_bootstrap.outputs.aks_oidc_issuer_url\n+}",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/9003f0499819533b7ce7315f9ad85b8f0c3fcb38/tofu%2Fremote-state.tf",
+    "sha": "d4e0f715b8dbbc44e65616834bcb444484714e7b",
+    "status": "modified"
+  }
+]

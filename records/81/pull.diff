@@ -1,0 +1,13 @@
+diff --git a/frontend/src/components/SorenessTab.jsx b/frontend/src/components/SorenessTab.jsx
+index 2f712954..b658fa3f 100644
+--- a/frontend/src/components/SorenessTab.jsx
++++ b/frontend/src/components/SorenessTab.jsx
+@@ -99,7 +99,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+   const { fetchSoreness, fetchWorkouts, isReady } = useDataSource();
+   const isMobile = useIsMobile();
+ 
+-  const [view, setView] = useState('journal'); // 'journal' | 'timeline' | 'lanes'
++  const [view, setView] = useState('lanes'); // 'lanes' | 'journal' | 'timeline'
+ 
+   // Editor state
+   const [editing, setEditing] = useState(false);

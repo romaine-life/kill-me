@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 6,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/0f2ab96c50465c0e39fff8fe0a65d0200a25d5f0/frontend%2Fsrc%2FApp.jsx",
+    "changes": 8,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fsrc%2FApp.jsx?ref=0f2ab96c50465c0e39fff8fe0a65d0200a25d5f0",
+    "deletions": 2,
+    "filename": "frontend/src/App.jsx",
+    "patch": "@@ -42,6 +42,10 @@ const tabFromPath = (path) =\u003e {\n \n const pathFromTab = (tab) =\u003e (tab === 'soreness' ? '/' : `/${tab}`);\n \n+// The Activity view the app opens to. Mounting and finishing a log both land\n+// here, so the landing page is defined once instead of per navigation path.\n+const DEFAULT_ACTIVITY_VIEW = 'lanes';\n+\n function App() {\n   const [activeTab, setActiveTab] = useState(() =\u003e tabFromPath(window.location.pathname));\n   const { isAdmin } = useAuth();\n@@ -58,7 +62,7 @@ function App() {\n   const [sorenessEditEntry, setSorenessEditEntry] = useState(null);\n   const [isMobile, setIsMobile] = useState(() =\u003e window.innerWidth \u003c 760);\n   const [mobileNavOpen, setMobileNavOpen] = useState(false);\n-  const [activityView, setActivityView] = useState('lanes');\n+  const [activityView, setActivityView] = useState(DEFAULT_ACTIVITY_VIEW);\n   const [sorenessCreateRequested, setSorenessCreateRequested] = useState(false);\n   // The editor temporarily replaces Activity content without changing the\n   // selected view. Preserve enough context to return to its launch point.\n@@ -221,7 +225,7 @@ function App() {\n     setLogViewWorkout(null);\n     setLogViewCardio(null);\n     setDetailStack([]);\n-    setActivityView('list');\n+    setActivityView(DEFAULT_ACTIVITY_VIEW);\n     navigateTab('soreness');\n   };\n ",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/0f2ab96c50465c0e39fff8fe0a65d0200a25d5f0/frontend%2Fsrc%2FApp.jsx",
+    "sha": "86abafd75ebde562ca4bf83133566979a32a81a3",
+    "status": "modified"
+  }
+]

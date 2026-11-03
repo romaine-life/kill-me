@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/in/29110?v=4",
+      "events_url": "https://api.github.com/users/dependabot%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/dependabot%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/dependabot%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/dependabot%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/dependabot",
+      "id": 49699333,
+      "login": "dependabot[bot]",
+      "node_id": "MDM6Qm90NDk2OTkzMzM=",
+      "organizations_url": "https://api.github.com/users/dependabot%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/dependabot%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/dependabot%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/dependabot%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/dependabot%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/dependabot%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/88472213aa44847d6914c9745ddbe0fe4ffbc7ba/comments",
+    "commit": {
+      "author": {
+        "date": "2026-04-06T00:09:51Z",
+        "email": "49699333+dependabot[bot]@users.noreply.github.com",
+        "name": "dependabot[bot]"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-04-06T00:09:51Z",
+        "email": "noreply@github.com",
+        "name": "GitHub"
+      },
+      "message": "Bump minimatch from 3.1.2 to 3.1.5 in /frontend\n\nBumps [minimatch](https://github.com/isaacs/minimatch) from 3.1.2 to 3.1.5.\n- [Changelog](https://github.com/isaacs/minimatch/blob/main/changelog.md)\n- [Commits](https://github.com/isaacs/minimatch/compare/v3.1.2...v3.1.5)\n\n---\nupdated-dependencies:\n- dependency-name: minimatch\n  dependency-version: 3.1.5\n  dependency-type: indirect\n...\n\nSigned-off-by: dependabot[bot] \u003csupport@github.com\u003e",
+      "tree": {
+        "sha": "8df23419126a824fab46625bf4e810660b1d3121",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/8df23419126a824fab46625bf4e810660b1d3121"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/88472213aa44847d6914c9745ddbe0fe4ffbc7ba",
+      "verification": {
+        "payload": "tree 8df23419126a824fab46625bf4e810660b1d3121\nparent e02e5dc0e6cc3644d7b6bde67aa0f922e1e86caa\nauthor dependabot[bot] \u003c49699333+dependabot[bot]@users.noreply.github.com\u003e 1775434191 +0000\ncommitter GitHub \u003cnoreply@github.com\u003e 1775434191 +0000\n\nBump minimatch from 3.1.2 to 3.1.5 in /frontend\n\nBumps [minimatch](https://github.com/isaacs/minimatch) from 3.1.2 to 3.1.5.\n- [Changelog](https://github.com/isaacs/minimatch/blob/main/changelog.md)\n- [Commits](https://github.com/isaacs/minimatch/compare/v3.1.2...v3.1.5)\n\n---\nupdated-dependencies:\n- dependency-name: minimatch\n  dependency-version: 3.1.5\n  dependency-type: indirect\n...\n\nSigned-off-by: dependabot[bot] \u003csupport@github.com\u003e",
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJp0vnPCRC1aQ7uu5UhlAAARp8QABk6Cw800Ri8sBIHQ/e7ZdSH\nqfqxAdlcmOyqs7KcG2nwLXHuGYQzCw3/sikUAZYbFB3MfzMq7+n9F+T9RFFyDVO9\nIELfThFcXK1yuk7tNWb3vZA6QvbleWwyK+W/UFVXd48K9ekZmnlPgJsUKya2TXyg\n2shG+1bAz+XgpVqJBoVIjStWAJJIxxYXA1BES9JIM2lJHeEURdXofKuWYuMsvYBG\n43SCJbiGfWxTszkdR6IxxxZkzol2ZYXP0fnKitPewTdfecbDWUHitg7YsOKuK9FP\nRfE77R3wxKJNJ8n6pengqemmIAat+VsbXHf52hb8kI2gaHkOBfPhLWQ3CKWyJfkD\nIFPpNUrCrXJaH/CqlRp7J45szwHQH3tLzIPZeSOxFqgwlH2BwE7GKW9Msqf0fsRA\nRgqfvJ4qXcbtUdy6V3tT8SnrybSEIGzafoIgIaIbVxEW98QP2jmO+UJBECs8l+tg\nLuaNU6HJk4Mee5t4Zt+Iht11/s9levBXAudufMyXzVbrpquEmo/00PDbsbZkcepb\nPiVlAcohyqTVnD/SyyhjjlVhO64mnm/h0t5GAc9bp5TmuMyXD9SiC+wZPnroTelF\nFEpZTCoCzLOz7PgCu3UkpNgtQNUjToS+LTD4aT81IlKlnn0tUfG+Jz4btPDmw2nc\n6CiEJnogEjM1xXNM5K5w\n=sFHB\n-----END PGP SIGNATURE-----\n",
+        "verified": true,
+        "verified_at": "2026-04-06T00:09:52Z"
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/web-flow",
+      "id": 19864447,
+      "login": "web-flow",
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/web-flow",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/88472213aa44847d6914c9745ddbe0fe4ffbc7ba",
+    "node_id": "C_kwDORV0mMdoAKDg4NDcyMjEzYWE0NDg0N2Q2OTE0Yzk3NDVkZGJlMGZlNGZmYmM3YmE",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/e02e5dc0e6cc3644d7b6bde67aa0f922e1e86caa",
+        "sha": "e02e5dc0e6cc3644d7b6bde67aa0f922e1e86caa",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/e02e5dc0e6cc3644d7b6bde67aa0f922e1e86caa"
+      }
+    ],
+    "sha": "88472213aa44847d6914c9745ddbe0fe4ffbc7ba",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/88472213aa44847d6914c9745ddbe0fe4ffbc7ba"
+  }
+]

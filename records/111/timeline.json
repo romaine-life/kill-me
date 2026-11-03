@@ -1,0 +1,247 @@
+[
+  {
+    "author": {
+      "date": "2026-09-16T19:07:39Z",
+      "email": "fullnelsongrip@gmail.com",
+      "name": "Nelson"
+    },
+    "committer": {
+      "date": "2026-09-16T19:07:39Z",
+      "email": "fullnelsongrip@gmail.com",
+      "name": "Nelson"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/0778d33f0dce7af0380c014ee8d1956bec1fa6a2",
+    "message": "feat: track meals with calorie and protein defaults\n\nMeal defaults hold one set of numbers per portion and log in one tap;\nentries store their numbers as eaten so later default changes never\nrewrite a past day. Daily totals appear as a Meals column on the\nOverview and open a meal day with per-meal edit.",
+    "node_id": "C_kwDORV0mMdoAKDA3NzhkMzNmMGRjZTdhZjAzODBjMDE0ZWU4ZDE5NTZiZWMxZmE2YTI",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/10b7f2fc705d4ba286c2ea342912eca5d4ed9615",
+        "sha": "10b7f2fc705d4ba286c2ea342912eca5d4ed9615",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/10b7f2fc705d4ba286c2ea342912eca5d4ed9615"
+      }
+    ],
+    "sha": "0778d33f0dce7af0380c014ee8d1956bec1fa6a2",
+    "tree": {
+      "sha": "18af6b1a8216d2a4be480e7bda7f66164b2c6498",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/18af6b1a8216d2a4be480e7bda7f66164b2c6498"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/0778d33f0dce7af0380c014ee8d1956bec1fa6a2",
+    "verification": {
+      "payload": null,
+      "reason": "unsigned",
+      "signature": null,
+      "verified": false,
+      "verified_at": null
+    }
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-09-16T19:07:52Z",
+    "event": "labeled",
+    "id": 31269749669,
+    "intent": null,
+    "label": {
+      "color": "1d76db",
+      "name": "release:minor"
+    },
+    "node_id": "LE_lADORV0mMc8AAAABRpBhcM8AAAAHR9KDpQ",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/31269749669"
+  },
+  {
+    "author": {
+      "date": "2026-09-16T21:01:21Z",
+      "email": "fullnelsongrip@gmail.com",
+      "name": "Nelson"
+    },
+    "committer": {
+      "date": "2026-09-16T21:01:21Z",
+      "email": "fullnelsongrip@gmail.com",
+      "name": "Nelson"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/09d52fe782f73208e74d27a1078caefd7f0c5b26",
+    "message": "fix: make saved meals a visible list separate from logging\n\nCreating a saved meal was hidden inside logging behind a checkbox whose\nlabel changed meaning, and 'default' was the wrong word for it. Saved\nmeals now have their own list, '+ New saved meal' screen and edit\nbutton; logging only logs. The example meal name placeholder is gone.",
+    "node_id": "C_kwDORV0mMdoAKDA5ZDUyZmU3ODJmNzMyMDhlNzRkMjdhMTA3OGNhZWZkN2YwYzViMjY",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/0778d33f0dce7af0380c014ee8d1956bec1fa6a2",
+        "sha": "0778d33f0dce7af0380c014ee8d1956bec1fa6a2",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/0778d33f0dce7af0380c014ee8d1956bec1fa6a2"
+      }
+    ],
+    "sha": "09d52fe782f73208e74d27a1078caefd7f0c5b26",
+    "tree": {
+      "sha": "01b34ad387c726af23c0412431648a583bad66ac",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/01b34ad387c726af23c0412431648a583bad66ac"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/09d52fe782f73208e74d27a1078caefd7f0c5b26",
+    "verification": {
+      "payload": null,
+      "reason": "unsigned",
+      "signature": null,
+      "verified": false,
+      "verified_at": null
+    }
+  },
+  {
+    "author": {
+      "date": "2026-09-16T22:46:59Z",
+      "email": "fullnelsongrip@gmail.com",
+      "name": "Nelson"
+    },
+    "committer": {
+      "date": "2026-09-16T22:46:59Z",
+      "email": "fullnelsongrip@gmail.com",
+      "name": "Nelson"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/c1a04cf1c342033baf7de37a9413664a1499bb4c",
+    "message": "fix: show the pointer cursor on every enabled button\n\nTailwind 4 resets buttons to the arrow cursor, so Tailwind-styled buttons\nlike the Log type picker never showed a hand on hover.",
+    "node_id": "C_kwDORV0mMdoAKGMxYTA0Y2YxYzM0MjAzM2JhZjdkZTM3YTk0MTM2NjRhMTQ5OWJiNGM",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/09d52fe782f73208e74d27a1078caefd7f0c5b26",
+        "sha": "09d52fe782f73208e74d27a1078caefd7f0c5b26",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/09d52fe782f73208e74d27a1078caefd7f0c5b26"
+      }
+    ],
+    "sha": "c1a04cf1c342033baf7de37a9413664a1499bb4c",
+    "tree": {
+      "sha": "fc6cabc5651eb500ca27083f66b981cd6ee38c57",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/fc6cabc5651eb500ca27083f66b981cd6ee38c57"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/c1a04cf1c342033baf7de37a9413664a1499bb4c",
+    "verification": {
+      "payload": null,
+      "reason": "unsigned",
+      "signature": null,
+      "verified": false,
+      "verified_at": null
+    }
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "author_association": "MEMBER",
+    "body": "Moved to native Forgejo pull request https://forgejo.romaine.life/romaine-life/kill-me/pulls/4. The original description and exact source branch/head commit are preserved there. Please continue discussion and changes on Forgejo. https://openproject.romaine.life/wp/FORGEJO-3",
+    "created_at": "2026-11-03T18:37:38Z",
+    "event": "commented",
+    "html_url": "https://github.com/romaine-life/kill-me/pull/111#issuecomment-6612380999",
+    "id": 6612380999,
+    "issue_url": "https://api.github.com/repos/romaine-life/kill-me/issues/111",
+    "minimized": null,
+    "node_id": "IC_kwDORV0mMc8AAAABiiDtRw",
+    "performed_via_github_app": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/romaine-life/kill-me/issues/comments/6612380999/reactions"
+    },
+    "updated_at": "2026-11-03T18:37:38Z",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/comments/6612380999",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    }
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-11-03T18:37:51Z",
+    "event": "closed",
+    "id": 35052872989,
+    "intent": null,
+    "node_id": "CE_lADORV0mMc8AAAABRpBhcM8AAAAIKVBlHQ",
+    "performed_via_github_app": null,
+    "state_reason": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/35052872989"
+  }
+]

@@ -1,0 +1,343 @@
+[
+  {
+    "author": {
+      "date": "2026-06-17T04:11:01Z",
+      "email": "tank-operator@romaine.life",
+      "name": "Tank Operator"
+    },
+    "committer": {
+      "date": "2026-06-17T04:11:01Z",
+      "email": "tank-operator@romaine.life",
+      "name": "Tank Operator"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/3ee39dc3924ea3289619e33a24b4b0ac62d38068",
+    "message": "Tank session 1041 start",
+    "node_id": "C_kwDORV0mMdoAKDNlZTM5ZGMzOTI0ZWEzMjg5NjE5ZTMzYTI0YjRiMGFjNjJkMzgwNjg",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/57e2f8c750f1486568e2c63b56ef4b1119f6eadf",
+        "sha": "57e2f8c750f1486568e2c63b56ef4b1119f6eadf",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/57e2f8c750f1486568e2c63b56ef4b1119f6eadf"
+      }
+    ],
+    "sha": "3ee39dc3924ea3289619e33a24b4b0ac62d38068",
+    "tree": {
+      "sha": "f09f724e35d13385c7cf31cec5f4e0f022a946b8",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/f09f724e35d13385c7cf31cec5f4e0f022a946b8"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/3ee39dc3924ea3289619e33a24b4b0ac62d38068",
+    "verification": {
+      "payload": null,
+      "reason": "unsigned",
+      "signature": null,
+      "verified": false,
+      "verified_at": null
+    }
+  },
+  {
+    "author": {
+      "date": "2026-06-17T04:22:07Z",
+      "email": "tank-operator-codex@romaine.life",
+      "name": "tank-operator-codex[bot]"
+    },
+    "committer": {
+      "date": "2026-06-17T04:22:07Z",
+      "email": "tank-operator-codex@romaine.life",
+      "name": "tank-operator-codex[bot]"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/1b9990026299fb6f5577a619363a0053705c3c15",
+    "message": "ci: use fingerprinted kill-me image tags",
+    "node_id": "C_kwDORV0mMdoAKDFiOTk5MDAyNjI5OWZiNmY1NTc3YTYxOTM2M2EwMDUzNzA1YzNjMTU",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/3ee39dc3924ea3289619e33a24b4b0ac62d38068",
+        "sha": "3ee39dc3924ea3289619e33a24b4b0ac62d38068",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/3ee39dc3924ea3289619e33a24b4b0ac62d38068"
+      }
+    ],
+    "sha": "1b9990026299fb6f5577a619363a0053705c3c15",
+    "tree": {
+      "sha": "c1a79ed749a0987007953b456ebda15ecccc6b9d",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/c1a79ed749a0987007953b456ebda15ecccc6b9d"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/1b9990026299fb6f5577a619363a0053705c3c15",
+    "verification": {
+      "payload": null,
+      "reason": "unsigned",
+      "signature": null,
+      "verified": false,
+      "verified_at": null
+    }
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-06-17T04:33:40Z",
+    "event": "renamed",
+    "id": 26841913312,
+    "node_id": "RTE_lADORV0mMc8AAAABFvLElM8AAAAGP-cX4A",
+    "performed_via_github_app": null,
+    "rename": {
+      "from": "Tank session 1041: kill-me",
+      "to": "ci: use fingerprinted kill-me image tags"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/26841913312"
+  },
+  {
+    "author": {
+      "date": "2026-06-17T05:18:45Z",
+      "email": "tank-operator-codex@romaine.life",
+      "name": "tank-operator-codex[bot]"
+    },
+    "committer": {
+      "date": "2026-06-17T05:18:45Z",
+      "email": "tank-operator-codex@romaine.life",
+      "name": "tank-operator-codex[bot]"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/04e601243a20b74227deb44b571284baaceacd32",
+    "message": "ci: add run-scoped ACR image lookup tags",
+    "node_id": "C_kwDORV0mMdoAKDA0ZTYwMTI0M2EyMGI3NDIyN2RlYjQ0YjU3MTI4NGJhYWNlYWNkMzI",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/1b9990026299fb6f5577a619363a0053705c3c15",
+        "sha": "1b9990026299fb6f5577a619363a0053705c3c15",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/1b9990026299fb6f5577a619363a0053705c3c15"
+      }
+    ],
+    "sha": "04e601243a20b74227deb44b571284baaceacd32",
+    "tree": {
+      "sha": "4fceaa51c2c8ff16b5235d957d12f83122b32da9",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/4fceaa51c2c8ff16b5235d957d12f83122b32da9"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/04e601243a20b74227deb44b571284baaceacd32",
+    "verification": {
+      "payload": null,
+      "reason": "unsigned",
+      "signature": null,
+      "verified": false,
+      "verified_at": null
+    }
+  },
+  {
+    "author": {
+      "date": "2026-06-17T05:33:37Z",
+      "email": "tank-operator-codex@romaine.life",
+      "name": "tank-operator-codex[bot]"
+    },
+    "committer": {
+      "date": "2026-06-17T05:33:37Z",
+      "email": "tank-operator-codex@romaine.life",
+      "name": "tank-operator-codex[bot]"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/a77b5629c0f198ebbf4c54b486e840ce16309894",
+    "message": "Normalize CI lookup ref hash input",
+    "node_id": "C_kwDORV0mMdoAKGE3N2I1NjI5YzBmMTk4ZWJiZjRjNTRiNDg2ZTg0MGNlMTYzMDk4OTQ",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/04e601243a20b74227deb44b571284baaceacd32",
+        "sha": "04e601243a20b74227deb44b571284baaceacd32",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/04e601243a20b74227deb44b571284baaceacd32"
+      }
+    ],
+    "sha": "a77b5629c0f198ebbf4c54b486e840ce16309894",
+    "tree": {
+      "sha": "f21e3be5a2cbf5f060310be8801c9bfef732a359",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/f21e3be5a2cbf5f060310be8801c9bfef732a359"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/a77b5629c0f198ebbf4c54b486e840ce16309894",
+    "verification": {
+      "payload": null,
+      "reason": "unsigned",
+      "signature": null,
+      "verified": false,
+      "verified_at": null
+    }
+  },
+  {
+    "author": {
+      "date": "2026-06-17T05:39:02Z",
+      "email": "tank-operator-codex@romaine.life",
+      "name": "tank-operator-codex[bot]"
+    },
+    "committer": {
+      "date": "2026-06-17T05:39:02Z",
+      "email": "tank-operator-codex@romaine.life",
+      "name": "tank-operator-codex[bot]"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/385a5caaa4f5ed590ac3f0008c4b0104673fa335",
+    "message": "Use source SHA for CI lookup tags",
+    "node_id": "C_kwDORV0mMdoAKDM4NWE1Y2FhYTRmNWVkNTkwYWMzZjAwMDhjNGIwMTA0NjczZmEzMzU",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/a77b5629c0f198ebbf4c54b486e840ce16309894",
+        "sha": "a77b5629c0f198ebbf4c54b486e840ce16309894",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/a77b5629c0f198ebbf4c54b486e840ce16309894"
+      }
+    ],
+    "sha": "385a5caaa4f5ed590ac3f0008c4b0104673fa335",
+    "tree": {
+      "sha": "a107efbd03cbe5474593c883d51edca37178678e",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/a107efbd03cbe5474593c883d51edca37178678e"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/385a5caaa4f5ed590ac3f0008c4b0104673fa335",
+    "verification": {
+      "payload": null,
+      "reason": "unsigned",
+      "signature": null,
+      "verified": false,
+      "verified_at": null
+    }
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-06-17T05:47:22Z",
+    "event": "ready_for_review",
+    "id": 26843976897,
+    "node_id": "RFRE_lADORV0mMc8AAAABFvLElM8AAAAGQAaUwQ",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/26843976897"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": "1160d1c789c2c5d2d12186ed4f250bcaf57f5e08",
+    "commit_url": "https://api.github.com/repos/romaine-life/kill-me/commits/1160d1c789c2c5d2d12186ed4f250bcaf57f5e08",
+    "created_at": "2026-06-17T05:47:58Z",
+    "event": "merged",
+    "id": 26843997638,
+    "node_id": "ME_lADORV0mMc8AAAABFvLElM8AAAAGQAblxg",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/26843997638"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-06-17T05:47:58Z",
+    "event": "closed",
+    "id": 26843997751,
+    "intent": null,
+    "node_id": "CE_lADORV0mMc8AAAABFvLElM8AAAAGQAbmNw",
+    "performed_via_github_app": null,
+    "state_reason": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/26843997751"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-06-17T05:47:59Z",
+    "event": "head_ref_deleted",
+    "id": 26843998921,
+    "node_id": "HRDE_lADORV0mMc8AAAABFvLElM8AAAAGQAbqyQ",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/26843998921"
+  }
+]

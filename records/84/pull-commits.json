@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/6737809bff8191fec0455bb94348d77511ce2062/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-24T02:59:03Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-24T02:59:03Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "Draw soreness stripe day boundaries as seams, not gaps\n\nA stripe was one rect per logged day, each inset a pixel top and bottom\nwith rounded corners, so every day boundary opened a ~2px window onto the\npage background. The spawn connectors are drawn behind the stripes, so a\nconnector crossing a lane showed through those windows and read as if it\nterminated in the stripe rather than passing under it.\n\nStripes are now one shape per unbroken run of days, with the boundaries\ndrawn on top of the fill as an opaque seam in a darker cast of the day's\nown colour, plus a matching outline around the run. Days still read as\ncells in a bar — that segmentation is what makes the length countable —\nbut the separation is paint, so nothing can pass through it. The per-day\nrects survive as invisible hit targets over the fill, so a click still\nopens exactly one date's entry and a hover still names one day.\n\nBridged (unlogged) days merge into a single thin bar for the same reason:\na run of them used to draw as a row of ticks, when the narrowing is meant\nto read as one constriction.\n\nConnectors also now land on the middle of their first day instead of on\nits top edge. That edge is exactly where a boundary seam sits, so a\nworkout spawning mid-run and a day boundary were drawing the same mark at\nthe same height.",
+      "tree": {
+        "sha": "648406945ffc5472a05106e16c3f0dbdfa5fcbc6",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/648406945ffc5472a05106e16c3f0dbdfa5fcbc6"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/6737809bff8191fec0455bb94348d77511ce2062",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/6737809bff8191fec0455bb94348d77511ce2062",
+    "node_id": "C_kwDORV0mMdoAKDY3Mzc4MDliZmY4MTkxZmVjMDQ1NWJiOTQzNDhkNzc1MTFjZTIwNjI",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/862a401a01bd2c9d835015bcd9b6746e850f3448",
+        "sha": "862a401a01bd2c9d835015bcd9b6746e850f3448",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/862a401a01bd2c9d835015bcd9b6746e850f3448"
+      }
+    ],
+    "sha": "6737809bff8191fec0455bb94348d77511ce2062",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/6737809bff8191fec0455bb94348d77511ce2062"
+  }
+]

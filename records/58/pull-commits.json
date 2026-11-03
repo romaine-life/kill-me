@@ -1,0 +1,86 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/b03523e16773fb5ca86a94cc7d599bc9ed7ba5e1/comments",
+    "commit": {
+      "author": {
+        "date": "2026-06-21T12:29:18Z",
+        "email": "tank-operator@romaine.life",
+        "name": "Tank Operator"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-06-21T12:29:18Z",
+        "email": "tank-operator@romaine.life",
+        "name": "Tank Operator"
+      },
+      "message": "Tank session 1221 start",
+      "tree": {
+        "sha": "eea565c929a8cb17f6b7ec4b7cfaafd38a486e52",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/eea565c929a8cb17f6b7ec4b7cfaafd38a486e52"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/b03523e16773fb5ca86a94cc7d599bc9ed7ba5e1",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/b03523e16773fb5ca86a94cc7d599bc9ed7ba5e1",
+    "node_id": "C_kwDORV0mMdoAKGIwMzUyM2UxNjc3M2ZiNWNhODZhOTRjYzdkNTk5YmM5ZWQ3YmE1ZTE",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/d66b4e3c953fe42abb6fa1981260de00d6672583",
+        "sha": "d66b4e3c953fe42abb6fa1981260de00d6672583",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/d66b4e3c953fe42abb6fa1981260de00d6672583"
+      }
+    ],
+    "sha": "b03523e16773fb5ca86a94cc7d599bc9ed7ba5e1",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/b03523e16773fb5ca86a94cc7d599bc9ed7ba5e1"
+  },
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/daa0a55791b8f36c61c16cb805e90e9a8874f0d8/comments",
+    "commit": {
+      "author": {
+        "date": "2026-06-21T12:36:12Z",
+        "email": "tank-operator-claude@romaine.life",
+        "name": "tank-operator-claude[bot]"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-06-21T12:36:12Z",
+        "email": "tank-operator-claude@romaine.life",
+        "name": "tank-operator-claude[bot]"
+      },
+      "message": "Onboard kill-me to the live-preview lane (Stage 4b)\n\nWire kill-me's slot chart to optionally host Glimmung's generic\nlive-preview-edge in front of its own stable backend on a preview lease,\nmirroring glimmung/k8s/issue. OFF by default (livePreview.enabled=false) so a\nnormal/CI/prod/validation render is functionally identical to today — the\nfaithful image-deploy lane is untouched.\n\n- values.yaml: add livePreview block (enabled:false; edge image with empty tag\n  Glimmung --sets at provision; upstream http://127.0.0.1:3000; backendPrefixes;\n  authorizedSubject; override volume).\n- helpers.tpl: kill-me.appPortName — backend port name stays \"http\" when off,\n  flips to \"app-internal\" when the edge fronts it (keeps disabled render\n  byte-identical).\n- deployment.yaml: backend container port becomes the named app port (3000\n  unchanged); probes follow the name; live-preview-edge.container + .volume\n  included gated on livePreview.enabled; replicas via live-preview-edge.replicas\n  (single serving pod), include gated so the chart renders standalone without\n  the vendored library.\n- service.yaml: targetPort flips to the edge's served port when enabled (else\n  \"http\"), include gated for standalone render.\n- .gitignore: ignore charts/ — Glimmung vendors the partial at provision time\n  (cluster ConfigMap, not a committed copy, not a Helm dependency).\n\nAuth: the edge validates pushes via auth.romaine.life JWKS (public RS256 over\nHTTPS); no projected SA token is added to the slot pod.\n\nRefs glimmung docs/live-preview-plan.md \"Stage 4a landed contracts\".\n\nCo-Authored-By: Claude Opus 4.8 \u003cnoreply@anthropic.com\u003e",
+      "tree": {
+        "sha": "eef63dbda01805491cc6f043785cee5c1f201931",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/eef63dbda01805491cc6f043785cee5c1f201931"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/daa0a55791b8f36c61c16cb805e90e9a8874f0d8",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/daa0a55791b8f36c61c16cb805e90e9a8874f0d8",
+    "node_id": "C_kwDORV0mMdoAKGRhYTBhNTU3OTFiOGYzNmM2MWMxNmNiODA1ZTkwZTlhODg3NGYwZDg",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/b03523e16773fb5ca86a94cc7d599bc9ed7ba5e1",
+        "sha": "b03523e16773fb5ca86a94cc7d599bc9ed7ba5e1",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/b03523e16773fb5ca86a94cc7d599bc9ed7ba5e1"
+      }
+    ],
+    "sha": "daa0a55791b8f36c61c16cb805e90e9a8874f0d8",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/daa0a55791b8f36c61c16cb805e90e9a8874f0d8"
+  }
+]

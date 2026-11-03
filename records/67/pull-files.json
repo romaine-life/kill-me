@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/0855dbc168a68a37f12b20db7b59b91364644bdd/frontend%2Findex.html",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Findex.html?ref=0855dbc168a68a37f12b20db7b59b91364644bdd",
+    "deletions": 1,
+    "filename": "frontend/index.html",
+    "patch": "@@ -3,7 +3,7 @@\n   \u003chead\u003e\n     \u003cmeta charset=\"UTF-8\" /\u003e\n     \u003clink rel=\"icon\" type=\"image/svg+xml\" href=\"/favicon.svg\" /\u003e\n-    \u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" /\u003e\n+    \u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, viewport-fit=cover\" /\u003e\n     \u003ctitle\u003esynergy-12\u003c/title\u003e\n   \u003c/head\u003e\n   \u003cbody\u003e",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/0855dbc168a68a37f12b20db7b59b91364644bdd/frontend%2Findex.html",
+    "sha": "7a878fc14ac9625e31d4707bd482727caebe5876",
+    "status": "modified"
+  },
+  {
+    "additions": 18,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/0855dbc168a68a37f12b20db7b59b91364644bdd/frontend%2Fsrc%2FApp.jsx",
+    "changes": 21,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fsrc%2FApp.jsx?ref=0855dbc168a68a37f12b20db7b59b91364644bdd",
+    "deletions": 3,
+    "filename": "frontend/src/App.jsx",
+    "patch": "@@ -190,7 +190,15 @@ function App() {\n         )}\n \n         {/* Tab content area */}\n-        \u003cdiv className=\"app-tab-content\" style={styles.tabContent}\u003e\n+        \u003cdiv\n+          className=\"app-tab-content\"\n+          style={{\n+            ...styles.tabContent,\n+            // Clear the fixed bottom nav (+ home-indicator safe area) on mobile\n+            // so the last row of content is never hidden behind it.\n+            ...(isMobile ? { paddingBottom: 'calc(76px + env(safe-area-inset-bottom))' } : {}),\n+          }}\n+        \u003e\n           {activeTab === 'today' \u0026\u0026 (\n             \u003cTodayTab currentDay={currentDay} isAdmin={isAdmin} onNavigateExercises={handleNavigateExercises} /\u003e\n           )}\n@@ -332,7 +340,12 @@ function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, isAdmin,\n }\n \n function BottomNav({ tabs, activeTab, onTabChange }) {\n-  const visibleTabs = tabs.filter((tab) =\u003e ['list', 'today', 'cycle', 'soreness'].includes(tab.id));\n+  // Log is the primary daily action for admins — surface it centered in the bar\n+  // (it's only in `tabs` when signed in as admin, so public visitors still see 4).\n+  const order = ['list', 'today', 'log', 'cycle', 'soreness'];\n+  const visibleTabs = order\n+    .map((id) =\u003e tabs.find((tab) =\u003e tab.id === id))\n+    .filter(Boolean);\n \n   return (\n     \u003cnav style={{ ...styles.bottomNav, gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)` }}\u003e\n@@ -577,7 +590,9 @@ const styles = {\n     display: 'grid',\n     background: 'var(--bg-sidebar)',\n     borderTop: '1px solid var(--border-subtle)',\n-    padding: '8px 8px 16px',\n+    // Respect the home-indicator safe area on notched phones (needs\n+    // viewport-fit=cover in index.html) so the buttons aren't tucked under it.\n+    padding: '8px 8px calc(16px + env(safe-area-inset-bottom))',\n     zIndex: 35,\n   },\n   bottomNavButton: {",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/0855dbc168a68a37f12b20db7b59b91364644bdd/frontend%2Fsrc%2FApp.jsx",
+    "sha": "00b52cbf3a042dd84d57e76e251b49b7b6c1c96b",
+    "status": "modified"
+  },
+  {
+    "additions": 6,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/0855dbc168a68a37f12b20db7b59b91364644bdd/frontend%2Fsrc%2Fcomponents%2FWorkoutDrawer.jsx",
+    "changes": 9,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fsrc%2Fcomponents%2FWorkoutDrawer.jsx?ref=0855dbc168a68a37f12b20db7b59b91364644bdd",
+    "deletions": 3,
+    "filename": "frontend/src/components/WorkoutDrawer.jsx",
+    "patch": "@@ -848,24 +848,27 @@ export function LogTab({\n                               \u003cdiv className=\"grid grid-cols-3 gap-2\"\u003e\n                                 \u003cinput\n                                   type=\"text\"\n+                                  inputMode=\"decimal\"\n                                   placeholder=\"Weight (lbs)\"\n                                   value={exercise.weight}\n                                   onChange={(e) =\u003e updateExercise(idx, 'weight', e.target.value)}\n-                                  className=\"bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500\"\n+                                  className=\"bg-slate-800 border border-slate-600 rounded px-3 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500\"\n                                 /\u003e\n                                 \u003cinput\n                                   type=\"text\"\n+                                  inputMode=\"numeric\"\n                                   placeholder=\"Reps\"\n                                   value={exercise.reps}\n                                   onChange={(e) =\u003e updateExercise(idx, 'reps', e.target.value)}\n-                                  className=\"bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500\"\n+                                  className=\"bg-slate-800 border border-slate-600 rounded px-3 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500\"\n                                 /\u003e\n                                 \u003cinput\n                                   type=\"text\"\n+                                  inputMode=\"numeric\"\n                                   placeholder=\"Sets\"\n                                   value={exercise.sets}\n                                   onChange={(e) =\u003e updateExercise(idx, 'sets', e.target.value)}\n-                                  className=\"bg-slate-800 border border-slate-600 rounded px-3 py-2 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500\"\n+                                  className=\"bg-slate-800 border border-slate-600 rounded px-3 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500\"\n                                 /\u003e\n                               \u003c/div\u003e\n                             \u003c/div\u003e",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/0855dbc168a68a37f12b20db7b59b91364644bdd/frontend%2Fsrc%2Fcomponents%2FWorkoutDrawer.jsx",
+    "sha": "b11f2555ced3b3fd3200fc34260ba9812dd7ae88",
+    "status": "modified"
+  }
+]

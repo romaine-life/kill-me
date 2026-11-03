@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/40f4cffe1180528b1ccbfaa0c19e5a9c3ac4f12e/comments",
+    "commit": {
+      "author": {
+        "date": "2026-07-17T08:20:38Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-07-17T08:20:38Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "refactor: remove hardcoded treadmill template fallback\n\nTemplates are data — they live in Cosmos as cardio-template docs and are\nserved to everyone via the data source (live API when signed in, SQLite\nsnapshot for anonymous visitors). The static TREADMILL_TEMPLATES mirror in\ncardioTemplates.js was still hardcoded template data in git, which is the\nthing we were moving away from. Drop it entirely; the drawer now renders\nstrictly from fetchCardioTemplates(). cardioTemplates.js keeps only the pure\ninterval helpers (getTotalDuration, formatIntervalSummary).\n\nThe snapshot has been regenerated so anonymous visitors read the templates\nfrom the cardio_templates table (no fallback needed).",
+      "tree": {
+        "sha": "bc3a2b1a4bb5072fb67931c9804d60246b626192",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/bc3a2b1a4bb5072fb67931c9804d60246b626192"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/40f4cffe1180528b1ccbfaa0c19e5a9c3ac4f12e",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/40f4cffe1180528b1ccbfaa0c19e5a9c3ac4f12e",
+    "node_id": "C_kwDORV0mMdoAKDQwZjRjZmZlMTE4MDUyOGIxY2NiZmFhMGMxOWU1YTljM2FjNGYxMmU",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/61ce6fefbaeffdb8388618c537091aa2bca38253",
+        "sha": "61ce6fefbaeffdb8388618c537091aa2bca38253",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/61ce6fefbaeffdb8388618c537091aa2bca38253"
+      }
+    ],
+    "sha": "40f4cffe1180528b1ccbfaa0c19e5a9c3ac4f12e",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/40f4cffe1180528b1ccbfaa0c19e5a9c3ac4f12e"
+  }
+]

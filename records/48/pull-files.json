@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 13,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/9f91f31843a56688cb9d9c71e5aabece6ca58547/frontend%2Fpackage-lock.json",
+    "changes": 16,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fpackage-lock.json?ref=9f91f31843a56688cb9d9c71e5aabece6ca58547",
+    "deletions": 3,
+    "filename": "frontend/package-lock.json",
+    "patch": "@@ -2194,10 +2194,20 @@\n       \"license\": \"MIT\"\n     },\n     \"node_modules/js-yaml\": {\n-      \"version\": \"4.1.1\",\n-      \"resolved\": \"https://registry.npmjs.org/js-yaml/-/js-yaml-4.1.1.tgz\",\n-      \"integrity\": \"sha512-qQKT4zQxXl8lLwBtHMWwaTcGfFOZviOJet3Oy/xmGk2gZH677CJM9EvtfdSkgWcATZhj/55JZ0rmy3myCT5lsA==\",\n+      \"version\": \"4.2.0\",\n+      \"resolved\": \"https://registry.npmjs.org/js-yaml/-/js-yaml-4.2.0.tgz\",\n+      \"integrity\": \"sha512-ePWsvanv0DWuDRsW8dnt+R4jQ31SCRCQ7hhNcPXZPsoBZiemuZNYGf7adZdqX2D86j6rvKp3RpCxVTSb8WQlOw==\",\n       \"dev\": true,\n+      \"funding\": [\n+        {\n+          \"type\": \"github\",\n+          \"url\": \"https://github.com/sponsors/puzrin\"\n+        },\n+        {\n+          \"type\": \"github\",\n+          \"url\": \"https://github.com/sponsors/nodeca\"\n+        }\n+      ],\n       \"license\": \"MIT\",\n       \"dependencies\": {\n         \"argparse\": \"^2.0.1\"",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/9f91f31843a56688cb9d9c71e5aabece6ca58547/frontend%2Fpackage-lock.json",
+    "sha": "ead0fdcbad2fb167e7b9ee39d6062dc14f4bee6c",
+    "status": "modified"
+  }
+]

@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/c278bea3f5f57976eb83363ead7d917169f79d61/comments",
+    "commit": {
+      "author": {
+        "date": "2026-07-20T20:39:12Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-07-20T20:39:12Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "feat(dev): dev server runs against live backend + Cosmos, signed in as you\n\nA vite plugin spawns backend/server.js on an OS-assigned free port (so parallel worktrees don't collide), pointed at live Cosmos (COSMOS_DB_ENDPOINT, passwordless via az login) with DEV_AUTH as the real admin identity, then proxies /api to it. 'npm run dev' alone brings up the full app, logged in, with live data -- no separate backend process, no dev DB.\n\nbackend/config.js: COSMOS_DB_ENDPOINT short-circuits the App Config lookup. backend/auth.js: DEV_AUTH bypasses the auth.romaine.life cookie forward. DEV_NO_BACKEND=1 opts out to the frontend-only sql.js snapshot.\n\nAll dev-only: the plugin is apply:serve (absent from 'vite build') and the prod backend never sets DEV_AUTH or COSMOS_DB_ENDPOINT, so it is inert in prod.",
+      "tree": {
+        "sha": "394121be6de428c458cb6457f2e2659b273192a3",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/394121be6de428c458cb6457f2e2659b273192a3"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/c278bea3f5f57976eb83363ead7d917169f79d61",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/c278bea3f5f57976eb83363ead7d917169f79d61",
+    "node_id": "C_kwDORV0mMdoAKGMyNzhiZWEzZjVmNTc5NzZlYjgzMzYzZWFkN2Q5MTcxNjlmNzlkNjE",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/58862fc62b83c714227a3b3909f365d263ca9ab8",
+        "sha": "58862fc62b83c714227a3b3909f365d263ca9ab8",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/58862fc62b83c714227a3b3909f365d263ca9ab8"
+      }
+    ],
+    "sha": "c278bea3f5f57976eb83363ead7d917169f79d61",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/c278bea3f5f57976eb83363ead7d917169f79d61"
+  }
+]

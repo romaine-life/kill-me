@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/c559fc361d5b6cfff6228f960696ab5c8bcc5c13/.github%2Fworkflows%2Fauto-merge-dependabot.yaml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fauto-merge-dependabot.yaml?ref=c559fc361d5b6cfff6228f960696ab5c8bcc5c13",
+    "deletions": 1,
+    "filename": ".github/workflows/auto-merge-dependabot.yaml",
+    "patch": "@@ -24,7 +24,7 @@ jobs:\n       # that key is ever rotated.\n       - name: Mint app token\n         id: app-token\n-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2\n+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0\n         with:\n           app-id: 3942172 # infra-bootstrap-github-app\n           private-key: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/c559fc361d5b6cfff6228f960696ab5c8bcc5c13/.github%2Fworkflows%2Fauto-merge-dependabot.yaml",
+    "sha": "45cba79036c5d64518f448928733007b9043bad1",
+    "status": "modified"
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 2,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/0eb1056d36fb01cd8986897d6e445aac449752de/.github%2Fworkflows%2Flint.yaml",
+    "changes": 4,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Flint.yaml?ref=0eb1056d36fb01cd8986897d6e445aac449752de",
+    "deletions": 2,
+    "filename": ".github/workflows/lint.yaml",
+    "patch": "@@ -20,7 +20,7 @@ jobs:\n     runs-on: ubuntu-latest\n     steps:\n       - uses: actions/checkout@v7\n-      - uses: actions/setup-node@v6\n+      - uses: actions/setup-node@v7\n         with:\n           node-version: '20'\n       - name: Guard against MSAL/legacy-auth reintroduction\n@@ -31,7 +31,7 @@ jobs:\n     runs-on: ubuntu-latest\n     steps:\n       - uses: actions/checkout@v7\n-      - uses: actions/setup-node@v6\n+      - uses: actions/setup-node@v7\n         with:\n           node-version: '20'\n       - name: Guard image tag identity",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/0eb1056d36fb01cd8986897d6e445aac449752de/.github%2Fworkflows%2Flint.yaml",
+    "sha": "e90a0085dbf9d7a6c8f315fc01b426a0b6a15e30",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/0eb1056d36fb01cd8986897d6e445aac449752de/.github%2Fworkflows%2Fsnapshot.yaml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fsnapshot.yaml?ref=0eb1056d36fb01cd8986897d6e445aac449752de",
+    "deletions": 1,
+    "filename": ".github/workflows/snapshot.yaml",
+    "patch": "@@ -33,7 +33,7 @@ jobs:\n           ssh-key: ${{ secrets.MAIN_PUSH_DEPLOY_KEY }}\n \n       - name: Setup Node.js\n-        uses: actions/setup-node@v6\n+        uses: actions/setup-node@v7\n         with:\n           node-version: '20'\n ",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/0eb1056d36fb01cd8986897d6e445aac449752de/.github%2Fworkflows%2Fsnapshot.yaml",
+    "sha": "656c3f200477807048ea7e320cff1236a45a9dda",
+    "status": "modified"
+  }
+]

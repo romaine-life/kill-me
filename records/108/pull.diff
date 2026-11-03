@@ -1,0 +1,407 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 627904a..3fef03b 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -189,8 +189,8 @@ distinguished by a `type` field:
+ | `exercise` | Exercise library entries per day | `daySlug`, `dayNumber`, `name`, `equipment`, `tags[]`, `variations[]` (`{name, default, targetWeight/Reps/Sets, weightFields[]?, targetInclineDegrees?}`) |
+ | `logged-workout` | A completed workout session | `userId`, `daySlug`, `dayNumber`, `dayName`, `modelVersion`, `date`, `time` (HH:MM, nullable), `mode` (quick/detailed), `exercises[]` (`{name, variation, weight, weights[]?, inclineDegrees?, reps, sets}`; multi-load movements use labelled `{key, label, value}` weight entries) |
+ | `schema-migration` | Record that a migration ran. Its existence is what stops it running again | `version`, `name`, `appliedAt`, `durationMs` |
+-| `cardio-session` | A completed cardio session | `userId`, `date`, `time` (HH:MM, nullable), `activity` (treadmill/bike), `durationMinutes`, `treadmill{}`, `bike{}` |
+-| `cardio-template` | Shared treadmill interval template (library) | `userId` (`shared`), `templateId`, `name`, `description`, `activity`, `intervals[]` (`{type, speedMph, durationMinutes}`), `sortOrder` |
++| `cardio-session` | A completed cardio session | `userId`, `date`, `time` (HH:MM, nullable), `activity` (treadmill/bike), `durationMinutes`, `treadmill{}`, `bike{}`. A steady walk is a treadmill session with a single `walk` interval — not its own activity |
++| `cardio-template` | Shared treadmill template (library) | `userId` (`shared`), `templateId`, `name`, `description`, `activity`, `intervals[]` (`{type, speedMph, durationMinutes}`), `sortOrder`, `steady`. A `steady` template (the walk) has its pace entered per session, and the document holds the default — logging with "this is the new default" writes the entered values back to it, exactly as an exercise definition holds a strength default |
+ | `soreness-entry` | Soreness record linked to an optional originating workout | `userId`, `date`, required `level` (1–10), optional `muscles[]` (`{group, muscle, level}`), optional source-workout fields |
+ | `settings` | Per-user settings (current day) | `userId`, `currentDaySlug` |
+ | `account` | Microsoft auth account record | `userId`, `provider`, `name`, `email`, `role` |
+diff --git a/backend/migrations/006-steady-walk-template.js b/backend/migrations/006-steady-walk-template.js
+new file mode 100644
+index 0000000..5ccaed3
+--- /dev/null
++++ b/backend/migrations/006-steady-walk-template.js
+@@ -0,0 +1,60 @@
++// A steady walk is a treadmill workout, not a new cardio activity: same machine,
++// same color, same history lane. It differs from the interval templates only in
++// that its single `walk` interval is entered per session rather than fixed.
++//
++// It lives in the template library for the same reason exercise defaults live on
++// the exercise definition: the document IS the default. Logging a walk and ticking
++// "this is the new default" writes the entered pace and duration back here, so the
++// next walk prefills from it.
++//
++// Re-runnable: the upsert preserves whatever intervals the document already holds,
++// so re-applying the migration can never reset a default set from the app.
++
++const SHARED = 'shared';
++const TEMPLATE_ID = 'steady-walk';
++const DOCUMENT_ID = `cardio-template-${TEMPLATE_ID}`;
++
++// Only used when the template does not exist yet — a plausible starting pace that
++// the first "new default" tick replaces.
++const INITIAL_INTERVALS = [{ type: 'walk', speedMph: 3.2, durationMinutes: 30 }];
++
++export default {
++  version: 6,
++  name: 'steady-walk-template',
++
++  async up({ container }) {
++    const { resources } = await container.items
++      .query({
++        query: 'SELECT * FROM c WHERE c.type = @type AND c.templateId = @templateId',
++        parameters: [
++          { name: '@type', value: 'cardio-template' },
++          { name: '@templateId', value: TEMPLATE_ID },
++        ],
++      })
++      .fetchAll();
++
++    const current = resources[0] ?? null;
++    const intervals = Array.isArray(current?.intervals) && current.intervals.length > 0
++      ? current.intervals
++      : INITIAL_INTERVALS;
++
++    await container.items.upsert({
++      ...(current ?? {}),
++      id: DOCUMENT_ID,
++      type: 'cardio-template',
++      userId: SHARED,
++      templateId: TEMPLATE_ID,
++      activity: 'treadmill',
++      name: 'Walk',
++      description: 'Steady walk — pace and duration set per session',
++      // What tells the log form to ask for a pace instead of showing a fixed
++      // interval list, and what makes this template writable from the app.
++      steady: true,
++      intervals,
++      sortOrder: current?.sortOrder ?? 10,
++      updatedAt: new Date().toISOString(),
++    });
++
++    return { created: !current, intervals: intervals.length };
++  },
++};
+diff --git a/backend/routes/routes/cardio.js b/backend/routes/routes/cardio.js
+index 18706e1..830ebce 100644
+--- a/backend/routes/routes/cardio.js
++++ b/backend/routes/routes/cardio.js
+@@ -26,6 +26,10 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
+     activity: doc.activity || 'treadmill',
+     name: doc.name,
+     description: doc.description || '',
++    // A steady template (the walk) carries one interval whose pace and duration
++    // are entered per session; logging one can write the entered values back as
++    // the new default.
++    steady: !!doc.steady,
+     intervals: Array.isArray(doc.intervals) ? doc.intervals : [],
+     sortOrder: doc.sortOrder ?? 0,
+   });
+@@ -174,7 +178,7 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
+   // documents (userId: 'shared'), like the exercise library.
+   router.post('/api/cardio-templates', requireAuth, requireAdmin, async (req, res) => {
+     try {
+-      const { templateId, name, description, intervals, activity, sortOrder } = req.body;
++      const { templateId, name, description, intervals, activity, sortOrder, steady } = req.body;
+ 
+       if (!templateId || !name) {
+         return res.status(400).json({ error: 'Missing required fields: templateId and name' });
+@@ -191,6 +195,7 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
+         activity: activity || 'treadmill',
+         name,
+         description: description || '',
++        steady: !!steady,
+         intervals,
+         sortOrder: sortOrder ?? 0,
+         updatedAt: new Date().toISOString(),
+diff --git a/frontend/src/components/ActivityRecordDetail.jsx b/frontend/src/components/ActivityRecordDetail.jsx
+index e73e440..35cde33 100644
+--- a/frontend/src/components/ActivityRecordDetail.jsx
++++ b/frontend/src/components/ActivityRecordDetail.jsx
+@@ -3,6 +3,7 @@ import { Activity, Bike, ChevronLeft, Dumbbell, Wrench } from 'lucide-react';
+ import { useApi } from '../api/useApi.js';
+ import { colors } from '../colors';
+ import { cardioColor, cardioName } from '../utils/cardioConfig';
++import { isSteadySession } from '../utils/cardioTemplates.js';
+ import { formatTime12h } from '../utils/dateUtils';
+ import { describeLoggedDay, getDayInfo } from '../utils/dayConfig';
+ import { dayColor, pad2 } from '../utils/dayDesign';
+@@ -281,10 +282,14 @@ function ExerciseRow({ exercise, number, accent }) {
+ function CardioDetail({ session, isAdmin, onEdit }) {
+   const accent = cardioColor(session.activity);
+   const isBike = session.activity === 'bike';
+-  const intervals = Array.isArray(session.treadmill?.intervals) ? session.treadmill.intervals : [];
++  const allIntervals = Array.isArray(session.treadmill?.intervals) ? session.treadmill.intervals : [];
++  // A steady walk is one interval — it reads as a pace, not as an interval list.
++  const walk = isSteadySession(session.treadmill) ? allIntervals[0] : null;
++  const intervals = walk ? [] : allIntervals;
+   const metrics = [
+     ['Duration', session.durationMinutes != null ? `${session.durationMinutes} min` : 'Not recorded'],
+     session.treadmill?.templateName ? ['Workout', session.treadmill.templateName] : null,
++    walk?.speedMph != null ? ['Speed', `${walk.speedMph} mph`] : null,
+     session.bike?.distanceMiles != null ? ['Distance', `${session.bike.distanceMiles} mi`] : null,
+     session.bike?.avgSpeedMph != null ? ['Average speed', `${session.bike.avgSpeedMph} mph`] : null,
+     session.bike?.avgHeartRate != null ? ['Average heart rate', `${session.bike.avgHeartRate} bpm`] : null,
+diff --git a/frontend/src/components/WorkoutDrawer.jsx b/frontend/src/components/WorkoutDrawer.jsx
+index 59c1eed..701c75b 100644
+--- a/frontend/src/components/WorkoutDrawer.jsx
++++ b/frontend/src/components/WorkoutDrawer.jsx
+@@ -1,5 +1,6 @@
+ // Log tab — single form for both creating new workouts and editing existing ones.
+-// Also handles cardio session logging (treadmill with templates, bike with manual entry).
++// Also handles cardio session logging (treadmill with interval templates or a steady
++// walk, bike with manual entry).
+ //
+ // When viewWorkout is null (create mode): form starts with defaults, submits via
+ // POST, no delete option. When viewWorkout is set (edit mode): form pre-fills
+@@ -15,7 +16,7 @@ import { ChevronRight, ChevronLeft } from 'lucide-react';
+ import { apiFetch } from '../api/client.js';
+ import { todayLocal, nowLocalTime } from '../utils/dateUtils';
+ import { useApi } from '../api/useApi.js';
+-import { getTotalDuration } from '../utils/cardioTemplates.js';
++import { getTotalDuration, buildWalkIntervals, isSteadySession } from '../utils/cardioTemplates.js';
+ import { CARDIO_CONFIG, cardioColor } from '../utils/cardioConfig.js';
+ 
+ const buildWeightEntries = (variation = {}, savedWeights = []) => {
+@@ -110,8 +111,17 @@ export function LogTab({
+   const [bikeAvgSpeed, setBikeAvgSpeed] = useState('');
+   const [bikeAvgHR, setBikeAvgHR] = useState('');
+   const [bikeCalories, setBikeCalories] = useState('');
++  // Steady-template fields (the walk): pace and duration are per session, and
++  // can be written back to the template as the new default.
++  const [walkSpeed, setWalkSpeed] = useState('');
++  const [walkDuration, setWalkDuration] = useState('');
++  const [walkUseAsDefault, setWalkUseAsDefault] = useState(false);
+ 
+   const isCardioEditMode = !!viewCardio;
++  // The walk is a treadmill option, not an activity: it sits in the same template
++  // dropdown but carries a pace instead of an interval list.
++  const selectedTemplate = templates.find(t => t.id === cardioTemplateId) || null;
++  const isWalkSelected = !!selectedTemplate?.steady;
+ 
+   const dateInputRef = useRef(null);
+   const cardioDateRef = useRef(null);
+@@ -172,6 +182,16 @@ export function LogTab({
+       });
+   }, [fetchCardioTemplates, viewCardio]);
+ 
++  // Selecting the steady walk prefills its saved default. Editing an existing
++  // session keeps that session's own pace instead.
++  useEffect(() => {
++    if (viewCardio || !selectedTemplate?.steady) return;
++    const [interval] = selectedTemplate.intervals || [];
++    setWalkSpeed(interval?.speedMph ?? '');
++    setWalkDuration(interval?.durationMinutes ?? '');
++    setWalkUseAsDefault(false);
++  }, [selectedTemplate, viewCardio]);
++
+   // Switch logType/step when viewCardio/viewWorkout changes. Edit mode jumps
+   // straight to the form; create mode starts on the type picker.
+   useEffect(() => {
+@@ -191,6 +211,11 @@ export function LogTab({
+       if (viewCardio.treadmill?.templateId) {
+         setCardioTemplateId(viewCardio.treadmill.templateId);
+       }
++      if (isSteadySession(viewCardio.treadmill)) {
++        const [interval] = viewCardio.treadmill.intervals;
++        setWalkSpeed(interval.speedMph ?? '');
++        setWalkDuration(viewCardio.durationMinutes ?? interval.durationMinutes ?? '');
++      }
+       if (viewCardio.bike) {
+         setBikeDuration(viewCardio.durationMinutes || '');
+         setBikeDistance(viewCardio.bike.distanceMiles || '');
+@@ -208,7 +233,10 @@ export function LogTab({
+       setBikeAvgSpeed('');
+       setBikeAvgHR('');
+       setBikeCalories('');
++      setWalkSpeed('');
++      setWalkDuration('');
+     }
++    setWalkUseAsDefault(false);
+   }, [viewCardio]);
+ 
+   // Clean up cooldown/toast timers on unmount
+@@ -457,8 +485,6 @@ export function LogTab({
+   const handleCardioSubmit = async () => {
+     setCardioSubmitting(true);
+     try {
+-      const selectedTemplate = templates.find(t => t.id === cardioTemplateId);
+-
+       const body = {
+         date: cardioDate,
+         time: cardioTime || null,
+@@ -466,7 +492,37 @@ export function LogTab({
+         notes: cardioNotes || '',
+       };
+ 
+-      if (cardioActivity === 'treadmill' && selectedTemplate) {
++      if (cardioActivity === 'treadmill' && isWalkSelected) {
++        const intervals = buildWalkIntervals(
++          walkSpeed ? parseFloat(walkSpeed) : null,
++          walkDuration ? parseFloat(walkDuration) : null,
++        );
++        body.durationMinutes = getTotalDuration(intervals);
++        body.treadmill = {
++          templateId: selectedTemplate.id,
++          templateName: selectedTemplate.name,
++          intervals,
++        };
++
++        // Promote the entered pace to the template before logging, mirroring how a
++        // strength exercise promotes its default: if the default cannot be saved,
++        // nothing is logged, so the two never disagree.
++        if (walkUseAsDefault) {
++          try {
++            await apiFetch(`/api/cardio-templates/${encodeURIComponent(selectedTemplate.id)}`, {
++              method: 'PUT',
++              body: JSON.stringify({ intervals }),
++            });
++            setTemplates((prev) => prev.map((t) => (
++              t.id === selectedTemplate.id ? { ...t, intervals } : t
++            )));
++          } catch (error) {
++            console.error('Error updating walk default:', error);
++            alert('The new default could not be saved, so the walk was not logged. Please try again.');
++            return;
++          }
++        }
++      } else if (cardioActivity === 'treadmill' && selectedTemplate) {
+         body.durationMinutes = getTotalDuration(selectedTemplate.intervals);
+         body.treadmill = {
+           templateId: selectedTemplate.id,
+@@ -499,7 +555,9 @@ export function LogTab({
+       }
+ 
+       // Success: show toast and start cooldown
+-      const label = cardioActivity === 'treadmill' ? 'Treadmill session' : 'Bike ride';
++      const label = cardioActivity === 'bike'
++        ? 'Bike ride'
++        : isWalkSelected ? 'Walk' : 'Treadmill session';
+       setCardioToast(`${label} logged`);
+       clearTimeout(toastTimerRef.current);
+       toastTimerRef.current = setTimeout(() => setCardioToast(null), 4000);
+@@ -534,7 +592,7 @@ export function LogTab({
+   // Render — one form, always
+   // ─────────────────────────────────────────────
+ 
+-  const selectedTemplate = templates.find(t => t.id === cardioTemplateId);
++  const walkIncomplete = isWalkSelected && (!walkSpeed || !walkDuration);
+ 
+   return (
+     <div className="max-w-2xl">
+@@ -1165,7 +1223,7 @@ export function LogTab({
+             {/* Template Selector */}
+             <div>
+               <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">
+-                Template
++                Workout
+               </label>
+               <select
+                 value={cardioTemplateId}
+@@ -1180,8 +1238,60 @@ export function LogTab({
+               </select>
+             </div>
+ 
++            {/* Walk — pace and duration instead of an interval list */}
++            {isWalkSelected && (
++              <div className="grid grid-cols-2 gap-3">
++                <div>
++                  <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">
++                    Speed (mph)
++                  </label>
++                  <input
++                    type="number"
++                    step="0.1"
++                    value={walkSpeed}
++                    onChange={(e) => setWalkSpeed(e.target.value)}
++                    placeholder="3.2"
++                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
++                  />
++                </div>
++                <div>
++                  <label className="block text-sm font-bold text-slate-300 mb-2 uppercase tracking-wide">
++                    Duration (min)
++                  </label>
++                  <input
++                    type="number"
++                    value={walkDuration}
++                    onChange={(e) => setWalkDuration(e.target.value)}
++                    placeholder="30"
++                    className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
++                  />
++                </div>
++              </div>
++            )}
++
++            {isWalkSelected && !isCardioEditMode && (
++              <label className={`flex items-start gap-3 rounded-lg border px-3 py-3 cursor-pointer transition-colors ${
++                walkUseAsDefault
++                  ? 'border-emerald-400/60 bg-emerald-500/10'
++                  : 'border-slate-600/60 bg-slate-800/40 hover:border-slate-500'
++              }`}>
++                <input
++                  type="checkbox"
++                  checked={walkUseAsDefault}
++                  onChange={(e) => setWalkUseAsDefault(e.target.checked)}
++                  className="mt-0.5 w-5 h-5 rounded bg-slate-800 border-slate-600 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 cursor-pointer"
++                />
++                <span>
++                  <span className="block text-sm font-bold text-slate-200">This is the new default</span>
++                  <span className="block mt-0.5 text-xs text-slate-400">
++                    Prefill this pace and duration next time.
++                  </span>
++                </span>
++              </label>
++            )}
++
+             {/* Interval Preview */}
+-            {selectedTemplate && (
++            {selectedTemplate && !isWalkSelected && (
+               <div className="bg-slate-800/50 backdrop-blur-md rounded-xl border border-slate-700/50 p-4">
+                 <div className="flex items-center justify-between mb-3">
+                   <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wide">Intervals</h4>
+@@ -1230,7 +1340,7 @@ export function LogTab({
+             {/* Submit */}
+             <button
+               onClick={handleCardioSubmit}
+-              disabled={cardioSubmitting || cardioCooldown}
++              disabled={cardioSubmitting || cardioCooldown || walkIncomplete}
+               className="w-full text-white px-8 py-4 rounded-xl font-black text-xl uppercase tracking-wider shadow-lg transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden"
+               style={{ background: `linear-gradient(to right, ${CARDIO_CONFIG.treadmill.color}, #059669)` }}
+             >
+@@ -1242,7 +1352,9 @@ export function LogTab({
+                   ? 'Saving...'
+                   : cardioCooldown
+                     ? '✓ Logged'
+-                    : isCardioEditMode ? 'Save Changes' : 'Log Treadmill Session'}
++                    : isCardioEditMode
++                      ? 'Save Changes'
++                      : isWalkSelected ? 'Log Walk' : 'Log Treadmill Session'}
+               </span>
+             </button>
+           </div>
+diff --git a/frontend/src/utils/cardioTemplates.js b/frontend/src/utils/cardioTemplates.js
+index a808b94..e1ea1a5 100644
+--- a/frontend/src/utils/cardioTemplates.js
++++ b/frontend/src/utils/cardioTemplates.js
+@@ -13,7 +13,23 @@ export function getTotalDuration(intervals) {
+ 
+ // Human-readable summary of a template's intervals
+ export function formatIntervalSummary(intervals) {
++  // A steady walk is a treadmill session with one interval — summarize it by
++  // pace, since "0 jog intervals" says nothing about it.
++  if (intervals.length === 1) {
++    return `${intervals[0].speedMph} mph`;
++  }
+   const jogCount = intervals.filter(i => i.type === 'jog').length;
+   const totalMin = getTotalDuration(intervals);
+   return `${jogCount} jog intervals, ${totalMin} min`;
+ }
++
++// A steady walk is logged as a treadmill session rather than its own activity:
++// same machine, same color, same history lane. It differs from an interval
++// template only in that its single `walk` interval is entered per session, so a
++// logged session with one interval is a steady one.
++export const buildWalkIntervals = (speedMph, durationMinutes) => [
++  { type: 'walk', speedMph, durationMinutes },
++];
++
++export const isSteadySession = (treadmill) =>
++  (treadmill?.intervals || []).length === 1;

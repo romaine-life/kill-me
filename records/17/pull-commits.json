@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/in/29110?v=4",
+      "events_url": "https://api.github.com/users/dependabot%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/dependabot%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/dependabot%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/dependabot%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/dependabot",
+      "id": 49699333,
+      "login": "dependabot[bot]",
+      "node_id": "MDM6Qm90NDk2OTkzMzM=",
+      "organizations_url": "https://api.github.com/users/dependabot%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/dependabot%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/dependabot%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/dependabot%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/dependabot%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/dependabot%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/08d81bbb3a537964d2a925e0b05a43d2c4a0c5f0/comments",
+    "commit": {
+      "author": {
+        "date": "2026-05-02T07:28:55Z",
+        "email": "49699333+dependabot[bot]@users.noreply.github.com",
+        "name": "dependabot[bot]"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-05-02T07:28:55Z",
+        "email": "noreply@github.com",
+        "name": "GitHub"
+      },
+      "message": "build(deps): bump uuid and @azure/identity in /snapshot\n\nRemoves [uuid](https://github.com/uuidjs/uuid). It's no longer used after updating ancestor dependency [@azure/identity](https://github.com/Azure/azure-sdk-for-js). These dependencies need to be updated together.\n\n\nRemoves `uuid`\n\nUpdates `@azure/identity` from 4.13.0 to 4.13.1\n- [Release notes](https://github.com/Azure/azure-sdk-for-js/releases)\n- [Changelog](https://github.com/Azure/azure-sdk-for-js/blob/main/documentation/Changelog-for-next-generation.md)\n- [Commits](https://github.com/Azure/azure-sdk-for-js/compare/@azure/identity_4.13.0...@azure/identity_4.13.1)\n\n---\nupdated-dependencies:\n- dependency-name: uuid\n  dependency-version: \n  dependency-type: indirect\n- dependency-name: \"@azure/identity\"\n  dependency-version: 4.13.1\n  dependency-type: direct:production\n...\n\nSigned-off-by: dependabot[bot] \u003csupport@github.com\u003e",
+      "tree": {
+        "sha": "d9c6e3d9ddb77f35d90ea28e4a496d45f40b2fa5",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/d9c6e3d9ddb77f35d90ea28e4a496d45f40b2fa5"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/08d81bbb3a537964d2a925e0b05a43d2c4a0c5f0",
+      "verification": {
+        "payload": "tree d9c6e3d9ddb77f35d90ea28e4a496d45f40b2fa5\nparent 7047a7f29eb4d18015af1ed5972571a758b1fd66\nauthor dependabot[bot] \u003c49699333+dependabot[bot]@users.noreply.github.com\u003e 1777706935 +0000\ncommitter GitHub \u003cnoreply@github.com\u003e 1777706935 +0000\n\nbuild(deps): bump uuid and @azure/identity in /snapshot\n\nRemoves [uuid](https://github.com/uuidjs/uuid). It's no longer used after updating ancestor dependency [@azure/identity](https://github.com/Azure/azure-sdk-for-js). These dependencies need to be updated together.\n\n\nRemoves `uuid`\n\nUpdates `@azure/identity` from 4.13.0 to 4.13.1\n- [Release notes](https://github.com/Azure/azure-sdk-for-js/releases)\n- [Changelog](https://github.com/Azure/azure-sdk-for-js/blob/main/documentation/Changelog-for-next-generation.md)\n- [Commits](https://github.com/Azure/azure-sdk-for-js/compare/@azure/identity_4.13.0...@azure/identity_4.13.1)\n\n---\nupdated-dependencies:\n- dependency-name: uuid\n  dependency-version: \n  dependency-type: indirect\n- dependency-name: \"@azure/identity\"\n  dependency-version: 4.13.1\n  dependency-type: direct:production\n...\n\nSigned-off-by: dependabot[bot] \u003csupport@github.com\u003e",
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJp9ae3CRC1aQ7uu5UhlAAAgagQAJpLj21LSYaOHMfh/i9CD/SB\nGyqGy+zCIbDz+3qBf5chYsG9dsojGKFAJFl/spktbTw+xBHsGrEUL3gOrSLJnA2o\nOL6tZb7F6IJMFQ5AiVHorb/HXl8mBrW/GICO5mQx0Y1/JbEdbz6tGV3PVekyL66V\nx3K2wQ1tu4SM93KbVx9qYC5kVQ6cNLdTN/yNOAVo2dzGPl6vaSBs+p0VQU+pEAeg\nDoOc1mh13REaB8ASo264YiLAvhYGcmr0cvUyY5Y0mFM7A+t6Lnz3sPTzWiw2wjYa\nz0T7lIAmlAHMQeDqcla5iYiPJpp3ssPmzAAtXKux7uFxlxxy2GIwQHorUqBLl142\nqN38y/4IuBMVkZgs/n6K+zVVXbSsTfS59AqX1/4nh0L5veml8S4kRxvmjd+/QcHS\ntSNV3PxJxUAIY8Zplwa6y4wc5eGpsPw71Y/iPC5cYky39gA9hWkzMR86+ZlmXlTl\nUVJCGM1BiH3rMHX+ESoER6bNQzG6JcYmh1Dk+Xn7D1Izk4EboESFtGlxCRyh1NXS\nQJv1nD0/LuvaqHA/QqOh739xO9sxJy0mPNGPt5KOfDJbG4HPIAfrtY9iNmWVAsjZ\nlaEPXL2bYCTyW0rBXJAhbwTTe2JTyuVeS57vl1aAnTCTIGjdaYqXxlofnH+NCeam\n424WvLvrWcfMNn6nGmcm\n=NQo2\n-----END PGP SIGNATURE-----\n",
+        "verified": true,
+        "verified_at": "2026-05-02T07:28:56Z"
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/web-flow",
+      "id": 19864447,
+      "login": "web-flow",
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/web-flow",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/08d81bbb3a537964d2a925e0b05a43d2c4a0c5f0",
+    "node_id": "C_kwDORV0mMdoAKDA4ZDgxYmJiM2E1Mzc5NjRkMmE5MjVlMGIwNWE0M2QyYzRhMGM1ZjA",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/7047a7f29eb4d18015af1ed5972571a758b1fd66",
+        "sha": "7047a7f29eb4d18015af1ed5972571a758b1fd66",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/7047a7f29eb4d18015af1ed5972571a758b1fd66"
+      }
+    ],
+    "sha": "08d81bbb3a537964d2a925e0b05a43d2c4a0c5f0",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/08d81bbb3a537964d2a925e0b05a43d2c4a0c5f0"
+  }
+]

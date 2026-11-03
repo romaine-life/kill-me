@@ -1,0 +1,22 @@
+diff --git a/.github/workflows/container-app-build.yml b/.github/workflows/container-app-build.yml
+index 6aadb1c6..3c281f20 100644
+--- a/.github/workflows/container-app-build.yml
++++ b/.github/workflows/container-app-build.yml
+@@ -1,4 +1,3 @@
+-# .github/workflows/ci-caller.yml
+ name: Phase 1 - CI Build
+ 
+ on:
+@@ -8,11 +7,8 @@ on:
+     branches: [ "main" ]
+ 
+ jobs:
+-  # The name of this job ("build-pipeline") becomes part of the final check name!
+   build-pipeline:
+-    uses: nelsong6/infra-bootstrap/.github/workflows/ci-template.yml@main
++    uses: nelsong6/infra-bootstrap/.github/workflows/container-app-build-template.yml@main
+     with:
+-      backend_directory: './backend'
+-      image_name_suffix: 'workout-api'
+       node_version: '20'
+     secrets: inherit

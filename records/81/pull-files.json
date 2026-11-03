@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/9cc810643a4f87e22acc665804fded28283c15cc/frontend%2Fsrc%2Fcomponents%2FSorenessTab.jsx",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fsrc%2Fcomponents%2FSorenessTab.jsx?ref=9cc810643a4f87e22acc665804fded28283c15cc",
+    "deletions": 1,
+    "filename": "frontend/src/components/SorenessTab.jsx",
+    "patch": "@@ -99,7 +99,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })\n   const { fetchSoreness, fetchWorkouts, isReady } = useDataSource();\n   const isMobile = useIsMobile();\n \n-  const [view, setView] = useState('journal'); // 'journal' | 'timeline' | 'lanes'\n+  const [view, setView] = useState('lanes'); // 'lanes' | 'journal' | 'timeline'\n \n   // Editor state\n   const [editing, setEditing] = useState(false);",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/9cc810643a4f87e22acc665804fded28283c15cc/frontend%2Fsrc%2Fcomponents%2FSorenessTab.jsx",
+    "sha": "b658fa3f1a051e022e2a35b4ea4c57e7d0eccb25",
+    "status": "modified"
+  }
+]

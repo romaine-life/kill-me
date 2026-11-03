@@ -1,0 +1,464 @@
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 13d8be4..4541408 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -58,6 +58,7 @@ function App() {
+   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 760);
+   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+   const [activityView, setActivityView] = useState('lanes');
++  const [sorenessCreateRequested, setSorenessCreateRequested] = useState(false);
+ 
+   // Push URL when tab changes (but not on initial mount)
+   const navigateTab = useCallback((tab) => {
+@@ -131,6 +132,7 @@ function App() {
+   // Navigate to the Soreness tab with the editor pre-attributed to a workout
+   const handleLogSoreness = (workout) => {
+     setDetailStack([]);
++    setSorenessCreateRequested(false);
+     setSorenessSource(workout);
+     setActivityView('journal');
+     navigateTab('soreness');
+@@ -151,11 +153,19 @@ function App() {
+ 
+   const handleEditSoreness = (entry) => {
+     setDetailStack([]);
++    setSorenessCreateRequested(false);
+     setSorenessEditEntry(entry);
+     setActivityView('journal');
+     navigateTab('soreness');
+   };
+ 
++  const handleCreateSoreness = () => {
++    setSorenessSource(null);
++    setSorenessEditEntry(null);
++    setSorenessCreateRequested(true);
++    setActivityView('journal');
++  };
++
+   const handleEditRecord = (kind, record) => {
+     if (kind === 'workout') handleEditWorkout(record);
+     if (kind === 'cardio') handleEditCardio(record);
+@@ -256,37 +266,43 @@ function App() {
+           )}
+ 
+           {activeTab === 'soreness' && (
+-            activityView === 'calendar' ? (
+-              <HistoryTab
+-                key={refreshKey}
+-                viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
+-                onDayClick={isAdmin ? handleOpenLog : undefined}
+-                onWorkoutClick={(workout) => handleOpenRecord('workout', workout)}
+-                onCardioClick={(session) => handleOpenRecord('cardio', session)}
+-                onSorenessClick={(entry) => handleOpenRecord('soreness', entry)}
+-              />
+-            ) : activityView === 'list' ? (
+-              <ListTab
+-                key={refreshKey}
+-                viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
+-                onWorkoutClick={(workout) => handleOpenRecord('workout', workout)}
+-                onCardioClick={(session) => handleOpenRecord('cardio', session)}
+-                onSorenessClick={(entry) => handleOpenRecord('soreness', entry)}
+-              />
+-            ) : (
+-              <SorenessTab
+-                isAdmin={isAdmin}
+-                view={activityView}
+-                viewToggle={<ActivityToggle view={activityView} onChange={setActivityView} />}
+-                initialSource={sorenessSource}
+-                onSourceConsumed={() => setSorenessSource(null)}
+-                initialEditEntry={sorenessEditEntry}
+-                onEditConsumed={() => setSorenessEditEntry(null)}
+-                onOpenWorkout={(workout) => handleOpenRecord('workout', workout)}
+-                onOpenCardio={(session) => handleOpenRecord('cardio', session)}
+-                onOpenSoreness={(entry) => handleOpenRecord('soreness', entry)}
+-              />
+-            )
++            <ActivityWorkspace
++              view={activityView}
++              onViewChange={setActivityView}
++              isAdmin={isAdmin}
++              onCreateSoreness={handleCreateSoreness}
++            >
++              {activityView === 'calendar' ? (
++                <HistoryTab
++                  key={refreshKey}
++                  onDayClick={isAdmin ? handleOpenLog : undefined}
++                  onWorkoutClick={(workout) => handleOpenRecord('workout', workout)}
++                  onCardioClick={(session) => handleOpenRecord('cardio', session)}
++                  onSorenessClick={(entry) => handleOpenRecord('soreness', entry)}
++                />
++              ) : activityView === 'list' ? (
++                <ListTab
++                  key={refreshKey}
++                  onWorkoutClick={(workout) => handleOpenRecord('workout', workout)}
++                  onCardioClick={(session) => handleOpenRecord('cardio', session)}
++                  onSorenessClick={(entry) => handleOpenRecord('soreness', entry)}
++                />
++              ) : (
++                <SorenessTab
++                  isAdmin={isAdmin}
++                  view={activityView}
++                  initialCreate={sorenessCreateRequested}
++                  onCreateConsumed={() => setSorenessCreateRequested(false)}
++                  initialSource={sorenessSource}
++                  onSourceConsumed={() => setSorenessSource(null)}
++                  initialEditEntry={sorenessEditEntry}
++                  onEditConsumed={() => setSorenessEditEntry(null)}
++                  onOpenWorkout={(workout) => handleOpenRecord('workout', workout)}
++                  onOpenCardio={(session) => handleOpenRecord('cardio', session)}
++                  onOpenSoreness={(entry) => handleOpenRecord('soreness', entry)}
++                />
++              )}
++            </ActivityWorkspace>
+           )}
+ 
+           {activeTab === 'cycle' && (
+@@ -341,20 +357,47 @@ function ActivityToggle({ view, onChange }) {
+     { id: 'list', label: 'List' },
+     { id: 'calendar', label: 'Calendar' },
+   ];
++
++  const handleKeyDown = (event, index) => {
++    let nextIndex;
++    if (event.key === 'ArrowRight') nextIndex = (index + 1) % opts.length;
++    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + opts.length) % opts.length;
++    if (event.key === 'Home') nextIndex = 0;
++    if (event.key === 'End') nextIndex = opts.length - 1;
++    if (nextIndex === undefined) return;
++
++    event.preventDefault();
++    const next = opts[nextIndex];
++    onChange(next.id);
++    window.requestAnimationFrame(() => document.getElementById(`activity-tab-${next.id}`)?.focus());
++  };
++
+   return (
+-    <div className="activity-view-toggle" style={{ display: 'flex', flexWrap: 'wrap', gap: 4, padding: 4, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, width: 'fit-content', maxWidth: '100%', boxSizing: 'border-box' }}>
+-      {opts.map((o) => {
++    <div
++      className="activity-view-toggle"
++      role="tablist"
++      aria-label="Activity views"
++      style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 10, width: 'fit-content', maxWidth: '100%', boxSizing: 'border-box' }}
++    >
++      {opts.map((o, index) => {
+         const active = o.id === view;
+         return (
+           <button
+             key={o.id}
++            id={`activity-tab-${o.id}`}
++            type="button"
++            role="tab"
+             onClick={() => onChange(o.id)}
+-            aria-pressed={active}
++            onKeyDown={(event) => handleKeyDown(event, index)}
++            aria-selected={active}
++            aria-controls="activity-view-panel"
++            tabIndex={active ? 0 : -1}
+             style={{
+               padding: '9px 12px', borderRadius: 7, fontSize: 13, fontWeight: 600,
+               fontFamily: 'var(--font-primary)', border: 'none', cursor: 'pointer',
+               color: active ? 'var(--fg-primary)' : 'var(--fg-muted)',
+               background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
++              whiteSpace: 'nowrap', flexShrink: 0,
+             }}
+           >
+             {o.label}
+@@ -365,6 +408,37 @@ function ActivityToggle({ view, onChange }) {
+   );
+ }
+ 
++function ActivityWorkspace({ view, onViewChange, isAdmin, onCreateSoreness, children }) {
++  return (
++    <div className="activity-workspace">
++      <header className="activity-workspace-header">
++        <div className="activity-workspace-heading">
++          <h2>Activity &amp; Recovery</h2>
++          <p>Strength, cardio, and recovery over time</p>
++        </div>
++        <div className="activity-workspace-controls">
++          <ActivityToggle view={view} onChange={onViewChange} />
++          {isAdmin && (
++            <button type="button" className="activity-add-soreness" onClick={onCreateSoreness}>
++              <span className="activity-add-label-long">+ Add soreness</span>
++              <span className="activity-add-label-short">+ Add</span>
++            </button>
++          )}
++        </div>
++      </header>
++      <div
++        id="activity-view-panel"
++        className="activity-view-panel"
++        role="tabpanel"
++        aria-labelledby={`activity-tab-${view}`}
++        tabIndex={0}
++      >
++        {children}
++      </div>
++    </div>
++  );
++}
++
+ function TopBar({ activeTab, isMobile, showAdminTab, mobileNavOpen, onToggleMobileNav }) {
+   const title = activeTab === 'soreness'
+       ? 'Activity'
+diff --git a/frontend/src/components/HistoryTab.jsx b/frontend/src/components/HistoryTab.jsx
+index ce1cd1e..da002f9 100644
+--- a/frontend/src/components/HistoryTab.jsx
++++ b/frontend/src/components/HistoryTab.jsx
+@@ -21,7 +21,7 @@ import { dateToLocal } from '../utils/dateUtils';
+ 
+ const SORENESS_COLOR = '#f97316'; // orange-500
+ 
+-export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, onSorenessClick, viewToggle }) {
++export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, onSorenessClick }) {
+   const [calendarPeriod, setCalendarPeriod] = useState('month'); // 'week', 'month', or 'year'
+   const [workouts, setWorkouts] = useState([]);
+   const [cardioSessions, setCardioSessions] = useState([]);
+@@ -243,8 +243,6 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, onSorene
+ 
+   return (
+     <div className="space-y-4 sm:space-y-6">
+-      {viewToggle}
+-
+       {/* Stats Card */}
+       <div className="bg-gradient-to-r from-cyan-500/20 to-blue-600/20 backdrop-blur-md rounded-2xl border border-cyan-500/50 p-4 sm:p-6">
+         <div className="grid grid-cols-4 gap-2 sm:gap-4 text-center">
+diff --git a/frontend/src/components/ListTab.jsx b/frontend/src/components/ListTab.jsx
+index 12655c0..ae4619c 100644
+--- a/frontend/src/components/ListTab.jsx
++++ b/frontend/src/components/ListTab.jsx
+@@ -30,7 +30,7 @@ const daysSince = (iso) => {
+   return Math.round((b - a) / (1000 * 60 * 60 * 24));
+ };
+ 
+-export function ListTab({ onWorkoutClick, onCardioClick, onSorenessClick, viewToggle }) {
++export function ListTab({ onWorkoutClick, onCardioClick, onSorenessClick }) {
+   const [workouts, setWorkouts] = useState([]);
+   const [cardioSessions, setCardioSessions] = useState([]);
+   const [sorenessEntries, setSorenessEntries] = useState([]);
+@@ -122,8 +122,7 @@ export function ListTab({ onWorkoutClick, onCardioClick, onSorenessClick, viewTo
+   ];
+ 
+   return (
+-    <div className="list-tab-page" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 80px', display: 'flex', flexDirection: 'column', gap: 28, fontFamily: 'var(--font-primary)' }}>
+-      {viewToggle}
++    <div className="list-tab-page" style={{ width: '100%', maxWidth: 1100, margin: 0, padding: 0, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 28, fontFamily: 'var(--font-primary)' }}>
+       <StatsStrip workouts={workouts} cardio={cardioSessions} cycles={cyclesCompleted} activeDays={new Set(allDates).size} />
+ 
+       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+diff --git a/frontend/src/components/SorenessTab.jsx b/frontend/src/components/SorenessTab.jsx
+index 6de4d8a..9c699dd 100644
+--- a/frontend/src/components/SorenessTab.jsx
++++ b/frontend/src/components/SorenessTab.jsx
+@@ -103,7 +103,8 @@ function useIsMobile(breakpoint = 640) {
+ export function SorenessTab({
+   isAdmin,
+   view = 'lanes',
+-  viewToggle,
++  initialCreate = false,
++  onCreateConsumed,
+   initialSource = null,
+   onSourceConsumed,
+   initialEditEntry = null,
+@@ -222,6 +223,16 @@ export function SorenessTab({
+     resetPicker();
+   }
+ 
++  const createConsumedCallback = useRef(onCreateConsumed);
++  const startNewCallback = useRef(startNew);
++  createConsumedCallback.current = onCreateConsumed;
++  startNewCallback.current = startNew;
++  useEffect(() => {
++    if (!initialCreate) return;
++    startNewCallback.current();
++    createConsumedCallback.current?.();
++  }, [initialCreate]);
++
+   function showWorkout(workout) {
+     setEditing(false);
+     setChangingSource(false);
+@@ -645,36 +656,10 @@ export function SorenessTab({
+     );
+   }
+ 
+-  const header = (
+-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+-      <div>
+-        <h2 style={styles.heading}>
+-          {view === 'lanes' ? 'Activity & Recovery' : view === 'timeline' ? 'Recovery Timeline' : 'Soreness Journal'}
+-        </h2>
+-        <p style={{ color: colors.text.tertiary, fontSize: 12, margin: '4px 0 0 0' }}>
+-          {view === 'journal'
+-            ? 'Soreness logged per workout'
+-            : view === 'lanes'
+-              ? 'Strength, cardio, and recovery over time'
+-              : 'Each workout and the soreness it caused'}
+-        </p>
+-      </div>
+-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+-        {viewToggle}
+-        {isAdmin && (
+-          <button onClick={startNew} style={styles.addBtn}>
+-            + Add soreness
+-          </button>
+-        )}
+-      </div>
+-    </div>
+-  );
+-
+   // ── Lanes view ───────────────────────────────────────────────────────
+   if (view === 'lanes') {
+     return (
+       <div style={{ width: '100%', maxWidth: 1200, minWidth: 0, boxSizing: 'border-box' }}>
+-        {header}
+         {error && <p style={{ color: colors.accent.red, fontSize: 12, marginBottom: 12 }}>{error}</p>}
+         <SorenessLanes
+           entries={entries}
+@@ -691,7 +676,6 @@ export function SorenessTab({
+   if (view === 'timeline') {
+     return (
+       <div style={{ width: '100%', maxWidth: 1000, minWidth: 0, boxSizing: 'border-box' }}>
+-        {header}
+         {error && <p style={{ color: colors.accent.red, fontSize: 12, marginBottom: 12 }}>{error}</p>}
+         <RecoveryTimeline
+           workouts={workoutsByDate}
+@@ -713,7 +697,6 @@ export function SorenessTab({
+   // ── Journal (list) view ──────────────────────────────────────────────
+   return (
+     <div style={{ maxWidth: isMobile ? undefined : 1000 }}>
+-      {header}
+       {error && <p style={{ color: colors.accent.red, fontSize: 12, marginBottom: 12 }}>{error}</p>}
+ 
+       <div style={{ display: 'flex', gap: isMobile ? 16 : 24, alignItems: 'flex-start', overflowX: 'auto' }}>
+diff --git a/frontend/src/index.css b/frontend/src/index.css
+index 5f150e5..82c03c8 100644
+--- a/frontend/src/index.css
++++ b/frontend/src/index.css
+@@ -246,6 +246,80 @@
+   font-family: var(--font-primary);
+ }
+ 
++.app-tab-content {
++  scrollbar-gutter: stable;
++}
++
++.activity-workspace-header {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 20px;
++  margin-bottom: 28px;
++}
++
++.activity-workspace-heading {
++  flex: 1 1 260px;
++  min-width: 0;
++}
++
++.activity-workspace-heading h2 {
++  margin: 0;
++  color: var(--fg-primary);
++  font-family: var(--font-mono);
++  font-size: 22px;
++  font-weight: 800;
++  line-height: 1.15;
++}
++
++.activity-workspace-heading p {
++  margin: 6px 0 0;
++  color: var(--fg-faint);
++  font-size: 12px;
++}
++
++.activity-workspace-controls {
++  display: flex;
++  align-items: center;
++  justify-content: flex-end;
++  gap: 14px;
++  min-width: 0;
++}
++
++.activity-view-toggle {
++  flex-wrap: nowrap;
++  overflow-x: auto;
++  overscroll-behavior-x: contain;
++  scrollbar-width: none;
++}
++
++.activity-view-toggle::-webkit-scrollbar {
++  display: none;
++}
++
++.activity-add-soreness {
++  flex-shrink: 0;
++  padding: 10px 16px;
++  border: 1px solid var(--muscle-red);
++  border-radius: 8px;
++  background: transparent;
++  color: var(--muscle-red);
++  cursor: pointer;
++  font-family: var(--font-primary);
++  font-size: 13px;
++  font-weight: 700;
++  white-space: nowrap;
++}
++
++.activity-add-label-short {
++  display: none;
++}
++
++.activity-view-panel {
++  min-width: 0;
++  outline: none;
++}
++
+ .app-tab-content h2.text-5xl,
+ .app-tab-content h2.text-3xl {
+   font-family: var(--font-primary);
+@@ -285,10 +359,44 @@
+     width: 100%;
+     box-sizing: border-box;
+     min-width: 0;
+-    padding: 16px 16px 104px !important;
++    padding: 0 !important;
+     gap: 20px !important;
+   }
+ 
++  .activity-workspace-header {
++    align-items: flex-start;
++    flex-wrap: wrap;
++    gap: 14px;
++    margin-bottom: 20px;
++  }
++
++  .activity-workspace-heading {
++    flex-basis: 100%;
++  }
++
++  .activity-workspace-controls {
++    width: 100%;
++    justify-content: flex-start;
++    gap: 8px;
++  }
++
++  .activity-view-toggle {
++    flex: 1 1 auto;
++    width: 0 !important;
++  }
++
++  .activity-add-soreness {
++    padding-inline: 12px;
++  }
++
++  .activity-add-label-long {
++    display: none;
++  }
++
++  .activity-add-label-short {
++    display: inline;
++  }
++
+   .list-hero {
+     grid-template-columns: minmax(0, 1fr) !important;
+     min-height: 200px !important;

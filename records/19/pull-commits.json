@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/81847?v=4",
+      "events_url": "https://api.github.com/users/claude/events{/privacy}",
+      "followers_url": "https://api.github.com/users/claude/followers",
+      "following_url": "https://api.github.com/users/claude/following{/other_user}",
+      "gists_url": "https://api.github.com/users/claude/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/claude",
+      "id": 81847,
+      "login": "claude",
+      "node_id": "MDQ6VXNlcjgxODQ3",
+      "organizations_url": "https://api.github.com/users/claude/orgs",
+      "received_events_url": "https://api.github.com/users/claude/received_events",
+      "repos_url": "https://api.github.com/users/claude/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/claude/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/claude/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/claude",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/8d1e2f9da40740e9301c4afe3e0ebde733be51fb/comments",
+    "commit": {
+      "author": {
+        "date": "2026-05-03T01:58:27Z",
+        "email": "noreply@anthropic.com",
+        "name": "Claude Code"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-05-03T01:58:27Z",
+        "email": "noreply@anthropic.com",
+        "name": "Claude Code"
+      },
+      "message": "Implement synergy-12 List landing page redesign\n\nPixel-matched to the workout-tracker.html design from claude.ai/design.\nMakes the List tab the public landing page (renders for auth + unauth)\nand gives it an anatomical hero, scoreboard stats strip, filter pills,\nand a date-grouped timeline of workouts / cardio / soreness. Adds a\n12-segment cycle dial to the sidebar showing today's day in its accent.\n\n- New: utils/dayDesign.js (per-day accent + muscle slug + helpers)\n- New: components/CycleDial.jsx (12-segment SVG dial w/ today center)\n- Rewritten: components/ListTab.jsx (hero + stats + filters + feed)\n- index.css: Archivo font, design tokens, .anatomy/.display/.eyebrow\n- App.jsx: list is the default tab, '/' maps to list, sidebar hosts dial\n\nCo-Authored-By: Claude Opus 4.7 (1M context) \u003cnoreply@anthropic.com\u003e",
+      "tree": {
+        "sha": "b80ca21d90e2674de49d2a31bd32fe2e8c76c9f3",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/b80ca21d90e2674de49d2a31bd32fe2e8c76c9f3"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/8d1e2f9da40740e9301c4afe3e0ebde733be51fb",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/81847?v=4",
+      "events_url": "https://api.github.com/users/claude/events{/privacy}",
+      "followers_url": "https://api.github.com/users/claude/followers",
+      "following_url": "https://api.github.com/users/claude/following{/other_user}",
+      "gists_url": "https://api.github.com/users/claude/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/claude",
+      "id": 81847,
+      "login": "claude",
+      "node_id": "MDQ6VXNlcjgxODQ3",
+      "organizations_url": "https://api.github.com/users/claude/orgs",
+      "received_events_url": "https://api.github.com/users/claude/received_events",
+      "repos_url": "https://api.github.com/users/claude/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/claude/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/claude/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/claude",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/8d1e2f9da40740e9301c4afe3e0ebde733be51fb",
+    "node_id": "C_kwDORV0mMdoAKDhkMWUyZjlkYTQwNzQwZTkzMDFjNGFmZTNlMGViZGU3MzNiZTUxZmI",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/bb478d7e3a7f4a1640e91019151d6942c0758e1a",
+        "sha": "bb478d7e3a7f4a1640e91019151d6942c0758e1a",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/bb478d7e3a7f4a1640e91019151d6942c0758e1a"
+      }
+    ],
+    "sha": "8d1e2f9da40740e9301c4afe3e0ebde733be51fb",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/8d1e2f9da40740e9301c4afe3e0ebde733be51fb"
+  }
+]

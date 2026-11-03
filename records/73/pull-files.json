@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 8,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/a799b3161680eb9ed0fa609378f9be2624a26679/frontend%2Fpackage-lock.json",
+    "changes": 16,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fpackage-lock.json?ref=a799b3161680eb9ed0fa609378f9be2624a26679",
+    "deletions": 8,
+    "filename": "frontend/package-lock.json",
+    "patch": "@@ -27,7 +27,7 @@\n         \"eslint-plugin-react-hooks\": \"^7.0.1\",\n         \"eslint-plugin-react-refresh\": \"^0.4.24\",\n         \"globals\": \"^16.5.0\",\n-        \"postcss\": \"^8.5.13\",\n+        \"postcss\": \"^8.5.25\",\n         \"tailwindcss\": \"^4.1.18\",\n         \"vite\": \"^8.0.16\"\n       }\n@@ -2636,9 +2636,9 @@\n       \"license\": \"MIT\"\n     },\n     \"node_modules/nanoid\": {\n-      \"version\": \"3.3.12\",\n-      \"resolved\": \"https://registry.npmjs.org/nanoid/-/nanoid-3.3.12.tgz\",\n-      \"integrity\": \"sha512-ZB9RH/39qpq5Vu6Y+NmUaFhQR6pp+M2Xt76XBnEwDaGcVAqhlvxrl3B2bKS5D3NH3QR76v3aSrKaF/Kiy7lEtQ==\",\n+      \"version\": \"3.3.16\",\n+      \"resolved\": \"https://registry.npmjs.org/nanoid/-/nanoid-3.3.16.tgz\",\n+      \"integrity\": \"sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q==\",\n       \"dev\": true,\n       \"funding\": [\n         {\n@@ -2772,9 +2772,9 @@\n       }\n     },\n     \"node_modules/postcss\": {\n-      \"version\": \"8.5.15\",\n-      \"resolved\": \"https://registry.npmjs.org/postcss/-/postcss-8.5.15.tgz\",\n-      \"integrity\": \"sha512-FfR8sjd4em2T6fb3I2MwAJU7HWVMr9zba+enmQeeWFfCbm+UOC/0X4DS8XtpUTMwWMGbjKYP7xjfNekzyGmB3A==\",\n+      \"version\": \"8.5.25\",\n+      \"resolved\": \"https://registry.npmjs.org/postcss/-/postcss-8.5.25.tgz\",\n+      \"integrity\": \"sha512-DTPx3RWSSnWyzLxQnlH0rJP+EW5ekl16ZU4/psbIhA0e53kJfdgaN5vKM+xP7yJtXVu+nfdVFmlgFDEKAe4Pyw==\",\n       \"dev\": true,\n       \"funding\": [\n         {\n@@ -2792,7 +2792,7 @@\n       ],\n       \"license\": \"MIT\",\n       \"dependencies\": {\n-        \"nanoid\": \"^3.3.12\",\n+        \"nanoid\": \"^3.3.16\",\n         \"picocolors\": \"^1.1.1\",\n         \"source-map-js\": \"^1.2.1\"\n       },",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/a799b3161680eb9ed0fa609378f9be2624a26679/frontend%2Fpackage-lock.json",
+    "sha": "319c5d1291e99455d9a0f3d1bf7f18b00abf6db2",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/a799b3161680eb9ed0fa609378f9be2624a26679/frontend%2Fpackage.json",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fpackage.json?ref=a799b3161680eb9ed0fa609378f9be2624a26679",
+    "deletions": 1,
+    "filename": "frontend/package.json",
+    "patch": "@@ -29,7 +29,7 @@\n     \"eslint-plugin-react-hooks\": \"^7.0.1\",\n     \"eslint-plugin-react-refresh\": \"^0.4.24\",\n     \"globals\": \"^16.5.0\",\n-    \"postcss\": \"^8.5.13\",\n+    \"postcss\": \"^8.5.25\",\n     \"tailwindcss\": \"^4.1.18\",\n     \"vite\": \"^8.0.16\"\n   }",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/a799b3161680eb9ed0fa609378f9be2624a26679/frontend%2Fpackage.json",
+    "sha": "bb891f94ecdba559d734c7a7dce031dba83643cc",
+    "status": "modified"
+  }
+]

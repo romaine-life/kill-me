@@ -1,0 +1,49 @@
+[
+  {
+    "author_association": "MEMBER",
+    "body": "Shipped. kill-me runs as a per-app K8s Deployment on AKS, serving [workout.romaine.life](https://workout.romaine.life) from a multi-stage Docker image:\n\n- **Stage 1 (Vite):** builds the React frontend. `VITE_MICROSOFT_CLIENT_ID` and `BUILD_NUMBER` inlined at build time via `--build-arg`; git is unavailable in the stage, so `vite.config.js` now prefers `process.env.BUILD_NUMBER` over its git-hash fallback.\n- **Stage 2 (Node):** Express serves `frontend/dist` via `express.static`, mounts the four kill-me route factories (`createWorkoutRoutes`, `createSorenessRoutes`, `createCardioRoutes`, `createAdminRoutes`), and Microsoft OAuth (`/auth/microsoft/login`) on the same origin.\n\n## Latent bugs fixed during migration\n\n- App Configuration key was `workout:microsoft_client_id` (colon + short name) — didn't match the `*/microsoft_oauth_client_id` filter the shared api uses to discover accepted audiences. Tokens from kill-me's own app registration would have been rejected. Renamed to `workout/microsoft_oauth_client_id` in tofu, and the new backend uses the same filter.\n- App registration had zero owners (same pattern we hit on house-hunt + investing). Added kill-me's SP as owner manually + declared `owners = [data.azuread_client_config.current.object_id]` in `tofu/oauth.tf`.\n\n## Full path\n\n- Azure SWA + CNAME destroyed (`tofu/frontend.tf` removed)\n- Image built + pushed to `romainecr` by GitHub Actions, tag committed back via `kustomize edit set image`\n- ArgoCD Application in infra-bootstrap syncs `k8s/` (Deployment, Service, ServiceAccount with workload identity, Certificate, XListenerSet, HTTPRoute with dual parentRef for external-dns#5694 workaround)\n- cert-manager issues Let's Encrypt via HTTP-01 on the shared `main` Gateway\n- ExternalDNS creates the A record from the HTTPRoute's Gateway parent\n- `snapshot.yml` trimmed to just generate + commit `snapshot.db` — the commit triggers `build-and-deploy.yml`'s `frontend/**` path filter, rebuilding the image with the new snapshot baked in and rolling the pod\n\n## Frontend same-origin flip\n\n- Dropped `VITE_API_URL` entirely (was falling back to `http://localhost:3000/workout`) from `api/client.js`, `auth/AuthContext.jsx`, `utils/adminMode.js`\n- Deleted SWA-specific `frontend/public/staticwebapp.config.json`\n\n## Verified\n\n- `https://workout.romaine.life/` → 200 (React SPA shell)\n- `/health` → healthy\n- `/api/current-day` → real data from Cosmos (workload identity + routes wiring works)\n- Unauth `POST /api/log-workout` → 401 (JWT middleware wired correctly)\n- Kill-me client ID `6a7ce0ef-...` inlined into the built JS bundle\n\n## Commits\n\n- [6cec70a](https://github.com/nelsong6/kill-me/commit/6cec70a) — migration\n- [035ea0a](https://github.com/nelsong6/kill-me/commit/035ea0a) — CI-committed image tag bump\n\n## Deliberate non-changes\n\n- `@nelsong6/kill-me-routes` npm package kept — now consumed by this repo's own backend instead of the shared api\n- `/workout` mount still live on the shared api; strip on the api-repo cleanup pass (nelsong6/api#15 pattern, can extend to workout)",
+    "created_at": "2026-04-19T19:42:09Z",
+    "html_url": "https://github.com/romaine-life/kill-me/issues/14#issuecomment-4276671992",
+    "id": 4276671992,
+    "issue_url": "https://api.github.com/repos/romaine-life/kill-me/issues/14",
+    "minimized": null,
+    "node_id": "IC_kwDORV0mMc7-6NX4",
+    "performed_via_github_app": null,
+    "pin": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/romaine-life/kill-me/issues/comments/4276671992/reactions"
+    },
+    "updated_at": "2026-04-19T19:42:09Z",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/comments/4276671992",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    }
+  }
+]

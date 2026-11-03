@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/0855dbc168a68a37f12b20db7b59b91364644bdd/comments",
+    "commit": {
+      "author": {
+        "date": "2026-07-18T20:00:13Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-07-18T20:00:13Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "feat: make mobile data entry first-class (keypads, Log in bottom nav, safe area)\n\nAudited every tab at 375px. The logging flow was built desktop-first; this\nlands the highest-impact mobile data-entry fixes:\n\n- Weight/reps/sets inputs were type=\"text\", so phones popped the full QWERTY\n  keyboard. Add inputMode (decimal for weight, numeric for reps/sets) so the\n  numeric keypad shows, and bump their touch height (py-2 -\u003e py-3).\n- The Log tab was missing from the mobile bottom nav (buried in the hamburger).\n  Surface it centered — the primary daily action — for admins; public visitors\n  still see the same four tabs.\n- Add viewport-fit=cover + env(safe-area-inset-bottom) padding so the bottom nav\n  isn't tucked under the home indicator on notched phones, and pad the scroll\n  area so the last row of content clears the fixed nav.",
+      "tree": {
+        "sha": "efbd0442235510dc0d7ea8b2712cf2884e358765",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/efbd0442235510dc0d7ea8b2712cf2884e358765"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/0855dbc168a68a37f12b20db7b59b91364644bdd",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/0855dbc168a68a37f12b20db7b59b91364644bdd",
+    "node_id": "C_kwDORV0mMdoAKDA4NTVkYmMxNjhhNjhhMzdmMTJiMjBkYjdiNTliOTEzNjQ2NDRiZGQ",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/e4721036c74ddbd2a7ef3385ac6ca5a926032305",
+        "sha": "e4721036c74ddbd2a7ef3385ac6ca5a926032305",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/e4721036c74ddbd2a7ef3385ac6ca5a926032305"
+      }
+    ],
+    "sha": "0855dbc168a68a37f12b20db7b59b91364644bdd",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/0855dbc168a68a37f12b20db7b59b91364644bdd"
+  }
+]

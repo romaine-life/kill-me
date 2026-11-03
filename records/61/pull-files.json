@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 5,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/4d85661a5d08cac22e703de9a530cfa91e9da227/.github%2Fworkflows%2Fbuild-and-deploy.yaml",
+    "changes": 5,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fbuild-and-deploy.yaml?ref=4d85661a5d08cac22e703de9a530cfa91e9da227",
+    "deletions": 0,
+    "filename": ".github/workflows/build-and-deploy.yaml",
+    "patch": "@@ -36,6 +36,11 @@ jobs:\n         uses: actions/checkout@v7\n         with:\n           fetch-depth: 0\n+          # Bump commits are pushed straight to main, which the branch ruleset\n+          # forbids for GITHUB_TOKEN (GitHub Actions cannot be a bypass actor).\n+          # The write deploy key is the ruleset's DeployKey bypass actor, so CI\n+          # pushes keep working while PR merges still wait for required checks.\n+          ssh-key: ${{ secrets.MAIN_PUSH_DEPLOY_KEY }}\n \n       - name: Resolve requested ref\n         env:",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/4d85661a5d08cac22e703de9a530cfa91e9da227/.github%2Fworkflows%2Fbuild-and-deploy.yaml",
+    "sha": "1cef71ffb88eb56b61316a60c6dc0667ee15eec3",
+    "status": "modified"
+  },
+  {
+    "additions": 6,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/4d85661a5d08cac22e703de9a530cfa91e9da227/.github%2Fworkflows%2Fsnapshot.yaml",
+    "changes": 6,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fsnapshot.yaml?ref=4d85661a5d08cac22e703de9a530cfa91e9da227",
+    "deletions": 0,
+    "filename": ".github/workflows/snapshot.yaml",
+    "patch": "@@ -25,6 +25,12 @@ jobs:\n     steps:\n       - name: Checkout code\n         uses: actions/checkout@v7\n+        with:\n+          # Bump commits are pushed straight to main, which the branch ruleset\n+          # forbids for GITHUB_TOKEN (GitHub Actions cannot be a bypass actor).\n+          # The write deploy key is the ruleset's DeployKey bypass actor, so CI\n+          # pushes keep working while PR merges still wait for required checks.\n+          ssh-key: ${{ secrets.MAIN_PUSH_DEPLOY_KEY }}\n \n       - name: Setup Node.js\n         uses: actions/setup-node@v6",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/4d85661a5d08cac22e703de9a530cfa91e9da227/.github%2Fworkflows%2Fsnapshot.yaml",
+    "sha": "e6d9aea419363f99dd569b37cce61e0c2e6e647c",
+    "status": "modified"
+  }
+]

@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/in/29110?v=4",
+      "events_url": "https://api.github.com/users/dependabot%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/dependabot%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/dependabot%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/dependabot%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/dependabot",
+      "id": 49699333,
+      "login": "dependabot[bot]",
+      "node_id": "MDM6Qm90NDk2OTkzMzM=",
+      "organizations_url": "https://api.github.com/users/dependabot%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/dependabot%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/dependabot%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/dependabot%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/dependabot%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/dependabot%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/c3c5e3ba27262d393ba72576a53db59fe639a9e4/comments",
+    "commit": {
+      "author": {
+        "date": "2026-04-19T23:16:10Z",
+        "email": "49699333+dependabot[bot]@users.noreply.github.com",
+        "name": "dependabot[bot]"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-04-19T23:16:10Z",
+        "email": "noreply@github.com",
+        "name": "GitHub"
+      },
+      "message": "Bump azure/login from 2 to 3\n\nBumps [azure/login](https://github.com/azure/login) from 2 to 3.\n- [Release notes](https://github.com/azure/login/releases)\n- [Commits](https://github.com/azure/login/compare/v2...v3)\n\n---\nupdated-dependencies:\n- dependency-name: azure/login\n  dependency-version: '3'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] \u003csupport@github.com\u003e",
+      "tree": {
+        "sha": "85360ba499314815b2287816211741d6c0b04d57",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/85360ba499314815b2287816211741d6c0b04d57"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/c3c5e3ba27262d393ba72576a53db59fe639a9e4",
+      "verification": {
+        "payload": "tree 85360ba499314815b2287816211741d6c0b04d57\nparent 20c0f6f4befb1e34d4bb8e76f7522525393e1fdd\nauthor dependabot[bot] \u003c49699333+dependabot[bot]@users.noreply.github.com\u003e 1776640570 +0000\ncommitter GitHub \u003cnoreply@github.com\u003e 1776640570 +0000\n\nBump azure/login from 2 to 3\n\nBumps [azure/login](https://github.com/azure/login) from 2 to 3.\n- [Release notes](https://github.com/azure/login/releases)\n- [Commits](https://github.com/azure/login/compare/v2...v3)\n\n---\nupdated-dependencies:\n- dependency-name: azure/login\n  dependency-version: '3'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] \u003csupport@github.com\u003e",
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJp5WI6CRC1aQ7uu5UhlAAAjbMQAFD5Fyweq62i545zNhjJ7hri\nYHYa/+tHOt9qnvIzMxKXhfHeSk4GuLrYBw2SSSqnErnmVkIHj+cv3sCHCV2SBb7f\nAuURsMj/Tl2LF/w81JfjxoW55X6XJbhEM0NR4DivU5puR4fYgjXdoVRIXggbLpSD\nPuq12OPWuOb9jOelb8LNW991KrewO2QftojmZp04vFmcr3P+ilPxWtTnYpfCJzTm\nApuaXo/hETB4R/bDeMIQhKwL4dMf1L54hCdyq6DDm7CzMnCWldYbSsNKhL8akPYr\n/35PHPk1/Rti8VlmWFD2TdFF7E+ORGnOPtN6e2jE/Qtx17TkhvnOVNY47wYtjTnm\no74mK30P6v2e8kR58SbACI6qiWdu56sLzBQIuw5qOb8Gf8hsvsVo3frFggU0WLV/\ncl1oj52lWeIVT/XRcUkHMmdzE8JZJcDq3g+4hHWE4T5W/FlbXrl7NsjeDGEvAjvX\ngwT/xjEvwr3LalYLh19XO6jsmp3pGV1uausIbWLqEYwOErkqU/JSfVBBlGQx46PU\nEYFphaKsxYrhwgUNElP+0sBlpF8O7OwRNZrhosiwUFA6nyMz6AGSUDTMxnXKZx2o\nGDuTvwae7TdoJwn/aFLrXd7jSGomuzPDe5pABhc//GZoD3jyaSRcO6bf435X5yM8\nCRaInfU7ThH4HZ8z5/AY\n=lNdj\n-----END PGP SIGNATURE-----\n",
+        "verified": true,
+        "verified_at": "2026-04-19T23:16:10Z"
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/web-flow",
+      "id": 19864447,
+      "login": "web-flow",
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/web-flow",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/c3c5e3ba27262d393ba72576a53db59fe639a9e4",
+    "node_id": "C_kwDORV0mMdoAKGMzYzVlM2JhMjcyNjJkMzkzYmE3MjU3NmE1M2RiNTlmZTYzOWE5ZTQ",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/20c0f6f4befb1e34d4bb8e76f7522525393e1fdd",
+        "sha": "20c0f6f4befb1e34d4bb8e76f7522525393e1fdd",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/20c0f6f4befb1e34d4bb8e76f7522525393e1fdd"
+      }
+    ],
+    "sha": "c3c5e3ba27262d393ba72576a53db59fe639a9e4",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/c3c5e3ba27262d393ba72576a53db59fe639a9e4"
+  }
+]

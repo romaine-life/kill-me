@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/in/29110?v=4",
+      "events_url": "https://api.github.com/users/dependabot%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/dependabot%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/dependabot%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/dependabot%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/dependabot",
+      "id": 49699333,
+      "login": "dependabot[bot]",
+      "node_id": "MDM6Qm90NDk2OTkzMzM=",
+      "organizations_url": "https://api.github.com/users/dependabot%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/dependabot%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/dependabot%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/dependabot%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/dependabot%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/dependabot%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/f785bafbbfc52abc33db12b2ce15c21f029bfd80/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-11T21:10:38Z",
+        "email": "49699333+dependabot[bot]@users.noreply.github.com",
+        "name": "dependabot[bot]"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-11T21:10:38Z",
+        "email": "noreply@github.com",
+        "name": "GitHub"
+      },
+      "message": "Bump js-yaml from 4.2.0 to 4.3.1 in /frontend\n\nBumps [js-yaml](https://github.com/nodeca/js-yaml) from 4.2.0 to 4.3.1.\n- [Changelog](https://github.com/nodeca/js-yaml/blob/4.3.1/CHANGELOG.md)\n- [Commits](https://github.com/nodeca/js-yaml/compare/4.2.0...4.3.1)\n\n---\nupdated-dependencies:\n- dependency-name: js-yaml\n  dependency-version: 4.3.1\n  dependency-type: indirect\n...\n\nSigned-off-by: dependabot[bot] \u003csupport@github.com\u003e",
+      "tree": {
+        "sha": "b72de7bdf1ca6a5c6cadb92aee26d25573425000",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/b72de7bdf1ca6a5c6cadb92aee26d25573425000"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/f785bafbbfc52abc33db12b2ce15c21f029bfd80",
+      "verification": {
+        "payload": "tree b72de7bdf1ca6a5c6cadb92aee26d25573425000\nparent 4bfdad5dbeaa7c0e798ea32a50ffeaa6cef8eca0\nauthor dependabot[bot] \u003c49699333+dependabot[bot]@users.noreply.github.com\u003e 1786482638 +0000\ncommitter GitHub \u003cnoreply@github.com\u003e 1786482638 +0000\n\nBump js-yaml from 4.2.0 to 4.3.1 in /frontend\n\nBumps [js-yaml](https://github.com/nodeca/js-yaml) from 4.2.0 to 4.3.1.\n- [Changelog](https://github.com/nodeca/js-yaml/blob/4.3.1/CHANGELOG.md)\n- [Commits](https://github.com/nodeca/js-yaml/compare/4.2.0...4.3.1)\n\n---\nupdated-dependencies:\n- dependency-name: js-yaml\n  dependency-version: 4.3.1\n  dependency-type: indirect\n...\n\nSigned-off-by: dependabot[bot] \u003csupport@github.com\u003e",
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJqe4/OCRC1aQ7uu5UhlAAAlVYQAHesjkT/y+dXyZGa9CRf8xVB\nXrg0uIVGEFUrt+aNG+VpiwH2lCSCv2ZClfQn22BdyUAM/FRHPUPYHbkphej7kNLm\nLlhe4BP0D2MhcgO7UdFe+yEynnXQl+rkTQ8I3gZJ/p+H8UPQt1XAU7tp3Vyvm+kz\nriPLP4jgFpRSDBcEooojZNlnzLDRq1PAIEhNndvXLCS5xW0SX4iUXa8Vm8kSWEK3\nPSIqQu2YffCrRWdMphre0i9IxJdmAGSmRllkPr1nodLFPv/rKCKSu4u2sPyNN9tV\nsCziPlaHmY6fdKyVMmrc89dDcd9M3VSUv/PzlwUdbh5GGbxwqzIv+mOOBatuTgpG\nGLaDDrR+UL/HzvIVHmvNpgY7KKm1XAEBBwAC9UfuGI+wst2UEyPt9pcuy4+Mce1y\nnfpOLpx2FJdvqXUBAl6cHMeT2vCjPyLuYr7yPHT7SfCYKSSIhQg0oCp9MOm/WrYY\nBqF8wZX+Zwj4AMmxSWF+vxM6YHVGFmJkqgu1NxEKa9d/Y5HEftpKMUYcl8iKrn0b\nRgJElkH6F2n3yxVQ2nvGJktogcL3RuC/JAgnBrdYgAdqIVyHYh928jzGH1dhjMYz\nX6aAdwM6XnwZeRr3xMpWNwPW06IjNjDKM1D2cu3juaKMBv0HK/N8CR3bY6gtGAeC\nsFHBd5tzmAu85fpdrc0b\n=crjn\n-----END PGP SIGNATURE-----\n",
+        "verified": true,
+        "verified_at": "2026-08-11T21:15:42Z"
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/web-flow",
+      "id": 19864447,
+      "login": "web-flow",
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/web-flow",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/f785bafbbfc52abc33db12b2ce15c21f029bfd80",
+    "node_id": "C_kwDORV0mMdoAKGY3ODViYWZiYmZjNTJhYmMzM2RiMTJiMmNlMTVjMjFmMDI5YmZkODA",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/4bfdad5dbeaa7c0e798ea32a50ffeaa6cef8eca0",
+        "sha": "4bfdad5dbeaa7c0e798ea32a50ffeaa6cef8eca0",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/4bfdad5dbeaa7c0e798ea32a50ffeaa6cef8eca0"
+      }
+    ],
+    "sha": "f785bafbbfc52abc33db12b2ce15c21f029bfd80",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/f785bafbbfc52abc33db12b2ce15c21f029bfd80"
+  }
+]

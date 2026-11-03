@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/80b51a18a4a91c73c527b634dcacc23c49983e24/.github%2Fworkflows%2Fbuild-and-deploy.yml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fbuild-and-deploy.yml?ref=80b51a18a4a91c73c527b634dcacc23c49983e24",
+    "deletions": 1,
+    "filename": ".github/workflows/build-and-deploy.yml",
+    "patch": "@@ -27,7 +27,7 @@ jobs:\n     runs-on: ubuntu-latest\n     steps:\n       - name: Checkout\n-        uses: actions/checkout@v4\n+        uses: actions/checkout@v6\n         with:\n           fetch-depth: 0\n ",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/80b51a18a4a91c73c527b634dcacc23c49983e24/.github%2Fworkflows%2Fbuild-and-deploy.yml",
+    "sha": "8b60ced5c7e1a6f1cf1a6dbf3506675a81e4a073",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/80b51a18a4a91c73c527b634dcacc23c49983e24/.github%2Fworkflows%2Fsnapshot.yml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fsnapshot.yml?ref=80b51a18a4a91c73c527b634dcacc23c49983e24",
+    "deletions": 1,
+    "filename": ".github/workflows/snapshot.yml",
+    "patch": "@@ -23,7 +23,7 @@ jobs:\n     runs-on: ubuntu-latest\n     steps:\n       - name: Checkout code\n-        uses: actions/checkout@v4\n+        uses: actions/checkout@v6\n \n       - name: Setup Node.js\n         uses: actions/setup-node@v6",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/80b51a18a4a91c73c527b634dcacc23c49983e24/.github%2Fworkflows%2Fsnapshot.yml",
+    "sha": "9375e65f1a1b4b6a280f0f7ba6599698cb64d082",
+    "status": "modified"
+  }
+]

@@ -1,0 +1,178 @@
+diff --git a/frontend/src/components/SorenessLanes.jsx b/frontend/src/components/SorenessLanes.jsx
+index 149497d..4cc1c4a 100644
+--- a/frontend/src/components/SorenessLanes.jsx
++++ b/frontend/src/components/SorenessLanes.jsx
+@@ -22,7 +22,7 @@
+ import { useMemo, useState, useEffect } from 'react';
+ import { getDayInfo, describeLoggedDay } from '../utils/dayConfig';
+ import { dayColor, pad2 } from '../utils/dayDesign';
+-import { cardioColor, cardioLabel, cardioName } from '../utils/cardioConfig';
++import { CARDIO_MOTIONS, cardioColor, cardioMotion, cardioName } from '../utils/cardioConfig';
+ import { buildTracks, packLanes, datesBetween, daysBetween } from '../utils/sorenessLink';
+ import { todayLocal } from '../utils/dateUtils';
+ import { colors } from '../colors';
+@@ -30,6 +30,7 @@ import { colors } from '../colors';
+ const ROW_H = 30;
+ const GAP_H = 22; // a collapsed run of dates with nothing in them
+ const ACTIVITY_W = 146;
++const CARDIO_W = 32; // one glyph per session, no label
+ const CARDIO_GAP = 12;
+ const DATE_W = 74; // wide enough for "Sat Aug 13" in 10px monospace
+ const ACTIVITY_GAP = 6;
+@@ -200,7 +201,7 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+   const dateX = 0;
+   const cardioX = dateX + DATE_W + ACTIVITY_GAP;
+   const workoutX = showCardioColumn
+-    ? cardioX + ACTIVITY_W + CARDIO_GAP
++    ? cardioX + CARDIO_W + CARDIO_GAP
+     : cardioX;
+   const laneX0 = workoutX + ACTIVITY_W + GUTTER;
+   const laneRight = laneX0 + Math.max(laneCount, 1) * LANE_PITCH;
+@@ -209,8 +210,10 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+     ? labelX + labelSlots.widest * LABEL_COL + 16
+     : laneRight + 16;
+   const height = bottom + 16;
+-  const visibleCardioActivities = [...new Set(
+-    [...cardioByDate.values()].flat().map((session) => session.activity),
++  // One legend entry per glyph shown, keyed by motion so walk and run each
++  // explain their figure even though they share the treadmill color.
++  const visibleCardioMotions = [...new Map(
++    [...cardioByDate.values()].flat().map((session) => [cardioMotion(session), session.activity]),
+   )];
+ 
+   const controls = (
+@@ -237,8 +240,8 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+ 
+       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', marginTop: 10, color: colors.text.tertiary, fontSize: 10 }}>
+         <LegendMark color={colors.text.secondary} label="Strength workout" />
+-        {visibleCardioActivities.map((activity) => (
+-          <LegendMark key={activity} color={cardioColor(activity)} label={cardioLabel(activity)} />
++        {visibleCardioMotions.map(([motion, activity]) => (
++          <LegendGlyph key={motion} color={cardioColor(activity)} motion={motion} />
+         ))}
+         <LegendMark color={colors.text.secondary} label="Recovery lane matches strength" />
+       </div>
+@@ -510,17 +513,20 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+               .filter((r) => r.kind === 'date')
+               .map((r) => {
+                 const sessions = cardioByDate.get(r.date) || [];
+-                const availableHeight = ROW_H - 6;
++                // Glyphs sit side by side rather than stacked: a row is too short
++                // for two icons on top of each other to stay legible.
++                const nodeHeight = ROW_H - 6;
+                 const gap = sessions.length > 1 ? 2 : 0;
+-                const nodeHeight = sessions.length
+-                  ? Math.max(7, (availableHeight - gap * (sessions.length - 1)) / sessions.length)
+-                  : availableHeight;
++                const nodeWidth = (CARDIO_W - gap * (sessions.length - 1)) / sessions.length;
++                const nodeY = r.y - ROW_H / 2 + 2;
+ 
+                 return sessions.map((session, i) => {
+-                  const nodeY = r.y - ROW_H / 2 + 2 + i * (nodeHeight + gap);
+-                  const activityLabel = cardioLabel(session.activity);
++                  const nodeX = cardioX + i * (nodeWidth + gap);
++                  const motion = cardioMotion(session);
++                  const activityLabel = CARDIO_MOTIONS[motion].label;
+                   const activityColor = cardioColor(session.activity);
+                   const label = `${activityLabel} · ${session.durationMinutes || '—'} min`;
++                  const iconSize = Math.min(18, nodeHeight - 4, nodeWidth - 4);
+                   return (
+                     <g
+                       key={`cardio-${session.id}`}
+@@ -540,25 +546,22 @@ export function SorenessLanes({ entries, workouts, cardioSessions = [], onOpenWo
+                       onFocus={() => setHover({ kind: 'cardio', session })}
+                       onBlur={() => setHover(null)}
+                     >
++                      <title>{label}</title>
+                       <rect
+-                        x={cardioX}
++                        x={nodeX}
+                         y={nodeY}
+-                        width={ACTIVITY_W}
++                        width={nodeWidth}
+                         height={nodeHeight}
+                         rx={4}
+-                        fill={colors.bg.surface}
++                        fill={`${activityColor}2e`}
+                         stroke={activityColor}
+                         strokeWidth={0.75}
+                       />
+-                      <rect x={cardioX} y={nodeY} width={3} height={nodeHeight} fill={activityColor} />
+-                      <text
+-                        x={cardioX + 10}
+-                        y={nodeY + nodeHeight / 2}
+-                        dominantBaseline="middle"
+-                        style={{ fontSize: nodeHeight < 14 ? 8 : 11, fill: colors.text.primary, fontWeight: 600 }}
+-                      >
+-                        {label}
+-                      </text>
++                      <path
++                        d={CARDIO_MOTIONS[motion].path}
++                        fill={activityColor}
++                        transform={`translate(${nodeX + (nodeWidth - iconSize) / 2} ${nodeY + (nodeHeight - iconSize) / 2}) scale(${iconSize / 24})`}
++                      />
+                     </g>
+                   );
+                 });
+@@ -709,6 +712,17 @@ function HoverPanel({ hover, narrow }) {
+   );
+ }
+ 
++function LegendGlyph({ color, motion }) {
++  return (
++    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
++      <svg width={12} height={12} viewBox="0 0 24 24" aria-hidden="true">
++        <path d={CARDIO_MOTIONS[motion].path} fill={color} />
++      </svg>
++      {CARDIO_MOTIONS[motion].label}
++    </span>
++  );
++}
++
+ function LegendMark({ color, label }) {
+   return (
+     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+diff --git a/frontend/src/utils/cardioConfig.js b/frontend/src/utils/cardioConfig.js
+index cc7067d..0c5e19b 100644
+--- a/frontend/src/utils/cardioConfig.js
++++ b/frontend/src/utils/cardioConfig.js
+@@ -2,6 +2,7 @@
+ // Used by HistoryTab (color coding, filter legend) and LogTab (cardio form).
+ 
+ import { DAY_DESIGN, SORENESS_TIER_COLORS } from './dayDesign';
++import { isSteadySession } from './cardioTemplates.js';
+ 
+ export const CARDIO_CONFIG = {
+   treadmill: {
+@@ -20,6 +21,31 @@ export const cardioColor = (activity) => CARDIO_CONFIG[activity]?.color || '#9b9
+ export const cardioLabel = (activity) => CARDIO_CONFIG[activity]?.label || activity || 'Cardio';
+ export const cardioName = (activity) => CARDIO_CONFIG[activity]?.name || cardioLabel(activity);
+ 
++// What a session looked like, for places that show a glyph instead of a label.
++// Walk and run share the treadmill's color; the figure is what tells them apart.
++// Paths are Material Icons (Apache 2.0) on a 24x24 grid — lucide has no
++// walking or running figure.
++export const CARDIO_MOTIONS = {
++  walk: {
++    label: 'Walk',
++    path: 'M13.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM9.8 8.9L7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3C14.8 12 16.8 13 19 13v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1L6 8.3V13h2V9.6l1.8-.7',
++  },
++  run: {
++    label: 'Run',
++    path: 'M13.49 5.48c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm-3.6 13.9l1-4.4 2.1 2v6h2v-7.5l-2.1-2 .6-3c1.3 1.5 3.3 2.5 5.5 2.5v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1l-5.2 2.2v4.7h2v-3.4l1.8-.7-1.6 8.1-4.9-1-.4 2 7 1.4z',
++  },
++  bike: {
++    label: 'Bike',
++    path: 'M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5.1 2.1V9c-1.5 0-2.7-.6-3.6-1.5l-1.9-1.9c-.5-.4-1-.6-1.6-.6s-1.1.2-1.4.6L7.8 8.4c-.4.4-.6.9-.6 1.4 0 .6.2 1.1.6 1.4L11 14v5h2v-6.2l-2.2-2.3zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z',
++  },
++};
++
++// A treadmill session with one steady interval is a walk; intervals are a run.
++export const cardioMotion = (session) => {
++  if (session.activity === 'bike') return 'bike';
++  return isSteadySession(session.treadmill) ? 'walk' : 'run';
++};
++
+ // Colors are semantic data here: day colors identify strength workouts,
+ // soreness colors identify intensity, and cardio colors identify activities.
+ // Fail during development/build if those namespaces ever collide.

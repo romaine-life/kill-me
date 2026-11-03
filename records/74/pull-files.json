@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 3,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/f785bafbbfc52abc33db12b2ce15c21f029bfd80/frontend%2Fpackage-lock.json",
+    "changes": 6,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fpackage-lock.json?ref=f785bafbbfc52abc33db12b2ce15c21f029bfd80",
+    "deletions": 3,
+    "filename": "frontend/package-lock.json",
+    "patch": "@@ -2194,9 +2194,9 @@\n       \"license\": \"MIT\"\n     },\n     \"node_modules/js-yaml\": {\n-      \"version\": \"4.2.0\",\n-      \"resolved\": \"https://registry.npmjs.org/js-yaml/-/js-yaml-4.2.0.tgz\",\n-      \"integrity\": \"sha512-ePWsvanv0DWuDRsW8dnt+R4jQ31SCRCQ7hhNcPXZPsoBZiemuZNYGf7adZdqX2D86j6rvKp3RpCxVTSb8WQlOw==\",\n+      \"version\": \"4.3.1\",\n+      \"resolved\": \"https://registry.npmjs.org/js-yaml/-/js-yaml-4.3.1.tgz\",\n+      \"integrity\": \"sha512-CY6crGq313MX8GkwvB7tzgp99vjQxY1++5y10/BKN/GUfHqWaOGQMNZkBvqSzsZKWk/ijwHlWzzkLulsGHhjWQ==\",\n       \"dev\": true,\n       \"funding\": [\n         {",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/f785bafbbfc52abc33db12b2ce15c21f029bfd80/frontend%2Fpackage-lock.json",
+    "sha": "597aff05d707e72cc4ac71da1602429d33841beb",
+    "status": "modified"
+  }
+]

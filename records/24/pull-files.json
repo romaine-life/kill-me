@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/1098e85c78f56210c6b59160af57f0ed4dfa84b7/frontend%2Fsrc%2Fcomponents%2FTodayTab.jsx",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fsrc%2Fcomponents%2FTodayTab.jsx?ref=1098e85c78f56210c6b59160af57f0ed4dfa84b7",
+    "deletions": 2,
+    "filename": "frontend/src/components/TodayTab.jsx",
+    "patch": "@@ -210,7 +210,6 @@ export function TodayTab({ currentDay, isAdmin, onNavigateExercises }) {\n       {loading \u0026\u0026 (\n         \u003cdiv className=\"flex items-center justify-center min-h-[30vh]\"\u003e\n           \u003cdiv className=\"text-center\"\u003e\n-            \u003cdiv className=\"text-6xl mb-4 animate-pulse\"\u003e🏋️\u003c/div\u003e\n             \u003cp className=\"text-slate-400\"\u003eLoading workout...\u003c/p\u003e\n           \u003c/div\u003e\n         \u003c/div\u003e\n@@ -278,7 +277,6 @@ export function TodayTab({ currentDay, isAdmin, onNavigateExercises }) {\n                   {workoutDay?.focus}\n                 \u003c/p\u003e\n               \u003c/div\u003e\n-              \u003cdiv className=\"text-5xl\"\u003e🏋️\u003c/div\u003e\n             \u003c/div\u003e\n \n             {/* Description */}",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/1098e85c78f56210c6b59160af57f0ed4dfa84b7/frontend%2Fsrc%2Fcomponents%2FTodayTab.jsx",
+    "sha": "8b110d980a1548133d21405507e6394b14913eb3",
+    "status": "modified"
+  }
+]

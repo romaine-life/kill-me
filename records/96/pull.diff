@@ -1,0 +1,946 @@
+diff --git a/.github/workflows/build-and-deploy.yaml b/.github/workflows/build-and-deploy.yaml
+index 1cef71ff..f8e24d9d 100644
+--- a/.github/workflows/build-and-deploy.yaml
++++ b/.github/workflows/build-and-deploy.yaml
+@@ -21,6 +21,7 @@ on:
+ permissions:
+   id-token: write
+   contents: write
++  pull-requests: read
+ 
+ concurrency:
+   group: build-and-deploy
+@@ -63,7 +64,70 @@ jobs:
+ 
+           git checkout --detach "$full_sha"
+           echo "Resolved ${target_ref} -> ${full_sha}"
+-          echo "BUILD_NUMBER=${full_sha::7}" >> "$GITHUB_ENV"
++          echo "SOURCE_SHA=${full_sha}" >> "$GITHUB_ENV"
++
++      - name: Resolve semantic application version
++        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
++        env:
++          GH_TOKEN: ${{ github.token }}
++        shell: bash
++        run: |
++          set -euo pipefail
++
++          existing_tag="$(git tag --points-at "${SOURCE_SHA}" --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1)"
++          latest_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1)"
++          release_title="Versioned application release"
++          create_tag=false
++          create_release=false
++
++          if [ -n "${existing_tag}" ]; then
++            app_version="${existing_tag#v}"
++            if ! gh release view "${existing_tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
++              create_release=true
++            fi
++          elif [ -z "${latest_tag}" ]; then
++            # The first release establishes a truthful baseline; it does not
++            # pretend the package.json/Helm placeholders were prior releases.
++            app_version="1.0.0"
++            release_title="Initial versioned release"
++            create_tag=true
++            create_release=true
++          else
++            pulls="$(gh api \
++              -H 'Accept: application/vnd.github+json' \
++              "repos/${GITHUB_REPOSITORY}/commits/${SOURCE_SHA}/pulls")"
++            pull_count="$(jq 'length' <<<"${pulls}")"
++            if [ "${pull_count}" -ne 1 ]; then
++              echo "::error::Expected ${SOURCE_SHA} to be associated with exactly one pull request; found ${pull_count}."
++              exit 1
++            fi
++
++            mapfile -t release_labels < <(jq -r \
++              '.[0].labels[].name | select(startswith("release:"))' \
++              <<<"${pulls}")
++            if [ "${#release_labels[@]}" -ne 1 ]; then
++              echo "::error::Expected exactly one release:* label; found ${#release_labels[@]}."
++              exit 1
++            fi
++
++            bump="${release_labels[0]#release:}"
++            release_title="$(jq -r '.[0].title' <<<"${pulls}")"
++            app_version="$(node scripts/next-app-version.mjs "${latest_tag#v}" "${bump}")"
++            if [ "${bump}" != "none" ]; then
++              create_tag=true
++              create_release=true
++            fi
++          fi
++
++          deployed_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
++          {
++            echo "APP_VERSION=${app_version}"
++            echo "APP_DEPLOYED_AT=${deployed_at}"
++            echo "CREATE_VERSION_TAG=${create_tag}"
++            echo "CREATE_GITHUB_RELEASE=${create_release}"
++            echo "RELEASE_TITLE=${release_title}"
++          } >> "$GITHUB_ENV"
++          echo "Resolved ${SOURCE_SHA} as application v${app_version}"
+ 
+       - name: Azure Login (OIDC)
+         uses: azure/login@v3
+@@ -118,7 +182,7 @@ jobs:
+           push: true
+           tags: romainecr.azurecr.io/kill-me:${{ env.ALIAS_TAG }}
+           build-args: |
+-            BUILD_NUMBER=${{ env.BUILD_NUMBER }}
++            APP_BUILD_ID=${{ env.ALIAS_TAG }}
+           cache-from: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app
+           cache-to: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app,mode=max
+ 
+@@ -128,6 +192,8 @@ jobs:
+           set -euo pipefail
+           # Quote the tag so YAML never reinterprets image tags.
+           sed -i "s|^  tag: .*|  tag: \"${ALIAS_TAG}\"|" k8s/values.yaml
++          sed -i "s|^  version: .*|  version: \"${APP_VERSION}\"|" k8s/values.yaml
++          sed -i "s|^  deployedAt: .*|  deployedAt: \"${APP_DEPLOYED_AT}\"|" k8s/values.yaml
+ 
+       - name: Commit and push tag bump
+         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+@@ -140,5 +206,25 @@ jobs:
+             echo "No values changes to commit"
+             exit 0
+           fi
+-          git commit -m "chore: bump kill-me image to fingerprint ${{ env.ALIAS_TAG }} [skip ci]"
++          git commit -m "chore: deploy kill-me v${APP_VERSION} as ${ALIAS_TAG} [skip ci]"
+           git push origin HEAD:main
++
++      - name: Publish semantic release
++        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.CREATE_GITHUB_RELEASE == 'true'
++        env:
++          GH_TOKEN: ${{ github.token }}
++        shell: bash
++        run: |
++          set -euo pipefail
++          version_tag="v${APP_VERSION}"
++          if [ "${CREATE_VERSION_TAG}" = "true" ]; then
++            git tag -a "${version_tag}" "${SOURCE_SHA}" -m "${version_tag}: ${RELEASE_TITLE}"
++            git push origin "refs/tags/${version_tag}"
++          fi
++          if ! gh release view "${version_tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
++            gh release create "${version_tag}" \
++              --repo "${GITHUB_REPOSITORY}" \
++              --target "${SOURCE_SHA}" \
++              --title "${version_tag} — ${RELEASE_TITLE}" \
++              --generate-notes
++          fi
+diff --git a/.github/workflows/docker-build-check.yaml b/.github/workflows/docker-build-check.yaml
+index 1147e723..1214d78a 100644
+--- a/.github/workflows/docker-build-check.yaml
++++ b/.github/workflows/docker-build-check.yaml
+@@ -57,7 +57,6 @@ jobs:
+           git checkout --detach "$full_sha"
+           echo "Resolved image source -> ${full_sha}"
+           echo "sha=${full_sha}" >> "${GITHUB_OUTPUT}"
+-          echo "BUILD_NUMBER=${full_sha}" >> "$GITHUB_ENV"
+ 
+       - name: Set up Buildx
+         uses: docker/setup-buildx-action@v4
+@@ -119,7 +118,7 @@ jobs:
+           load: false
+           tags: romainecr.azurecr.io/kill-me:${{ steps.fingerprint.outputs.proof_tag }}
+           build-args: |
+-            BUILD_NUMBER=${{ env.BUILD_NUMBER || github.event.pull_request.head.sha || github.sha }}
++            APP_BUILD_ID=${{ steps.fingerprint.outputs.proof_tag }}
+           cache-from: |
+             type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app
+             type=gha,scope=app
+@@ -153,6 +152,6 @@ jobs:
+           push: false
+           load: false
+           build-args: |
+-            BUILD_NUMBER=${{ github.event.pull_request.head.sha }}
++            APP_BUILD_ID=${{ steps.fingerprint.outputs.proof_tag }}
+           cache-from: type=gha
+           cache-to: type=gha,mode=max
+diff --git a/.github/workflows/lint.yaml b/.github/workflows/lint.yaml
+index 9ad899ab..979a80d3 100644
+--- a/.github/workflows/lint.yaml
++++ b/.github/workflows/lint.yaml
+@@ -3,6 +3,7 @@ name: Lint
+ on:
+   pull_request:
+     branches: [ main ]
++    types: [opened, synchronize, reopened, labeled, unlabeled]
+   workflow_dispatch:
+ 
+ concurrency:
+@@ -10,6 +11,41 @@ concurrency:
+   cancel-in-progress: true
+ 
+ jobs:
++  release-label:
++    name: Semantic release label
++    if: github.event_name == 'pull_request'
++    runs-on: ubuntu-latest
++    steps:
++      - name: Require exactly one release label
++        uses: actions/github-script@v8
++        with:
++          script: |
++            const allowed = new Set([
++              'release:major',
++              'release:minor',
++              'release:patch',
++              'release:none',
++            ]);
++            const found = context.payload.pull_request.labels
++              .map(({ name }) => name)
++              .filter((name) => allowed.has(name));
++            if (found.length !== 1) {
++              core.setFailed(
++                `Expected exactly one semantic release label (${[...allowed].join(', ')}); found ${found.length ? found.join(', ') : 'none'}.`
++              );
++            }
++
++  release-version-tests:
++    name: Semantic version rules
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v7
++      - uses: actions/setup-node@v6
++        with:
++          node-version: '20'
++      - name: Test version calculation
++        run: node --test scripts/next-app-version.test.mjs
++
+   code-quality:
+     uses: romaine-life/pipeline-templates/.github/workflows/lint-template.yml@main
+     with:
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 37312467..627904a5 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -247,7 +247,7 @@ Database writes and backups never trigger an application deployment.
+ 
+ | Workflow | Trigger | What it does |
+ | -------- | ------- | ------------ |
+-| `build-and-deploy.yaml` | App source push to main / manual | Builds the fingerprinted image and bumps the Helm values tag |
++| `build-and-deploy.yaml` | App source push to main / manual | Creates the next semantic release when required, builds or reuses the fingerprinted image, and records the deployed version/image/time in Helm values |
+ | `docker-build-check.yaml` | PR / manual | Verifies the container build and publishes the canonical fingerprint tag when permitted |
+ | `tofu.yml` | Push/PR touching `tofu/` | Plan on PR, apply on main merge |
+ | `lint.yaml` | PR to main | Repository lint checks |
+@@ -311,7 +311,21 @@ fall back from: you get a silent failure and no PNG at all. Use an isolated
+ is typically `C:\Program Files\Google\Chrome\Application\chrome.exe` or Edge's
+ `msedge.exe`.
+ 
+-### Build number
++### Application releases and deployed version
+ 
+-The frontend displays a git short hash as the build number, injected at build time
+-via Vite's `define` config.
++Application releases use immutable Git tags (`vMAJOR.MINOR.PATCH`) as their source
++of truth. Every PR carries exactly one `release:major`, `release:minor`,
++`release:patch`, or `release:none` label. On merge, `build-and-deploy.yaml` applies
++that bump to the latest tag, creates the GitHub release, and records the version,
++deployment time, and content-fingerprint image tag in `k8s/values.yaml`.
++
++The public `/api/version` endpoint returns that runtime metadata with `no-store`
++caching. The frontend shows the semantic version and deployment time at the bottom
++of the shared sidebar (also used by the mobile drawer). It polls the endpoint and
++compares the running image fingerprint with the build identity compiled into the
++bundle; an old browser tab gets an explicit reload action after a new deployment.
++Git SHAs remain CI/debugging metadata and are not presented as application versions.
++
++The `version` fields in the private frontend/backend npm packages are deliberately
++`0.0.0-private`; the Helm `version` is the chart packaging version. Neither is an
++application release number.
+diff --git a/Dockerfile b/Dockerfile
+index 701ce235..3d37ea5d 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -10,11 +10,11 @@ RUN npm ci
+ # Copy frontend source, then build.
+ COPY frontend/ ./
+ 
+-# Build-time env: Vite inlines VITE_* vars into the bundle. BUILD_NUMBER
+-# overrides vite.config.js's `execSync('git rev-parse')` fallback — git isn't
+-# available in this stage, and that's fine.
+-ARG BUILD_NUMBER=dev
+-ENV BUILD_NUMBER=$BUILD_NUMBER
++# The source-content fingerprint is stable when a PR-built image is reused after
++# merge. The frontend compares this identity with /api/version to detect an old
++# browser tab after a new image is deployed.
++ARG APP_BUILD_ID=dev
++ENV APP_BUILD_ID=$APP_BUILD_ID
+ 
+ RUN npm run build
+ 
+diff --git a/backend/package.json b/backend/package.json
+index bda61fb5..8bd61140 100644
+--- a/backend/package.json
++++ b/backend/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "@romaine-life/kill-me-backend",
+-  "version": "1.0.0",
++  "version": "0.0.0-private",
+   "private": true,
+   "type": "module",
+   "description": "Per-app backend for workout.romaine.life, running as a single container on AKS",
+@@ -8,6 +8,7 @@
+   "scripts": {
+     "start": "node server.js",
+     "dev": "node --watch server.js",
++    "test": "node --test",
+     "migrate:dry-run": "node migrations/dry-run.js",
+     "migrate": "node migrations/apply.js"
+   },
+diff --git a/backend/server.js b/backend/server.js
+index ec7e1b32..0da8893f 100644
+--- a/backend/server.js
++++ b/backend/server.js
+@@ -22,6 +22,7 @@ import {
+ import { createRequireAuth, requireAdmin, currentCaller } from './auth.js';
+ import { fetchConfig } from './config.js';
+ import { runMigrations, pendingMigrations } from './migrations/runner.js';
++import { getVersionInfo } from './version.js';
+ 
+ const __dirname = path.dirname(fileURLToPath(import.meta.url));
+ const FRONTEND_DIR = path.join(__dirname, '..', 'frontend', 'dist');
+@@ -46,6 +47,15 @@ app.get('/health', (req, res) => {
+   res.json({ status: 'healthy' });
+ });
+ 
++// Public, non-cached deployment identity. An already-open frontend polls this
++// endpoint and offers a reload when its immutable build no longer matches the
++// image currently serving the API.
++app.get('/api/version', (req, res) => {
++  res.setHeader('Cache-Control', 'no-store, max-age=0');
++  res.setHeader('Pragma', 'no-cache');
++  res.json(getVersionInfo());
++});
++
+ // Boot-time "am I signed in?" probe used by the frontend. Returns null if
+ // no valid session (rather than 401), so the SPA can simply render the
+ // Sign-in button without treating the missing session as an error.
+diff --git a/backend/version.js b/backend/version.js
+new file mode 100644
+index 00000000..08d473e4
+--- /dev/null
++++ b/backend/version.js
+@@ -0,0 +1,15 @@
++const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
++
++const clean = (value) => typeof value === 'string' ? value.trim() : '';
++
++export function getVersionInfo(env = process.env) {
++  const configuredVersion = clean(env.APP_VERSION);
++  const version = SEMVER.test(configuredVersion) ? configuredVersion : '0.0.0-dev';
++  const buildId = clean(env.APP_BUILD_ID) || 'dev';
++  const configuredDate = clean(env.APP_DEPLOYED_AT);
++  const deployedAt = configuredDate && !Number.isNaN(Date.parse(configuredDate))
++    ? new Date(configuredDate).toISOString()
++    : null;
++
++  return { version, deployedAt, buildId };
++}
+diff --git a/backend/version.test.js b/backend/version.test.js
+new file mode 100644
+index 00000000..0ac3d82b
+--- /dev/null
++++ b/backend/version.test.js
+@@ -0,0 +1,35 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { getVersionInfo } from './version.js';
++
++test('returns configured release metadata', () => {
++  assert.deepEqual(getVersionInfo({
++    APP_VERSION: '1.4.0',
++    APP_DEPLOYED_AT: '2026-08-27T16:33:46Z',
++    APP_BUILD_ID: 'app-abc123',
++  }), {
++    version: '1.4.0',
++    deployedAt: '2026-08-27T16:33:46.000Z',
++    buildId: 'app-abc123',
++  });
++});
++
++test('uses explicit development metadata when deployment values are absent', () => {
++  assert.deepEqual(getVersionInfo({}), {
++    version: '0.0.0-dev',
++    deployedAt: null,
++    buildId: 'dev',
++  });
++});
++
++test('does not expose malformed version or date values', () => {
++  assert.deepEqual(getVersionInfo({
++    APP_VERSION: 'latest',
++    APP_DEPLOYED_AT: 'yesterday-ish',
++    APP_BUILD_ID: ' ',
++  }), {
++    version: '0.0.0-dev',
++    deployedAt: null,
++    buildId: 'dev',
++  });
++});
+diff --git a/docs/decisions/0004-semantic-application-releases.md b/docs/decisions/0004-semantic-application-releases.md
+new file mode 100644
+index 00000000..3d59fa36
+--- /dev/null
++++ b/docs/decisions/0004-semantic-application-releases.md
+@@ -0,0 +1,80 @@
++# 0004: Give deployed application builds semantic release identity
++
++- Status: Accepted
++- Date: 2026-08-27
++- Deciders: Nelson
++
++## Context
++
++The application displayed a full Git commit SHA inside the signed-in account menu.
++That value identified a build for developers, but did not tell a person which
++release was running, when it was deployed, or whether an already-open tab was stale.
++It was also coupled to authentication even though deployment identity is public,
++application-wide state.
++
++The SHA was not fully trustworthy as a release identity. Pull-request CI publishes
++the canonical content-fingerprint image, and the main deployment deliberately reuses
++that exact image when the merged source has the same fingerprint. The embedded SHA
++could therefore name the PR commit rather than the equivalent merge commit.
++
++Three unrelated SemVer-shaped values already existed in package and Helm metadata,
++but none was bumped, tagged, released, deployed, or displayed. They did not form an
++application-version system.
++
++## Decision
++
++- Use immutable Git tags named `vMAJOR.MINOR.PATCH` as the source of truth for
++  application releases.
++- Require exactly one semantic-release label on every PR: `release:major`,
++  `release:minor`, `release:patch`, or `release:none`.
++- Establish `v1.0.0` as the first truthful baseline when the versioned release
++  workflow first reaches `main`; do not invent retrospective releases.
++- Have the main deployment workflow calculate the next version, create its tag and
++  GitHub release, and store the deployed version and timestamp beside the immutable
++  image tag in Helm values.
++- Pass the content-fingerprint image tag—not a Git SHA—into the frontend as its
++  build identity. This remains stable when a PR-built image is reused after merge.
++- Expose the running version, deployment time, and build identity from a public,
++  non-cached `/api/version` endpoint.
++- Show the semantic version and deployment time in the shared sidebar for all users.
++  If the loaded frontend build differs from the running server image, replace that
++  status with a reload action.
++- Keep package versions and Helm chart versions explicitly separate from the
++  application release number.
++
++## Version policy
++
++- **Major**: an incompatible data/workflow change or fundamental product redesign.
++- **Minor**: a new user-visible capability.
++- **Patch**: a bug fix, compatibility fix, or user-facing polish.
++- **None**: documentation or infrastructure-only work that does not change the
++  application release.
++
++## Consequences
++
++- A deployed release now has a human identity, timestamp, release history, and notes.
++- Release intent is reviewed on the PR rather than inferred from commit text.
++- Existing browser tabs can reliably detect that a new image is serving traffic.
++- PR image reuse remains intact because semantic version is runtime deployment
++  metadata and client freshness uses the immutable content fingerprint.
++- A missing or ambiguous release label fails CI and the deployment workflow rather
++  than silently publishing an incorrectly versioned release.
++
++## Alternatives considered
++
++### Continue displaying a shortened Git SHA
++
++Rejected because shortening a machine identifier does not make it a meaningful
++release number and PR image reuse makes its relationship to `main` confusing.
++
++### Manually edit a `VERSION` file in every PR
++
++Rejected because concurrent PRs collide and a forgotten edit silently creates an
++unversioned deployment. A reviewed bump label plus merge-time calculation is both
++explicit and automatable.
++
++### Treat npm or Helm package versions as the application version
++
++Rejected because the two private npm packages and the Helm chart have different
++packaging lifecycles. The deployed application is the single frontend/backend image,
++so its release identity belongs to that deployment rather than any one package.
+diff --git a/frontend/package-lock.json b/frontend/package-lock.json
+index 312d2079..b713ef8a 100644
+--- a/frontend/package-lock.json
++++ b/frontend/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+   "name": "frontend",
+-  "version": "1.0.0",
++  "version": "0.0.0-private",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "frontend",
+-      "version": "1.0.0",
++      "version": "0.0.0-private",
+       "dependencies": {
+         "clsx": "^2.1.1",
+         "framer-motion": "^12.34.0",
+diff --git a/frontend/package.json b/frontend/package.json
+index f4d6f9a8..f41aa3b3 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -1,12 +1,13 @@
+ {
+   "name": "frontend",
+   "private": true,
+-  "version": "1.0.0",
++  "version": "0.0.0-private",
+   "type": "module",
+   "scripts": {
+     "dev": "vite",
+     "build": "vite build",
+     "lint": "eslint .",
++    "test": "node --test",
+     "preview": "vite preview"
+   },
+   "dependencies": {
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 836f4081..ce2a746c 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -15,6 +15,7 @@ import { HistoryTab } from './components/HistoryTab';
+ import { DayOverride } from './components/DayOverride';
+ import { LogTab } from './components/WorkoutDrawer';
+ import { UserProfile } from './components/UserProfile';
++import { AppVersion } from './components/AppVersion';
+ import { TabBar } from './components/TabBar';
+ import { CycleTab } from './components/CycleTab';
+ import { SorenessTab } from './components/SorenessTab';
+@@ -538,6 +539,7 @@ function AppSidebar({ tabs, activeTab, onTabChange, currentDay, onDay, compact =
+       <TabBar tabs={tabs} activeTab={activeTab} onTabChange={onTabChange} />
+ 
+       <div style={{ flex: 1 }} />
++      <AppVersion />
+     </aside>
+   );
+ }
+diff --git a/frontend/src/components/AppVersion.jsx b/frontend/src/components/AppVersion.jsx
+new file mode 100644
+index 00000000..d433b726
+--- /dev/null
++++ b/frontend/src/components/AppVersion.jsx
+@@ -0,0 +1,136 @@
++import { useCallback, useEffect, useState } from 'react';
++import { RefreshCw } from 'lucide-react';
++import { colors } from '../colors';
++import {
++  displayVersion,
++  formatDeploymentTime,
++  isUpdateAvailable,
++} from '../utils/appVersion';
++
++const POLL_INTERVAL_MS = 60_000;
++const RELEASES_URL = 'https://github.com/romaine-life/kill-me/releases/tag/';
++
++export function AppVersion() {
++  const [release, setRelease] = useState(null);
++
++  const refresh = useCallback(async () => {
++    try {
++      const response = await fetch('/api/version', {
++        cache: 'no-store',
++        headers: { Accept: 'application/json' },
++      });
++      if (!response.ok) return;
++      setRelease(await response.json());
++    } catch {
++      // Version status must never make the application unavailable. Keep the
++      // last successful value and retry on the next poll/focus event.
++    }
++  }, []);
++
++  useEffect(() => {
++    refresh();
++    const interval = window.setInterval(refresh, POLL_INTERVAL_MS);
++    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
++    window.addEventListener('focus', refresh);
++    document.addEventListener('visibilitychange', onVisible);
++    return () => {
++      window.clearInterval(interval);
++      window.removeEventListener('focus', refresh);
++      document.removeEventListener('visibilitychange', onVisible);
++    };
++  }, [refresh]);
++
++  if (!release) {
++    return <div style={styles.loading}>Checking release…</div>;
++  }
++
++  const stale = isUpdateAvailable(release.buildId);
++  const deployed = formatDeploymentTime(release.deployedAt);
++  const isDevelopment = release.version?.includes('-dev');
++  const versionLabel = displayVersion(release.version);
++
++  return (
++    <section style={{ ...styles.container, ...(stale ? styles.staleContainer : {}) }} aria-live="polite">
++      {stale ? (
++        <>
++          <div style={styles.updateTitle}>v{release.version} is available</div>
++          <button type="button" onClick={() => window.location.reload()} style={styles.reloadButton}>
++            <RefreshCw size={12} />
++            Reload app
++          </button>
++        </>
++      ) : (
++        <>
++          {isDevelopment ? (
++            <div style={styles.version}>{versionLabel}</div>
++          ) : (
++            <a
++              href={`${RELEASES_URL}v${release.version}`}
++              target="_blank"
++              rel="noreferrer"
++              style={styles.version}
++              title={`View release notes for v${release.version}`}
++            >
++              {versionLabel}
++            </a>
++          )}
++          {deployed && <div style={styles.deployed}>Deployed {deployed}</div>}
++        </>
++      )}
++    </section>
++  );
++}
++
++const styles = {
++  container: {
++    margin: '0 6px',
++    padding: '10px 11px',
++    border: `1px solid ${colors.border.subtle}`,
++    borderRadius: 7,
++    background: colors.bg.surface,
++    display: 'flex',
++    flexDirection: 'column',
++    gap: 3,
++  },
++  staleContainer: {
++    borderColor: colors.accent.red,
++    gap: 8,
++  },
++  loading: {
++    margin: '0 6px',
++    padding: '8px 11px',
++    color: colors.text.disabled,
++    fontSize: 10,
++    fontFamily: 'var(--font-mono)',
++  },
++  version: {
++    color: colors.text.secondary,
++    fontSize: 11,
++    fontWeight: 600,
++    textDecoration: 'none',
++  },
++  deployed: {
++    color: colors.text.tertiary,
++    fontSize: 10,
++    fontFamily: 'var(--font-mono)',
++  },
++  updateTitle: {
++    color: colors.text.primary,
++    fontSize: 11,
++    fontWeight: 700,
++  },
++  reloadButton: {
++    border: 'none',
++    borderRadius: 5,
++    padding: '7px 9px',
++    background: colors.accent.red,
++    color: colors.text.primary,
++    display: 'inline-flex',
++    alignItems: 'center',
++    justifyContent: 'center',
++    gap: 6,
++    fontSize: 11,
++    fontWeight: 700,
++    cursor: 'pointer',
++  },
++};
+diff --git a/frontend/src/components/UserProfile.jsx b/frontend/src/components/UserProfile.jsx
+index f825d567..a6301e98 100644
+--- a/frontend/src/components/UserProfile.jsx
++++ b/frontend/src/components/UserProfile.jsx
+@@ -4,8 +4,6 @@ import { useAuth } from '../auth/AuthContext.jsx';
+ import { startLogin } from '../auth/index.js';
+ import { colors } from '../colors';
+ 
+-/* global __BUILD_NUMBER__ */
+-
+ // Gravatar for the signed-in email. Uses SHA-256 (Gravatar's modern hash);
+ // crypto.subtle needs a secure context, which both localhost and https satisfy.
+ // `d=retro` gives a deterministic pixel-art fallback when the email has no
+@@ -121,7 +119,6 @@ export function UserProfile() {
+           >
+             Sign Out
+           </button>
+-          <div style={styles.buildLine}>build {__BUILD_NUMBER__}</div>
+         </div>
+       )}
+     </div>
+@@ -240,11 +237,4 @@ const styles = {
+     cursor: 'pointer',
+     fontFamily: 'monospace',
+   },
+-  buildLine: {
+-    marginTop: 4,
+-    textAlign: 'center',
+-    fontSize: 10,
+-    color: colors.text.disabled,
+-    fontFamily: 'monospace',
+-  },
+ };
+diff --git a/frontend/src/utils/appVersion.js b/frontend/src/utils/appVersion.js
+new file mode 100644
+index 00000000..d5a5f2c1
+--- /dev/null
++++ b/frontend/src/utils/appVersion.js
+@@ -0,0 +1,29 @@
++/* global __APP_BUILD_ID__ */
++
++export const CLIENT_BUILD_ID = typeof __APP_BUILD_ID__ === 'undefined'
++  ? 'dev'
++  : __APP_BUILD_ID__;
++
++export function displayVersion(version) {
++  if (!version || version.includes('-dev')) return 'Development build';
++  return `Running v${version}`;
++}
++
++export function isUpdateAvailable(serverBuildId, clientBuildId = CLIENT_BUILD_ID) {
++  if (!serverBuildId || serverBuildId === 'dev' || clientBuildId === 'dev') return false;
++  return serverBuildId !== clientBuildId;
++}
++
++export function formatDeploymentTime(value, locale, timeZone) {
++  if (!value) return null;
++  const date = new Date(value);
++  if (Number.isNaN(date.getTime())) return null;
++  return new Intl.DateTimeFormat(locale, {
++    month: 'short',
++    day: 'numeric',
++    year: 'numeric',
++    hour: 'numeric',
++    minute: '2-digit',
++    ...(timeZone ? { timeZone } : {}),
++  }).format(date);
++}
+diff --git a/frontend/src/utils/appVersion.test.js b/frontend/src/utils/appVersion.test.js
+new file mode 100644
+index 00000000..3a6e50d7
+--- /dev/null
++++ b/frontend/src/utils/appVersion.test.js
+@@ -0,0 +1,26 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import {
++  displayVersion,
++  formatDeploymentTime,
++  isUpdateAvailable,
++} from './appVersion.js';
++
++test('formats semantic versions for people', () => {
++  assert.equal(displayVersion('1.4.0'), 'Running v1.4.0');
++  assert.equal(displayVersion('0.0.0-dev'), 'Development build');
++});
++
++test('only reports a stale production client', () => {
++  assert.equal(isUpdateAvailable('app-new', 'app-old'), true);
++  assert.equal(isUpdateAvailable('app-same', 'app-same'), false);
++  assert.equal(isUpdateAvailable('app-new', 'dev'), false);
++});
++
++test('formats deployment time in a requested timezone', () => {
++  assert.equal(
++    formatDeploymentTime('2026-08-27T16:33:46Z', 'en-US', 'America/Los_Angeles'),
++    'Aug 27, 2026, 9:33 AM',
++  );
++  assert.equal(formatDeploymentTime('not-a-date', 'en-US', 'UTC'), null);
++});
+diff --git a/frontend/vite.config.js b/frontend/vite.config.js
+index 80e30b5f..e77f3794 100644
+--- a/frontend/vite.config.js
++++ b/frontend/vite.config.js
+@@ -10,17 +10,10 @@ import { fileURLToPath } from 'node:url'
+ 
+ const __dirname = dirname(fileURLToPath(import.meta.url))
+ 
+-// Git short hash for the displayed build number. CI/Docker pass BUILD_NUMBER via
+-// env (the container isn't a git repo); local dev falls back to the running git.
+-const getGitCommit = () => {
+-  if (process.env.BUILD_NUMBER) return process.env.BUILD_NUMBER
+-  try {
+-    return execSync('git rev-parse --short HEAD').toString().trim()
+-  } catch (error) {
+-    console.warn('Could not get git commit hash:', error.message)
+-    return 'dev'
+-  }
+-}
++// CI passes the immutable source-content fingerprint used as the image tag.
++// Unlike a PR commit SHA, it remains correct when the exact image is reused
++// after merge. Local development deliberately uses a distinct identity.
++const getBuildId = () => process.env.APP_BUILD_ID || 'dev'
+ 
+ // Ask the OS for a free port instead of hardcoding one, so parallel worktrees /
+ // dev servers never fight over a fixed number (several backends pinning one port
+@@ -231,7 +224,7 @@ export default defineConfig(async ({ command }) => {
+       ...(useBackend ? [devBackend(backendPort)] : []),
+     ],
+     define: {
+-      __BUILD_NUMBER__: JSON.stringify(getGitCommit()),
++      __APP_BUILD_ID__: JSON.stringify(getBuildId()),
+     },
+     server: {
+       // Bind IPv4 loopback explicitly. Vite's default host is 'localhost', which
+diff --git a/k8s/Chart.yaml b/k8s/Chart.yaml
+index 66eba778..43c387d2 100644
+--- a/k8s/Chart.yaml
++++ b/k8s/Chart.yaml
+@@ -2,5 +2,6 @@ apiVersion: v2
+ name: kill-me
+ description: Workout tracker (workout.romaine.life)
+ type: application
++# This is the Helm chart packaging version. Application releases use Git tags
++# and .Values.release.version; the chart itself is not published independently.
+ version: 0.1.0
+-appVersion: "0.1.0"
+diff --git a/k8s/templates/deployment.yaml b/k8s/templates/deployment.yaml
+index 898ba90a..ef1568d8 100644
+--- a/k8s/templates/deployment.yaml
++++ b/k8s/templates/deployment.yaml
+@@ -28,6 +28,9 @@ spec:
+       labels:
+         app: {{ include "kill-me.resourceName" . }}
+         azure.workload.identity/use: "true"
++      annotations:
++        romaine.life/app-version: {{ .Values.release.version | quote }}
++        romaine.life/build-id: {{ .Values.image.tag | quote }}
+     spec:
+       serviceAccountName: {{ .Values.serviceAccount }}
+       containers:
+@@ -46,6 +49,12 @@ spec:
+           env:
+             - name: PORT
+               value: "3000"
++            - name: APP_VERSION
++              value: {{ .Values.release.version | quote }}
++            - name: APP_DEPLOYED_AT
++              value: {{ .Values.release.deployedAt | quote }}
++            - name: APP_BUILD_ID
++              value: {{ .Values.image.tag | quote }}
+             - name: AZURE_APP_CONFIG_ENDPOINT
+               value: https://infra-appconfig.azconfig.io
+             # Pending migrations apply here and nowhere else. Local development points at
+diff --git a/k8s/values.yaml b/k8s/values.yaml
+index 04b9f33b..f045d2c3 100644
+--- a/k8s/values.yaml
++++ b/k8s/values.yaml
+@@ -7,6 +7,12 @@ image:
+   tag: "app-11ce063dcc02ae35560f75b3154e2d601229e6752e2468b6d9e20764a9100f02"
+   pullPolicy: IfNotPresent
+ 
++# The deploy workflow derives semantic versions from immutable Git release
++# tags, then records the version-to-image mapping here for the running pod.
++release:
++  version: "1.0.0"
++  deployedAt: ""
++
+ name: kill-me
+ namespace: kill-me
+ 
+diff --git a/scripts/check-image-fingerprint-config.mjs b/scripts/check-image-fingerprint-config.mjs
+index d0cf00d4..a0a8d4f9 100755
+--- a/scripts/check-image-fingerprint-config.mjs
++++ b/scripts/check-image-fingerprint-config.mjs
+@@ -21,6 +21,7 @@ function assertNotIncludes(text, needle, label) {
+ assertIncludes(dockerBuildCheck, "scripts/image-fingerprint.sh", "docker-build-check");
+ assertIncludes(dockerBuildCheck, "steps.fingerprint.outputs.proof_tag", "docker-build-check");
+ assertIncludes(dockerBuildCheck, "romainecr.azurecr.io/kill-me:${{ steps.fingerprint.outputs.proof_tag }}", "docker-build-check");
++assertIncludes(dockerBuildCheck, "APP_BUILD_ID=${{ steps.fingerprint.outputs.proof_tag }}", "docker-build-check");
+ assertIncludes(dockerBuildCheck, "sha-${{ steps.source.outputs.sha }}", "docker-build-check");
+ assertNotIncludes(dockerBuildCheck, "ci-pr-", "docker-build-check");
+ assertNotIncludes(dockerBuildCheck, "ci-ref-", "docker-build-check");
+@@ -31,6 +32,7 @@ assertNotIncludes(dockerBuildCheck, "romainecr.azurecr.io/kill-me:${{ env.IMAGE_
+ assertIncludes(buildAndDeploy, "scripts/image-fingerprint.sh", "build-and-deploy");
+ assertIncludes(buildAndDeploy, "ALIAS_TAG=app-${fingerprint}", "build-and-deploy");
+ assertIncludes(buildAndDeploy, "romainecr.azurecr.io/kill-me:${{ env.ALIAS_TAG }}", "build-and-deploy");
++assertIncludes(buildAndDeploy, "APP_BUILD_ID=${{ env.ALIAS_TAG }}", "build-and-deploy");
+ assertNotIncludes(buildAndDeploy, "ci-ref-", "build-and-deploy");
+ assertNotIncludes(buildAndDeploy, 'TAG="${GITHUB_SHA::7}"', "build-and-deploy");
+ assertNotIncludes(buildAndDeploy, '--build-arg BUILD_NUMBER="${TAG}"', "build-and-deploy");
+diff --git a/scripts/next-app-version.mjs b/scripts/next-app-version.mjs
+new file mode 100644
+index 00000000..374bff20
+--- /dev/null
++++ b/scripts/next-app-version.mjs
+@@ -0,0 +1,41 @@
++#!/usr/bin/env node
++
++import { pathToFileURL } from 'node:url';
++
++const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
++const BUMPS = new Set(['major', 'minor', 'patch', 'none']);
++
++export function nextAppVersion(current, bump) {
++  const match = SEMVER.exec(current || '');
++  if (!match) throw new Error(`Current version must be stable SemVer (received ${JSON.stringify(current)})`);
++  if (!BUMPS.has(bump)) throw new Error(`Bump must be major, minor, patch, or none (received ${JSON.stringify(bump)})`);
++
++  let major = Number(match[1]);
++  let minor = Number(match[2]);
++  let patch = Number(match[3]);
++
++  if (bump === 'major') {
++    major += 1;
++    minor = 0;
++    patch = 0;
++  } else if (bump === 'minor') {
++    minor += 1;
++    patch = 0;
++  } else if (bump === 'patch') {
++    patch += 1;
++  }
++
++  return `${major}.${minor}.${patch}`;
++}
++
++const invokedDirectly = process.argv[1]
++  && import.meta.url === pathToFileURL(process.argv[1]).href;
++
++if (invokedDirectly) {
++  try {
++    console.log(nextAppVersion(process.argv[2], process.argv[3]));
++  } catch (error) {
++    console.error(error.message);
++    process.exitCode = 1;
++  }
++}
+diff --git a/scripts/next-app-version.test.mjs b/scripts/next-app-version.test.mjs
+new file mode 100644
+index 00000000..6a9a2631
+--- /dev/null
++++ b/scripts/next-app-version.test.mjs
+@@ -0,0 +1,15 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { nextAppVersion } from './next-app-version.mjs';
++
++test('applies semantic-version bumps', () => {
++  assert.equal(nextAppVersion('1.2.3', 'major'), '2.0.0');
++  assert.equal(nextAppVersion('1.2.3', 'minor'), '1.3.0');
++  assert.equal(nextAppVersion('1.2.3', 'patch'), '1.2.4');
++  assert.equal(nextAppVersion('1.2.3', 'none'), '1.2.3');
++});
++
++test('rejects ambiguous version inputs', () => {
++  assert.throws(() => nextAppVersion('v1.2.3', 'patch'), /stable SemVer/);
++  assert.throws(() => nextAppVersion('1.2.3', 'feature'), /Bump must be/);
++});

@@ -1,0 +1,368 @@
+diff --git a/frontend/eslint.config.js b/frontend/eslint.config.js
+index 4fa125da..f8cfed8a 100644
+--- a/frontend/eslint.config.js
++++ b/frontend/eslint.config.js
+@@ -23,7 +23,20 @@ export default defineConfig([
+       },
+     },
+     rules: {
+-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
++      'no-unused-vars': ['error', {
++        argsIgnorePattern: '^_',
++        caughtErrorsIgnorePattern: '^_',
++        ignoreRestSiblings: true,
++        varsIgnorePattern: '^[A-Z_]|^motion$',
++      }],
++      'react-hooks/set-state-in-effect': 'off',
++      'react-refresh/only-export-components': 'off',
++    },
++  },
++  {
++    files: ['vite.config.js'],
++    languageOptions: {
++      globals: globals.node,
+     },
+   },
+ ])
+diff --git a/frontend/src/components/HistoryTab.jsx b/frontend/src/components/HistoryTab.jsx
+index 4efe495f..7f9b7fef 100644
+--- a/frontend/src/components/HistoryTab.jsx
++++ b/frontend/src/components/HistoryTab.jsx
+@@ -160,15 +160,6 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick }) {
+     });
+   };
+ 
+-  const formatDate = (dateString) => {
+-    const date = new Date(dateString);
+-    return date.toLocaleDateString('en-US', {
+-      month: 'short',
+-      day: 'numeric',
+-      year: 'numeric'
+-    });
+-  };
+-
+   const getDayColor = (dayNumber) => {
+     return DAY_CONFIG[dayNumber]?.color || 'bg-slate-500';
+   };
+diff --git a/frontend/src/components/TodayTab.jsx b/frontend/src/components/TodayTab.jsx
+index 8b110d98..54db4ed9 100644
+--- a/frontend/src/components/TodayTab.jsx
++++ b/frontend/src/components/TodayTab.jsx
+@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react';
+ import { todayLocal } from '../utils/dateUtils';
+ import { motion, AnimatePresence } from 'framer-motion';
+ import { useDataSource } from '../api/snapshotContext.jsx';
++import { apiFetch } from '../api/client.js';
+ import { DAY_CONFIG } from '../utils/dayConfig.js';
+ import { colors } from '../colors.js';
+ 
+diff --git a/frontend/src/components/WorkoutDrawer.jsx b/frontend/src/components/WorkoutDrawer.jsx
+index f4a8c4c0..40f8c9e3 100644
+--- a/frontend/src/components/WorkoutDrawer.jsx
++++ b/frontend/src/components/WorkoutDrawer.jsx
+@@ -14,7 +14,7 @@ import { getDayInfo, DAY_CONFIG } from '../utils/dayConfig';
+ import { apiFetch } from '../api/client.js';
+ import { todayLocal, nowLocalTime } from '../utils/dateUtils';
+ import { useDataSource } from '../api/snapshotContext.jsx';
+-import { TREADMILL_TEMPLATES, getTotalDuration, formatIntervalSummary } from '../utils/cardioTemplates.js';
++import { TREADMILL_TEMPLATES, getTotalDuration } from '../utils/cardioTemplates.js';
+ import { CARDIO_CONFIG } from '../utils/cardioConfig.js';
+ 
+ export function LogTab({
+@@ -497,7 +497,7 @@ export function LogTab({
+             value={selectedDate}
+             onChange={(e) => setSelectedDate(e.target.value)}
+             onClick={() => {
+-              try { dateInputRef.current?.showPicker(); } catch {}
++              try { dateInputRef.current?.showPicker(); } catch { /* showPicker is optional */ }
+             }}
+             max={todayLocal()}
+             className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30 transition-all cursor-pointer"
+@@ -952,7 +952,7 @@ export function LogTab({
+               type="date"
+               value={cardioDate}
+               onChange={(e) => setCardioDate(e.target.value)}
+-              onClick={() => { try { cardioDateRef.current?.showPicker(); } catch {} }}
++              onClick={() => { try { cardioDateRef.current?.showPicker(); } catch { /* showPicker is optional */ } }}
+               max={todayLocal()}
+               className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-slate-200 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 transition-all cursor-pointer"
+             />
+diff --git a/k8s/templates/certificate.yaml b/k8s/templates/certificate.yaml
+index 7c5b79f8..77c83a85 100644
+--- a/k8s/templates/certificate.yaml
++++ b/k8s/templates/certificate.yaml
+@@ -1,12 +1,17 @@
++{{- if eq (include "kill-me.renderWarm" .) "true" }}
++{{- if not .Values.hostname -}}
++{{- fail "hostname is required" -}}
++{{- end -}}
+ apiVersion: cert-manager.io/v1
+ kind: Certificate
+ metadata:
+-  name: kill-me-tls
+-  namespace: kill-me
++  name: {{ .Values.ingress.tlsSecret }}
++  namespace: {{ include "kill-me.namespace" . }}
+ spec:
+-  secretName: kill-me-tls
++  secretName: {{ .Values.ingress.tlsSecret }}
+   issuerRef:
+-    name: letsencrypt-prod
++    name: {{ .Values.ingress.certIssuer }}
+     kind: ClusterIssuer
+   dnsNames:
+-    - workout.romaine.life
++    - {{ .Values.hostname | quote }}
++{{- end }}
+diff --git a/k8s/templates/deployment.yaml b/k8s/templates/deployment.yaml
+index 31b41e96..549692f3 100644
+--- a/k8s/templates/deployment.yaml
++++ b/k8s/templates/deployment.yaml
+@@ -1,15 +1,16 @@
++{{- if eq (include "kill-me.renderHot" .) "true" }}
+ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+-  name: kill-me
+-  namespace: kill-me
++  name: {{ include "kill-me.resourceName" . }}
++  namespace: {{ include "kill-me.namespace" . }}
+   labels:
+-    app: kill-me
++    app: {{ include "kill-me.resourceName" . }}
+ spec:
+   replicas: 1
+   selector:
+     matchLabels:
+-      app: kill-me
++      app: {{ include "kill-me.resourceName" . }}
+   strategy:
+     type: RollingUpdate
+     rollingUpdate:
+@@ -18,14 +19,14 @@ spec:
+   template:
+     metadata:
+       labels:
+-        app: kill-me
++        app: {{ include "kill-me.resourceName" . }}
+         azure.workload.identity/use: "true"
+     spec:
+-      serviceAccountName: infra-shared
++      serviceAccountName: {{ .Values.serviceAccount }}
+       containers:
+-        - name: kill-me
++        - name: {{ include "kill-me.resourceName" . }}
+           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+-          imagePullPolicy: IfNotPresent
++          imagePullPolicy: {{ .Values.image.pullPolicy }}
+           ports:
+             - name: http
+               containerPort: 3000
+@@ -59,3 +60,4 @@ spec:
+               port: http
+             periodSeconds: 30
+             failureThreshold: 3
++{{- end }}
+diff --git a/k8s/templates/helpers.tpl b/k8s/templates/helpers.tpl
+new file mode 100644
+index 00000000..850b880b
+--- /dev/null
++++ b/k8s/templates/helpers.tpl
+@@ -0,0 +1,38 @@
++{{- define "kill-me.renderMode" -}}
++{{- $mode := .Values.renderMode | default "normal" -}}
++{{- if not (has $mode (list "normal" "warm" "hot")) -}}
++{{- fail (printf "renderMode must be one of: normal, warm, hot; got %q" $mode) -}}
++{{- end -}}
++{{- $mode -}}
++{{- end -}}
++
++{{- define "kill-me.isTestEnv" -}}
++{{- $mode := include "kill-me.renderMode" . -}}
++{{- if or (eq $mode "warm") (eq $mode "hot") -}}true{{- else -}}false{{- end -}}
++{{- end -}}
++
++{{- define "kill-me.renderWarm" -}}
++{{- $mode := include "kill-me.renderMode" . -}}
++{{- if or (eq $mode "normal") (eq $mode "warm") -}}true{{- else -}}false{{- end -}}
++{{- end -}}
++
++{{- define "kill-me.renderHot" -}}
++{{- $mode := include "kill-me.renderMode" . -}}
++{{- if or (eq $mode "normal") (eq $mode "hot") -}}true{{- else -}}false{{- end -}}
++{{- end -}}
++
++{{- define "kill-me.resourceName" -}}
++{{- if eq (include "kill-me.isTestEnv" .) "true" -}}
++{{- required "testEnv.slotName is required when renderMode is warm or hot" .Values.testEnv.slotName -}}
++{{- else -}}
++{{- .Values.name | default "kill-me" -}}
++{{- end -}}
++{{- end -}}
++
++{{- define "kill-me.namespace" -}}
++{{- if eq (include "kill-me.isTestEnv" .) "true" -}}
++{{- .Release.Namespace -}}
++{{- else -}}
++{{- .Values.namespace | default .Release.Namespace -}}
++{{- end -}}
++{{- end -}}
+diff --git a/k8s/templates/httproute.yaml b/k8s/templates/httproute.yaml
+index bbea79bf..710e7939 100644
+--- a/k8s/templates/httproute.yaml
++++ b/k8s/templates/httproute.yaml
+@@ -1,30 +1,35 @@
++{{- if eq (include "kill-me.renderWarm" .) "true" }}
++{{- if not .Values.hostname -}}
++{{- fail "hostname is required" -}}
++{{- end -}}
+ # Dual parentRef: XListenerSet for HTTPS serving, Gateway main for HTTP (and
+ # so ExternalDNS creates the A record — external-dns#5694 tracks native
+ # XListenerSet source support).
+ apiVersion: gateway.networking.k8s.io/v1
+ kind: HTTPRoute
+ metadata:
+-  name: kill-me
+-  namespace: kill-me
++  name: {{ include "kill-me.resourceName" . }}
++  namespace: {{ include "kill-me.namespace" . }}
+ spec:
+   hostnames:
+-    - workout.romaine.life
++    - {{ .Values.hostname | quote }}
+   parentRefs:
+     - group: gateway.networking.k8s.io
+       kind: Gateway
+-      name: main
+-      namespace: envoy-gateway-system
++      name: {{ .Values.ingress.gatewayName }}
++      namespace: {{ .Values.ingress.gatewayNamespace }}
+     - group: gateway.networking.x-k8s.io
+       kind: XListenerSet
+-      name: kill-me
++      name: {{ include "kill-me.resourceName" . }}
+   rules:
+     - backendRefs:
+         - group: ""
+           kind: Service
+-          name: kill-me
++          name: {{ include "kill-me.resourceName" . }}
+           port: 80
+           weight: 1
+       matches:
+         - path:
+             type: PathPrefix
+             value: /
++{{- end }}
+diff --git a/k8s/templates/service.yaml b/k8s/templates/service.yaml
+index 17eea5b2..99394a86 100644
+--- a/k8s/templates/service.yaml
++++ b/k8s/templates/service.yaml
+@@ -1,16 +1,18 @@
++{{- if eq (include "kill-me.renderHot" .) "true" }}
+ apiVersion: v1
+ kind: Service
+ metadata:
+-  name: kill-me
+-  namespace: kill-me
++  name: {{ include "kill-me.resourceName" . }}
++  namespace: {{ include "kill-me.namespace" . }}
+   labels:
+-    app: kill-me
++    app: {{ include "kill-me.resourceName" . }}
+ spec:
+   type: ClusterIP
+   selector:
+-    app: kill-me
++    app: {{ include "kill-me.resourceName" . }}
+   ports:
+     - name: http
+       port: 80
+       targetPort: http
+       protocol: TCP
++{{- end }}
+diff --git a/k8s/templates/serviceaccount.yaml b/k8s/templates/serviceaccount.yaml
+index 204889ff..bd412b78 100644
+--- a/k8s/templates/serviceaccount.yaml
++++ b/k8s/templates/serviceaccount.yaml
+@@ -1,3 +1,4 @@
++{{- if eq (include "kill-me.renderWarm" .) "true" }}
+ # Federated to kill-me-identity (tofu/identity.tf::azurerm_federated_identity_credential.kill_me)
+ # instead of the shared infra-shared-identity. New identity is scoped to
+ # kill-me's actual surface: Cosmos data on dbs/WorkoutTrackerDB and
+@@ -7,9 +8,10 @@
+ apiVersion: v1
+ kind: ServiceAccount
+ metadata:
+-  name: infra-shared
+-  namespace: kill-me
++  name: {{ .Values.serviceAccount }}
++  namespace: {{ include "kill-me.namespace" . }}
+   labels:
+     azure.workload.identity/use: "true"
+   annotations:
+-    azure.workload.identity/client-id: 2ba3e252-c553-4a57-8811-c29b51c06cd9
++    azure.workload.identity/client-id: {{ .Values.serviceAccountClientId | quote }}
++{{- end }}
+diff --git a/k8s/templates/xlistenerset.yaml b/k8s/templates/xlistenerset.yaml
+index a2f79d2a..f304a29e 100644
+--- a/k8s/templates/xlistenerset.yaml
++++ b/k8s/templates/xlistenerset.yaml
+@@ -1,22 +1,24 @@
++{{- if eq (include "kill-me.renderWarm" .) "true" }}
+ apiVersion: gateway.networking.x-k8s.io/v1alpha1
+ kind: XListenerSet
+ metadata:
+-  name: kill-me
+-  namespace: kill-me
++  name: {{ include "kill-me.resourceName" . }}
++  namespace: {{ include "kill-me.namespace" . }}
+ spec:
+   parentRef:
+     group: gateway.networking.k8s.io
+     kind: Gateway
+-    name: main
+-    namespace: envoy-gateway-system
++    name: {{ .Values.ingress.gatewayName }}
++    namespace: {{ .Values.ingress.gatewayNamespace }}
+   listeners:
+     - name: https
+       protocol: HTTPS
+       port: 443
+-      hostname: workout.romaine.life
++      hostname: {{ .Values.hostname | quote }}
+       tls:
+         mode: Terminate
+         certificateRefs:
+           - group: ""
+             kind: Secret
+-            name: kill-me-tls
++            name: {{ .Values.ingress.tlsSecret }}
++{{- end }}
+diff --git a/k8s/values.yaml b/k8s/values.yaml
+index 61baa3b8..99bbb64b 100644
+--- a/k8s/values.yaml
++++ b/k8s/values.yaml
+@@ -3,3 +3,22 @@
+ image:
+   repository: romainecr.azurecr.io/kill-me
+   tag: 79104f4
++  pullPolicy: IfNotPresent
++
++name: kill-me
++namespace: kill-me
++
++hostname: workout.romaine.life
++renderMode: normal
++
++testEnv:
++  slotName: ""
++
++serviceAccount: infra-shared
++serviceAccountClientId: 2ba3e252-c553-4a57-8811-c29b51c06cd9
++
++ingress:
++  gatewayName: main
++  gatewayNamespace: envoy-gateway-system
++  certIssuer: letsencrypt-prod
++  tlsSecret: kill-me-tls

@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 2,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/5479a0bd2fe3a354d40ab6e89c741e7efccfeaee/frontend%2Findex.html",
+    "changes": 4,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Findex.html?ref=5479a0bd2fe3a354d40ab6e89c741e7efccfeaee",
+    "deletions": 2,
+    "filename": "frontend/index.html",
+    "patch": "@@ -2,9 +2,9 @@\n \u003chtml lang=\"en\"\u003e\n   \u003chead\u003e\n     \u003cmeta charset=\"UTF-8\" /\u003e\n-    \u003clink rel=\"icon\" type=\"image/svg+xml\" href=\"/vite.svg\" /\u003e\n+    \u003clink rel=\"icon\" type=\"image/svg+xml\" href=\"/favicon.svg\" /\u003e\n     \u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" /\u003e\n-    \u003ctitle\u003e12-Day Synergy System\u003c/title\u003e\n+    \u003ctitle\u003esynergy-12\u003c/title\u003e\n   \u003c/head\u003e\n   \u003cbody\u003e\n     \u003cdiv id=\"root\"\u003e\u003c/div\u003e",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/5479a0bd2fe3a354d40ab6e89c741e7efccfeaee/frontend%2Findex.html",
+    "sha": "54cadae7d5bc8167e6b41b909610bc3bcba12b26",
+    "status": "modified"
+  },
+  {
+    "additions": 7,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/5479a0bd2fe3a354d40ab6e89c741e7efccfeaee/frontend%2Fpublic%2Ffavicon.svg",
+    "changes": 7,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fpublic%2Ffavicon.svg?ref=5479a0bd2fe3a354d40ab6e89c741e7efccfeaee",
+    "deletions": 0,
+    "filename": "frontend/public/favicon.svg",
+    "patch": "@@ -0,0 +1,7 @@\n+\u003csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"\u003e\n+  \u003crect width=\"64\" height=\"64\" rx=\"14\" fill=\"#0d0d0d\"/\u003e\n+  \u003crect x=\"1\" y=\"1\" width=\"62\" height=\"62\" rx=\"13\" fill=\"none\" stroke=\"rgba(255,255,255,0.10)\" stroke-width=\"2\"/\u003e\n+  \u003cpath d=\"M15 43c5 5 12 7 19 5 8-2 14-8 16-16\" fill=\"none\" stroke=\"#c83838\" stroke-width=\"5\" stroke-linecap=\"round\"/\u003e\n+  \u003cpath d=\"M17 21c6-5 14-7 22-4 5 2 8 5 10 9\" fill=\"none\" stroke=\"#f0c560\" stroke-width=\"5\" stroke-linecap=\"round\"/\u003e\n+  \u003ctext x=\"32\" y=\"38\" text-anchor=\"middle\" font-family=\"Archivo, Arial, sans-serif\" font-size=\"18\" font-weight=\"900\" fill=\"#ffffff\"\u003e12\u003c/text\u003e\n+\u003c/svg\u003e",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/5479a0bd2fe3a354d40ab6e89c741e7efccfeaee/frontend%2Fpublic%2Ffavicon.svg",
+    "sha": "ba9447d2e0a509021de2fff8f69e1c3e2032c68d",
+    "status": "added"
+  },
+  {
+    "additions": 6,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/5479a0bd2fe3a354d40ab6e89c741e7efccfeaee/frontend%2Fsrc%2Fcomponents%2FListTab.jsx",
+    "changes": 7,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fsrc%2Fcomponents%2FListTab.jsx?ref=5479a0bd2fe3a354d40ab6e89c741e7efccfeaee",
+    "deletions": 1,
+    "filename": "frontend/src/components/ListTab.jsx",
+    "patch": "@@ -8,6 +8,7 @@ import { useState, useEffect, useMemo } from 'react';\n import { DAY_CONFIG } from '../utils/dayConfig';\n import { useDataSource } from '../api/snapshotContext.jsx';\n import { formatTime12h, todayLocal } from '../utils/dateUtils';\n+import { formatIntervalSummary } from '../utils/cardioTemplates.js';\n import {\n   DAY_DESIGN,\n   dayColor,\n@@ -558,6 +559,10 @@ function WorkoutCard({ w, onClick }) {\n // ── Cardio card ────────────────────────────────────────────────────────\n function CardioCard({ c, onClick }) {\n   const isBike = c.activity === 'bike';\n+  const intervalSummary = Array.isArray(c.treadmill?.intervals)\n+    ? formatIntervalSummary(c.treadmill.intervals)\n+    : c.treadmill?.intervals;\n+\n   return (\n     \u003cdiv\n       onClick={() =\u003e onClick?.(c)}\n@@ -600,7 +605,7 @@ function CardioCard({ c, onClick }) {\n         \u003cdiv style={{ fontSize: 12, color: 'var(--fg-muted)', fontFamily: 'var(--font-mono)' }}\u003e\n           {c.time \u0026\u0026 \u003c\u003e{formatTime12h(c.time)} · \u003c/\u003e}\n           {c.durationMinutes} min\n-          {c.treadmill?.intervals \u0026\u0026 \u003cspan\u003e · {c.treadmill.intervals}\u003c/span\u003e}\n+          {intervalSummary \u0026\u0026 \u003cspan\u003e · {intervalSummary}\u003c/span\u003e}\n         \u003c/div\u003e\n       \u003c/div\u003e\n       \u003cdiv style={{ display: 'flex', gap: 16, alignItems: 'baseline' }}\u003e",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/5479a0bd2fe3a354d40ab6e89c741e7efccfeaee/frontend%2Fsrc%2Fcomponents%2FListTab.jsx",
+    "sha": "8372763ea04429565c2c058beea9bf2eb6e90154",
+    "status": "modified"
+  }
+]

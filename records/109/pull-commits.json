@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/457dc8c5941fecf91f32823e29736b0faeeee787/comments",
+    "commit": {
+      "author": {
+        "date": "2026-09-16T16:36:17Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-09-16T16:36:17Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "fix: open soreness records from the Overview lanes\n\nSoreness stripes on the Overview only showed hover details, so a record\ncould not be opened or edited from the one view in use. Each day's hit\ntarget now opens that day's soreness record, matching the strength and\ncardio nodes.",
+      "tree": {
+        "sha": "5b11f4eccd6d1a84e74db638aeb3f26b99d49600",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/5b11f4eccd6d1a84e74db638aeb3f26b99d49600"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/457dc8c5941fecf91f32823e29736b0faeeee787",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/457dc8c5941fecf91f32823e29736b0faeeee787",
+    "node_id": "C_kwDORV0mMdoAKDQ1N2RjOGM1OTQxZmVjZjkxZjMyODIzZTI5NzM2YjBmYWVlZWU3ODc",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/dc84a0d9023684cec7b9077e081f26f744f06281",
+        "sha": "dc84a0d9023684cec7b9077e081f26f744f06281",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/dc84a0d9023684cec7b9077e081f26f744f06281"
+      }
+    ],
+    "sha": "457dc8c5941fecf91f32823e29736b0faeeee787",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/457dc8c5941fecf91f32823e29736b0faeeee787"
+  }
+]

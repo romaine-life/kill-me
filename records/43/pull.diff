@@ -1,0 +1,19 @@
+diff --git a/.github/workflows/generate-local-env.yaml b/.github/workflows/generate-local-env.yaml
+deleted file mode 100644
+index edd74c4f..00000000
+--- a/.github/workflows/generate-local-env.yaml
++++ /dev/null
+@@ -1,13 +0,0 @@
+-name: Generate Local .env Files
+-
+-on:
+-  workflow_dispatch:
+-
+-permissions:
+-  id-token: write
+-  contents: read
+-
+-jobs:
+-  call-generate-env-template:
+-    uses: nelsong6/pipeline-templates/.github/workflows/generate-local-env-template.yml@main
+-    secrets: inherit

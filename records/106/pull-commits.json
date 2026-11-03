@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/81847?v=4",
+      "events_url": "https://api.github.com/users/claude/events{/privacy}",
+      "followers_url": "https://api.github.com/users/claude/followers",
+      "following_url": "https://api.github.com/users/claude/following{/other_user}",
+      "gists_url": "https://api.github.com/users/claude/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/claude",
+      "id": 81847,
+      "login": "claude",
+      "node_id": "MDQ6VXNlcjgxODQ3",
+      "organizations_url": "https://api.github.com/users/claude/orgs",
+      "received_events_url": "https://api.github.com/users/claude/received_events",
+      "repos_url": "https://api.github.com/users/claude/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/claude/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/claude/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/claude",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/4e5ead299821e08d5d8ea89fb480d28813aaac6f/comments",
+    "commit": {
+      "author": {
+        "date": "2026-09-15T06:47:31Z",
+        "email": "noreply@anthropic.com",
+        "name": "Claude"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-09-15T06:47:31Z",
+        "email": "noreply@anthropic.com",
+        "name": "Claude"
+      },
+      "message": "feat: swap hips day cable work for machines\n\nBoth single-leg cable movements on Hips day used an ankle cuff, which is\nthe attachment being avoided. Hip extension moves to the standing kickback\nmachine and hip flexion to a captain's chair knee raise. Same two joint\nactions, no cuff.\n\nEach replacement carries the cue that distinguishes it from its failure\nmode. The kickback note calls out that driving through the heel with a\nfree knee turns the movement into a backwards single-leg press, felt as\nquad rather than glute. The knee raise keeps the psoas-above-90 cue from\nthe cable entry it replaces and adds the pelvis tell: neutral pelvis is\nhip flexion, curling toward the ribs hands the work to the abs.\n\nNo model version bump — the cycle's days are unchanged, only the exercise\nlibrary, so this follows 003 rather than 004.\n\nVerified by running the migration twice against the in-memory container:\nfirst run creates 2 and removes 2, second is a clean no-op.\n\nCo-Authored-By: Claude Opus 5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_011ctuQJERVf8TyXczQB9Ufx",
+      "tree": {
+        "sha": "1850035490e43d56be59842ba7e77cc50c790e62",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/1850035490e43d56be59842ba7e77cc50c790e62"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/4e5ead299821e08d5d8ea89fb480d28813aaac6f",
+      "verification": {
+        "payload": "tree 1850035490e43d56be59842ba7e77cc50c790e62\nparent 2263e9bdf8533ddb84fa1ee9c58c8b5714c34cc7\nauthor Claude \u003cnoreply@anthropic.com\u003e 1789454851 +0000\ncommitter Claude \u003cnoreply@anthropic.com\u003e 1789454851 +0000\n\nfeat: swap hips day cable work for machines\n\nBoth single-leg cable movements on Hips day used an ankle cuff, which is\nthe attachment being avoided. Hip extension moves to the standing kickback\nmachine and hip flexion to a captain's chair knee raise. Same two joint\nactions, no cuff.\n\nEach replacement carries the cue that distinguishes it from its failure\nmode. The kickback note calls out that driving through the heel with a\nfree knee turns the movement into a backwards single-leg press, felt as\nquad rather than glute. The knee raise keeps the psoas-above-90 cue from\nthe cable entry it replaces and adds the pelvis tell: neutral pelvis is\nhip flexion, curling toward the ribs hands the work to the abs.\n\nNo model version bump — the cycle's days are unchanged, only the exercise\nlibrary, so this follows 003 rather than 004.\n\nVerified by running the migration twice against the in-memory container:\nfirst run creates 2 and removes 2, second is a clean no-op.\n\nCo-Authored-By: Claude Opus 5 \u003cnoreply@anthropic.com\u003e\nClaude-Session: https://claude.ai/code/session_011ctuQJERVf8TyXczQB9Ufx\n",
+        "reason": "valid",
+        "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgrLzsfFISF4by8Q+FKz27YpkK1USsBB+m\namu1QkJnbDsAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5AAAAQK1UytzF\nN7oUBpgMVp0tj1CWu0vo6v/Rxr2zcc+GBS3H8nPvbC6Nec22TlNoTR7rTL9Yz3t32k1y3ASBchmK\noAQ=\n-----END SSH SIGNATURE-----",
+        "verified": true,
+        "verified_at": "2026-09-15T06:47:37Z"
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/81847?v=4",
+      "events_url": "https://api.github.com/users/claude/events{/privacy}",
+      "followers_url": "https://api.github.com/users/claude/followers",
+      "following_url": "https://api.github.com/users/claude/following{/other_user}",
+      "gists_url": "https://api.github.com/users/claude/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/claude",
+      "id": 81847,
+      "login": "claude",
+      "node_id": "MDQ6VXNlcjgxODQ3",
+      "organizations_url": "https://api.github.com/users/claude/orgs",
+      "received_events_url": "https://api.github.com/users/claude/received_events",
+      "repos_url": "https://api.github.com/users/claude/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/claude/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/claude/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/claude",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/4e5ead299821e08d5d8ea89fb480d28813aaac6f",
+    "node_id": "C_kwDORV0mMdoAKDRlNWVhZDI5OTgyMWUwOGQ1ZDhlYTg5ZmI0ODBkMjg4MTNhYWFjNmY",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/2263e9bdf8533ddb84fa1ee9c58c8b5714c34cc7",
+        "sha": "2263e9bdf8533ddb84fa1ee9c58c8b5714c34cc7",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/2263e9bdf8533ddb84fa1ee9c58c8b5714c34cc7"
+      }
+    ],
+    "sha": "4e5ead299821e08d5d8ea89fb480d28813aaac6f",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/4e5ead299821e08d5d8ea89fb480d28813aaac6f"
+  }
+]

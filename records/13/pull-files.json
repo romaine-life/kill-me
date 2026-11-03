@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/053371246080ff02be3843382f5a42db1ea7a94f/.github%2Fworkflows%2Fpublish-routes.yml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fpublish-routes.yml?ref=053371246080ff02be3843382f5a42db1ea7a94f",
+    "deletions": 1,
+    "filename": ".github/workflows/publish-routes.yml",
+    "patch": "@@ -55,7 +55,7 @@ jobs:\n \n       - name: Generate GitHub App token\n         id: app-token\n-        uses: actions/create-github-app-token@v1\n+        uses: actions/create-github-app-token@v3\n         with:\n           app-id: ${{ steps.app-creds.outputs.app_id }}\n           private-key: ${{ steps.app-creds.outputs.private_key }}",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/053371246080ff02be3843382f5a42db1ea7a94f/.github%2Fworkflows%2Fpublish-routes.yml",
+    "sha": "1111a749a6847431f50db281392d92b08693c5db",
+    "status": "modified"
+  }
+]

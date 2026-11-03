@@ -1,0 +1,38 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/c1b672506b325f29e62d7105f53b64692fb2dec7/.github%2Fworkflows%2Fbuild-and-deploy.yaml",
+    "changes": 1,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fbuild-and-deploy.yaml?ref=c1b672506b325f29e62d7105f53b64692fb2dec7",
+    "deletions": 0,
+    "filename": ".github/workflows/build-and-deploy.yaml",
+    "patch": "@@ -30,6 +30,7 @@ jobs:\n   build-and-deploy:\n     name: Build image, push, bump Helm values tag\n     runs-on: ubuntu-latest\n+    environment: ${{ github.ref == 'refs/heads/main' \u0026\u0026 'prod' || 'dev' }}\n     steps:\n       - name: Checkout\n         uses: actions/checkout@v6",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/c1b672506b325f29e62d7105f53b64692fb2dec7/.github%2Fworkflows%2Fbuild-and-deploy.yaml",
+    "sha": "4b3ccffd1dccfff0e115cddeb79914de247805ae",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/c1b672506b325f29e62d7105f53b64692fb2dec7/.github%2Fworkflows%2Fdocker-build-check.yaml",
+    "changes": 1,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fdocker-build-check.yaml?ref=c1b672506b325f29e62d7105f53b64692fb2dec7",
+    "deletions": 0,
+    "filename": ".github/workflows/docker-build-check.yaml",
+    "patch": "@@ -22,6 +22,7 @@ jobs:\n   build:\n     name: Build app image\n     runs-on: ubuntu-latest\n+    environment: ${{ github.ref == 'refs/heads/main' \u0026\u0026 'prod' || 'dev' }}\n     steps:\n       - name: Checkout\n         uses: actions/checkout@v6",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/c1b672506b325f29e62d7105f53b64692fb2dec7/.github%2Fworkflows%2Fdocker-build-check.yaml",
+    "sha": "f0c9ae04493fbe09b299835aac178afce05ec2e7",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/c1b672506b325f29e62d7105f53b64692fb2dec7/.github%2Fworkflows%2Fsnapshot.yaml",
+    "changes": 1,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fsnapshot.yaml?ref=c1b672506b325f29e62d7105f53b64692fb2dec7",
+    "deletions": 0,
+    "filename": ".github/workflows/snapshot.yaml",
+    "patch": "@@ -21,6 +21,7 @@ jobs:\n     name: Generate snapshot.db and commit\n     needs: tofu-outputs\n     runs-on: ubuntu-latest\n+    environment: ${{ github.ref == 'refs/heads/main' \u0026\u0026 'prod' || 'dev' }}\n     steps:\n       - name: Checkout code\n         uses: actions/checkout@v6",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/c1b672506b325f29e62d7105f53b64692fb2dec7/.github%2Fworkflows%2Fsnapshot.yaml",
+    "sha": "a0aea28710f5768e5e625d6f1e72a4c346da528d",
+    "status": "modified"
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 7,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/cefb1777d5d66e9369ad64e9d405200bd479aaf9/frontend%2Fpackage-lock.json",
+    "changes": 11,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/frontend%2Fpackage-lock.json?ref=cefb1777d5d66e9369ad64e9d405200bd479aaf9",
+    "deletions": 4,
+    "filename": "frontend/package-lock.json",
+    "patch": "@@ -1462,13 +1462,16 @@\n       \"license\": \"MIT\"\n     },\n     \"node_modules/baseline-browser-mapping\": {\n-      \"version\": \"2.9.19\",\n-      \"resolved\": \"https://registry.npmjs.org/baseline-browser-mapping/-/baseline-browser-mapping-2.9.19.tgz\",\n-      \"integrity\": \"sha512-ipDqC8FrAl/76p2SSWKSI+H9tFwm7vYqXQrItCuiVPt26Km0jS+NzSsBWAaBusvSbQcfJG+JitdMm+wZAgTYqg==\",\n+      \"version\": \"2.11.21\",\n+      \"resolved\": \"https://registry.npmjs.org/baseline-browser-mapping/-/baseline-browser-mapping-2.11.21.tgz\",\n+      \"integrity\": \"sha512-uh8vpY/1/YyFkunIDFH/12p7/7VdPKA1hejMVEbdkEaWnUz0Hesvx5EbiU6XxjyHZIOju+ZMbQJkRh+es3/spQ==\",\n       \"dev\": true,\n       \"license\": \"Apache-2.0\",\n       \"bin\": {\n-        \"baseline-browser-mapping\": \"dist/cli.js\"\n+        \"baseline-browser-mapping\": \"dist/cli.cjs\"\n+      },\n+      \"engines\": {\n+        \"node\": \"\u003e=6.0.0\"\n       }\n     },\n     \"node_modules/brace-expansion\": {",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/cefb1777d5d66e9369ad64e9d405200bd479aaf9/frontend%2Fpackage-lock.json",
+    "sha": "cdb38dc70e5fbbea1adead08b3d0e4adfb5132a9",
+    "status": "modified"
+  }
+]

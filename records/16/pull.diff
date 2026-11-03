@@ -1,0 +1,225 @@
+diff --git a/.github/workflows/build-and-deploy.yml b/.github/workflows/build-and-deploy.yml
+index 8b60ced5..4d0f0f40 100644
+--- a/.github/workflows/build-and-deploy.yml
++++ b/.github/workflows/build-and-deploy.yml
+@@ -15,7 +15,6 @@ on:
+ permissions:
+   id-token: write
+   contents: write
+-  packages: read
+ 
+ concurrency:
+   group: build-and-deploy
+@@ -57,7 +56,6 @@ jobs:
+           TAG="${GITHUB_SHA::7}"
+           IMAGE="romainecr.azurecr.io/kill-me:${TAG}"
+           docker build \
+-            --build-arg NPM_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+             --build-arg BUILD_NUMBER="${TAG}" \
+             --build-arg VITE_MICROSOFT_CLIENT_ID="${MICROSOFT_CLIENT_ID}" \
+             -t "$IMAGE" .
+diff --git a/.github/workflows/publish-routes.yml b/.github/workflows/publish-routes.yml
+deleted file mode 100644
+index 1111a749..00000000
+--- a/.github/workflows/publish-routes.yml
++++ /dev/null
+@@ -1,77 +0,0 @@
+-name: Publish Routes Package
+-
+-on:
+-  push:
+-    branches: ["main"]
+-    paths: ["packages/routes/**"]
+-
+-permissions:
+-  contents: read
+-  packages: write
+-  id-token: write
+-
+-jobs:
+-  publish:
+-    runs-on: ubuntu-latest
+-    steps:
+-      - uses: actions/checkout@v6
+-
+-      - uses: actions/setup-node@v6
+-        with:
+-          node-version: '20'
+-          registry-url: 'https://npm.pkg.github.com'
+-
+-      - name: Publish to GitHub Packages
+-        id: publish
+-        working-directory: packages/routes
+-        env:
+-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-        run: |
+-          REGISTRY_VERSION=$(npm view @nelsong6/kill-me-routes version 2>/dev/null || echo "0.0.0")
+-          npm version "$REGISTRY_VERSION" --no-git-tag-version --allow-same-version
+-          npm version patch --no-git-tag-version
+-          npm publish
+-          echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+-
+-      - name: Azure Login via OIDC
+-        uses: azure/login@v2
+-        with:
+-          client-id: ${{ vars.ARM_CLIENT_ID }}
+-          tenant-id: ${{ vars.ARM_TENANT_ID }}
+-          subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
+-
+-      - name: Get GitHub App credentials
+-        id: app-creds
+-        run: |
+-          APP_ID=$(az keyvault secret show --vault-name ${{ vars.KEY_VAULT_NAME }} --name github-app-id --query value -o tsv)
+-          echo "::add-mask::$APP_ID"
+-          echo "app_id=$APP_ID" >> $GITHUB_OUTPUT
+-          PRIVATE_KEY=$(az keyvault secret show --vault-name ${{ vars.KEY_VAULT_NAME }} --name github-app-private-key --query value -o tsv)
+-          echo "::add-mask::$PRIVATE_KEY"
+-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+-          echo "private_key<<$EOF" >> $GITHUB_OUTPUT
+-          echo "$PRIVATE_KEY" >> $GITHUB_OUTPUT
+-          echo "$EOF" >> $GITHUB_OUTPUT
+-
+-      - name: Generate GitHub App token
+-        id: app-token
+-        uses: actions/create-github-app-token@v3
+-        with:
+-          app-id: ${{ steps.app-creds.outputs.app_id }}
+-          private-key: ${{ steps.app-creds.outputs.private_key }}
+-          repositories: api
+-
+-      - name: Trigger API rebuild
+-        run: |
+-          curl -s -X POST \
+-            -H "Authorization: token ${{ steps.app-token.outputs.token }}" \
+-            -H "Accept: application/vnd.github.v3+json" \
+-            https://api.github.com/repos/nelsong6/api/dispatches \
+-            -d '{"event_type":"dependency-updated","client_payload":{"package":"@nelsong6/kill-me-routes","version":"${{ steps.publish.outputs.version }}"}}'
+-
+-      - name: Report published version to CI dashboard
+-        run: |
+-          curl -sf -X POST https://api.romaine.life/ci/published \
+-            -H "Content-Type: application/json" \
+-            -d '{"repoName":"kill-me","version":"${{ steps.publish.outputs.version }}"}' \
+-            || echo "Version report failed (non-fatal)"
+diff --git a/CLAUDE.md b/CLAUDE.md
+index ee0e8e97..e376c2c2 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -57,10 +57,9 @@ snapshot/          SQLite snapshot generator (Node 20)
+   ├── Writes a SQLite .db file consumed by the frontend
+   └── Runs every 4 hours via GitHub Actions cron
+ 
+-packages/routes/   @nelsong6/kill-me-routes npm package
+-  ├── Extracted Express router factories (workouts, soreness, cardio, admin)
+-  ├── Published to GitHub Packages, consumed by shared api repo
+-  └── Seed data included (seed-data.js, seed-soreness.js)
++backend/routes/    Express router factories (workouts, soreness, cardio, admin)
++  ├── Imported locally by backend/server.js — no longer published to GitHub Packages
++  └── Seed data included (data/seed-data.js, data/seed-soreness.js)
+ 
+ tofu/              OpenTofu infrastructure-as-code
+   └── App-specific resources on top of shared infra (no backend — decommissioned)
+@@ -139,7 +138,6 @@ All workflows delegate to **nelsong6/pipeline-templates** reusable templates:
+ | `tofu-lockfile-update.yml` | Manual dispatch | Regenerates lockfile across platforms |
+ | `generate-local-env.yml` | Manual dispatch | Generates `frontend/.env` and `backend/.env` from infra outputs |
+ | `snapshot.yml` | Every 4 hours / manual | Generates SQLite snapshot from Cosmos DB and commits it to the repo (`frontend/public/snapshot.db`) |
+-| `publish-routes.yml` | Push to main touching `packages/routes/` | Publishes `@nelsong6/kill-me-routes` to GitHub Packages, triggers shared api repo rebuild |
+ 
+ ## Development
+ 
+diff --git a/Dockerfile b/Dockerfile
+index a9afc9ea..7668e961 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -25,14 +25,8 @@ FROM node:20-alpine
+ 
+ WORKDIR /app
+ 
+-# Install backend deps with GitHub Packages auth for @nelsong6 scoped packages.
+ COPY backend/package*.json backend/
+-ARG NPM_TOKEN
+-RUN cd backend && \
+-    echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" > .npmrc && \
+-    echo "@nelsong6:registry=https://npm.pkg.github.com" >> .npmrc && \
+-    npm install --omit=dev && \
+-    rm -f .npmrc
++RUN cd backend && npm install --omit=dev
+ 
+ # Bring the built frontend and the backend source into the runtime image.
+ COPY --from=frontend-builder /build/frontend/dist frontend/dist
+diff --git a/backend/package.json b/backend/package.json
+index 37983cf3..2b0c6a1b 100644
+--- a/backend/package.json
++++ b/backend/package.json
+@@ -15,7 +15,6 @@
+     "@azure/cosmos": "^4.0.0",
+     "@azure/identity": "^4.0.0",
+     "@azure/keyvault-secrets": "^4.11.1",
+-    "@nelsong6/kill-me-routes": "^0.1.2",
+     "cors": "^2.8.6",
+     "dotenv": "^17.4.2",
+     "express": "^5.2.1",
+diff --git a/packages/routes/admin/admin-routes.js b/backend/routes/admin/admin-routes.js
+similarity index 100%
+rename from packages/routes/admin/admin-routes.js
+rename to backend/routes/admin/admin-routes.js
+diff --git a/packages/routes/data/seed-data.js b/backend/routes/data/seed-data.js
+similarity index 100%
+rename from packages/routes/data/seed-data.js
+rename to backend/routes/data/seed-data.js
+diff --git a/packages/routes/data/seed-soreness.js b/backend/routes/data/seed-soreness.js
+similarity index 100%
+rename from packages/routes/data/seed-soreness.js
+rename to backend/routes/data/seed-soreness.js
+diff --git a/packages/routes/index.js b/backend/routes/index.js
+similarity index 100%
+rename from packages/routes/index.js
+rename to backend/routes/index.js
+diff --git a/packages/routes/routes/cardio.js b/backend/routes/routes/cardio.js
+similarity index 100%
+rename from packages/routes/routes/cardio.js
+rename to backend/routes/routes/cardio.js
+diff --git a/packages/routes/routes/soreness.js b/backend/routes/routes/soreness.js
+similarity index 100%
+rename from packages/routes/routes/soreness.js
+rename to backend/routes/routes/soreness.js
+diff --git a/packages/routes/routes/workouts.js b/backend/routes/routes/workouts.js
+similarity index 100%
+rename from packages/routes/routes/workouts.js
+rename to backend/routes/routes/workouts.js
+diff --git a/backend/server.js b/backend/server.js
+index 53e367ee..44ab715f 100644
+--- a/backend/server.js
++++ b/backend/server.js
+@@ -15,7 +15,7 @@ import {
+   createSorenessRoutes,
+   createCardioRoutes,
+   createAdminRoutes,
+-} from '@nelsong6/kill-me-routes';
++} from './routes/index.js';
+ import { createRequireAuth, requireAdmin } from './auth.js';
+ import { createMicrosoftRoutes } from './microsoft-routes.js';
+ import { fetchConfig } from './config.js';
+diff --git a/packages/routes/package.json b/packages/routes/package.json
+deleted file mode 100644
+index 9201bc62..00000000
+--- a/packages/routes/package.json
++++ /dev/null
+@@ -1,17 +0,0 @@
+-{
+-  "name": "@nelsong6/kill-me-routes",
+-  "version": "0.1.0",
+-  "type": "module",
+-  "description": "Workout tracker route handlers for the shared API",
+-  "main": "index.js",
+-  "license": "MIT",
+-  "peerDependencies": {
+-    "express": "^4.18.0 || ^5.0.0"
+-  },
+-  "engines": {
+-    "node": ">=20.0.0"
+-  },
+-  "publishConfig": {
+-    "registry": "https://npm.pkg.github.com"
+-  }
+-}

@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 24,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/eb914272295d45e6b095ff7d282ac4800ead3bf4/.github%2Fworkflows%2Fauto-merge-dependabot.yaml",
+    "changes": 28,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fauto-merge-dependabot.yaml?ref=eb914272295d45e6b095ff7d282ac4800ead3bf4",
+    "deletions": 4,
+    "filename": ".github/workflows/auto-merge-dependabot.yaml",
+    "patch": "@@ -2,16 +2,36 @@ name: Auto-merge Dependabot\n \n on: pull_request\n \n-permissions:\n-  contents: write\n-  pull-requests: write\n+permissions: {}\n \n jobs:\n   auto-merge:\n     if: github.actor == 'dependabot[bot]'\n     runs-on: ubuntu-latest\n     steps:\n+      # Merge with a GitHub App token instead of the workflow GITHUB_TOKEN:\n+      # pushes made with the default GITHUB_TOKEN never fire `push` workflows\n+      # (GitHub's recursive-trigger guard), so Dependabot merges landed on\n+      # main without triggering deploy/apply workflows and deployed state\n+      # drifted behind. An app-attributed merge push triggers workflows\n+      # normally. See romaine-life/my-homepage#84.\n+      #\n+      # AUTOMERGE_APP_PRIVATE_KEY is an org-level *Dependabot* secret (runs\n+      # triggered by dependabot[bot] read Dependabot secrets, not Actions\n+      # secrets). It holds the infra-bootstrap-github-app private key, also\n+      # kept in Key Vault `romaine-kv` as\n+      # `infra-bootstrap-github-app-private-key` — re-sync the org secret if\n+      # that key is ever rotated.\n+      - name: Mint app token\n+        id: app-token\n+        uses: actions/create-github-app-token@v2\n+        with:\n+          app-id: 3942172 # infra-bootstrap-github-app\n+          private-key: ${{ secrets.AUTOMERGE_APP_PRIVATE_KEY }}\n+          permission-contents: write\n+          permission-pull-requests: write\n+\n       - run: gh pr merge --auto --squash \"$PR_URL\"\n         env:\n           PR_URL: ${{ github.event.pull_request.html_url }}\n-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n+          GH_TOKEN: ${{ steps.app-token.outputs.token }}",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/eb914272295d45e6b095ff7d282ac4800ead3bf4/.github%2Fworkflows%2Fauto-merge-dependabot.yaml",
+    "sha": "843eebfc2244d8ba3d80bf8348c757eed9924565",
+    "status": "modified"
+  }
+]

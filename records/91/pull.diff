@@ -1,0 +1,3247 @@
+diff --git a/.github/workflows/snapshot.yaml b/.github/workflows/snapshot.yaml
+deleted file mode 100644
+index c46d6837..00000000
+--- a/.github/workflows/snapshot.yaml
++++ /dev/null
+@@ -1,80 +0,0 @@
+-name: Snapshot
+-
+-on:
+-  schedule:
+-    - cron: '0 */4 * * *' # Every 4 hours
+-  workflow_dispatch:
+-
+-permissions:
+-  id-token: write
+-  contents: write
+-
+-jobs:
+-  tofu-outputs:
+-    uses: romaine-life/pipeline-templates/.github/workflows/tofu-outputs-template.yml@main
+-    with:
+-      storage_account: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+-      state_key: kill-me.tfstate
+-    secrets: inherit
+-
+-  generate-and-commit:
+-    name: Generate snapshot.db and commit
+-    needs: tofu-outputs
+-    runs-on: ubuntu-latest
+-    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+-    steps:
+-      - name: Checkout code
+-        uses: actions/checkout@v7
+-        with:
+-          # Bump commits are pushed straight to main, which the branch ruleset
+-          # forbids for GITHUB_TOKEN (GitHub Actions cannot be a bypass actor).
+-          # The write deploy key is the ruleset's DeployKey bypass actor, so CI
+-          # pushes keep working while PR merges still wait for required checks.
+-          ssh-key: ${{ secrets.MAIN_PUSH_DEPLOY_KEY }}
+-
+-      - name: Setup Node.js
+-        uses: actions/setup-node@v6
+-        with:
+-          node-version: '20'
+-
+-      - name: Azure Login via OIDC
+-        uses: azure/login@v3
+-        with:
+-          client-id: ${{ vars.ARM_CLIENT_ID }}
+-          tenant-id: ${{ vars.ARM_TENANT_ID }}
+-          subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
+-
+-      - name: Install snapshot dependencies
+-        working-directory: ./snapshot
+-        run: npm ci
+-
+-      - name: Resolve Cosmos DB endpoint from App Config
+-        id: cosmos
+-        run: |
+-          ENDPOINT=$(az appconfig kv show \
+-            --endpoint "${{ vars.AZURE_APP_CONFIG_ENDPOINT }}" \
+-            --auth-mode login \
+-            --key cosmos_db_endpoint \
+-            --query value -o tsv)
+-          echo "::add-mask::$ENDPOINT"
+-          echo "endpoint=$ENDPOINT" >> $GITHUB_OUTPUT
+-
+-      - name: Generate SQLite snapshot
+-        working-directory: ./snapshot
+-        env:
+-          COSMOS_DB_ENDPOINT: ${{ steps.cosmos.outputs.endpoint }}
+-          COSMOS_DB_DATABASE_NAME: ${{ fromJSON(needs.tofu-outputs.outputs.outputs_json).cosmos_db_database_name }}
+-          COSMOS_DB_CONTAINER_NAME: ${{ fromJSON(needs.tofu-outputs.outputs.outputs_json).cosmos_db_container_name }}
+-        run: |
+-          node generate-snapshot.js --output ../frontend/public/snapshot.db
+-
+-      - name: Commit snapshot.db to repo
+-        # The commit triggers build-and-deploy.yml (matches its frontend/**
+-        # paths filter), which rebuilds the Docker image with the new snapshot
+-        # baked into frontend/dist, commits the tag bump, ArgoCD rolls the pod.
+-        run: |
+-          git config user.name "github-actions[bot]"
+-          git config user.email "github-actions[bot]@users.noreply.github.com"
+-          git add frontend/public/snapshot.db
+-          git diff --cached --quiet || git commit -m "Update snapshot.db"
+-          git push
+diff --git a/.gitignore b/.gitignore
+index 3c6ac955..ed35bb00 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -138,9 +138,6 @@ dist
+ vite.config.js.timestamp-*
+ vite.config.ts.timestamp-*
+ 
+-# Snapshot build artifacts
+-frontend/public/sql-wasm.wasm
+-
+ # Terraform
+ *.tfstate
+ *.tfstate.*
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 1207a40d..37312467 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -108,16 +108,12 @@ frontend/          React 19 SPA (Vite + Tailwind CSS 4)
+   ├── Centralized color palette (src/colors.js)
+   ├── Sign-in delegated to auth.romaine.life (no MSAL in-app)
+   ├── Public viewing, admin-only editing
+-  ├── In-browser SQLite via sql.js/WASM for anonymous visitors (instant loads)
+-  ├── Deployed to Azure Static Web App
+-  └── Calls backend API with Bearer tokens
+-
+-snapshot/          SQLite snapshot generator (Node 20)
+-  ├── Queries Cosmos DB for all public document types (7 tables)
+-  ├── Writes a SQLite .db file consumed by the frontend
+-  └── Runs every 4 hours via GitHub Actions cron
++  ├── All reads use the same-origin public API
++  └── Built into the application image and served by Express on AKS
+ 
+ backend/routes/    Express router factories (workouts, soreness, cardio)
++  ├── Public GET routes read Cosmos DB for every visitor
++  ├── Authenticated admin routes perform writes
+   └── Imported locally by backend/server.js — no longer published to GitHub Packages
+ 
+ backend/migrations/  Forward-only database migrations
+@@ -131,26 +127,32 @@ tofu/              OpenTofu infrastructure-as-code
+ 
+ ### Auth model
+ 
+-"Everyone can view, only admins can edit." Anonymous visitors get instant page
+-loads from an in-browser SQLite snapshot (sql.js/WASM) — no backend cold start.
+-Authenticated users switch to the live API. Logging workouts, changing the
+-current day, and admin actions require signing in via auth.romaine.life — the
++"Everyone can view, only admins can edit." Public reads go directly through the
++same-origin Express API on the always-running AKS pod. Logging workouts, changing
++the current day, and admin actions require signing in via auth.romaine.life — the
+ central identity service that owns the user table and the role claim
+ (`admin`/`user`/`pending`). Admins are promoted manually via
+ https://auth.romaine.life/admin.
+ 
+ ### Data flow
+ 
+-1. Anonymous visitors load `snapshot.db` via sql.js/WASM — reads served entirely in-browser
+-2. On sign-in, snapshot is discarded and all reads switch to the live backend API
+-
+-**Critical `useDataSource()` contract:** Every consumer of `useDataSource()` MUST check `isReady` before calling any fetch function. The snapshot loads asynchronously (WASM init + network fetch). Until it's ready, `db` is null, `isLive` evaluates to true, and fetches silently hit the live API — which doesn't exist for anonymous visitors, causing a permanent loading spinner. Pattern: `const { fetchFoo, isReady } = useDataSource(); useEffect(() => { if (!isReady) return; fetchFoo()... }, [isReady]);`
+-3. To edit, user clicks Sign in → redirects to `auth.romaine.life/sign-in/microsoft?callbackURL=...`
+-4. After Microsoft completes, auth.romaine.life sets a `.romaine.life` session cookie and bounces back here. Browser auto-attaches that cookie on every request to `workout.romaine.life` because it's scoped to the parent `.romaine.life` domain.
+-5. Frontend's `bootstrapAuth()` ([frontend/src/auth/index.js](frontend/src/auth/index.js)) asks the backend `GET /api/auth/me` — the backend forwards the cookie to `auth.romaine.life/api/auth/get-session` and returns the user record (or null). No tokens stored anywhere in the SPA.
+-6. On every request to a protected route, `requireAuth` ([backend/auth.js](backend/auth.js)) does the same cookie-forward to `auth.romaine.life/api/auth/get-session` (60s in-process cache to amortize), and gates on `role ∈ {admin, user}` — `pending` returns 403.
++1. Every visitor reads public workout data from `/api/*` on the same AKS pod that
++   serves the frontend. Cosmos DB is the only application data source.
++2. Authentication bootstraps in parallel and never blocks public rendering.
++3. To edit, the user clicks Sign in → redirects to
++   `auth.romaine.life/sign-in/microsoft?callbackURL=...`.
++4. After Microsoft completes, auth.romaine.life sets a `.romaine.life` session
++   cookie and bounces back here. The browser attaches that cookie to
++   `workout.romaine.life` because it is scoped to the parent domain.
++5. Frontend's `bootstrapAuth()` ([frontend/src/auth/index.js](frontend/src/auth/index.js))
++   asks the backend `GET /api/auth/me`; the backend forwards the cookie to
++   `auth.romaine.life/api/auth/get-session` and returns the user record (or null).
++   Both sides bound this probe with a timeout, and the SPA stores no token.
++6. On every protected request, `requireAuth` ([backend/auth.js](backend/auth.js))
++   performs the same cookie-forward (with a 60s in-process cache) and gates on
++   `role ∈ {admin, user}`; `pending` returns 403.
+ 7. `requireAdmin` gates admin-only routes on `role === 'admin'`.
+-8. Backend queries/writes Cosmos DB, partitioned by userId (= `req.user.sub`, i.e. the auth.romaine.life user id).
++8. Backend queries/writes Cosmos DB, partitioned by userId (`req.user.sub`).
+ 
+ No per-app HS256 signing, no Key Vault read, no Bearer-token handling on the frontend. auth.romaine.life is the single source of truth for sessions; this app just consults it.
+ 
+@@ -158,7 +160,8 @@ No per-app HS256 signing, no Key Vault read, no Bearer-token handling on the fro
+ 
+ This repo builds on shared resources provisioned by **infra-bootstrap**:
+ 
+-- Cosmos DB account (`infra-cosmos-serverless`) — pay-per-request, no throughput floor
++- Cosmos DB account (`infra-cosmos-serverless`) — pay-per-request, no throughput floor,
++  continuous backup enabled at the shared account level
+ - AKS cluster (`infra-aks`) — hosts the `kill-me` namespace pod
+ - Azure Container Registry (`romainecr`) — AcrPush granted per-app
+ - Azure App Configuration (`infra-appconfig`)
+@@ -237,29 +240,17 @@ Migrations auto-apply only in the cluster, gated on `RUN_MIGRATIONS_ON_BOOT=true
+ `npm run dev` deliberately reports what is pending instead of applying it — otherwise
+ starting a dev server on a branch would push a half-written migration to production.
+ 
+-`frontend/public/snapshot.db` is committed and baked into the image, so it has to be
+-regenerated in the same commit as any migration that changes its schema. Otherwise
+-anonymous visitors read a snapshot the new frontend cannot parse until the 4-hourly
+-cron catches up:
+-
+-```bash
+-cd snapshot && node generate-snapshot.js --preview-migrations --output ../frontend/public/snapshot.db
+-```
+-
+ ## CI/CD
+ 
+-All workflows delegate to **nelsong6/pipeline-templates** reusable templates:
++Application images are rebuilt only when application or infrastructure source changes.
++Database writes and backups never trigger an application deployment.
+ 
+ | Workflow | Trigger | What it does |
+ | -------- | ------- | ------------ |
+-| `container-app-build.yml` | Push/PR to main | Builds Docker image, pushes to GHCR |
+-| `full-stack-deploy.yml` | After CI Build succeeds / manual | Deploys backend (Container App image update + custom domain cert), deploys frontend (SWA) |
++| `build-and-deploy.yaml` | App source push to main / manual | Builds the fingerprinted image and bumps the Helm values tag |
++| `docker-build-check.yaml` | PR / manual | Verifies the container build and publishes the canonical fingerprint tag when permitted |
+ | `tofu.yml` | Push/PR touching `tofu/` | Plan on PR, apply on main merge |
+-| `lint.yml` | PR to main | Trailing newlines, YAML, spelling, markdown, tofu fmt |
+-| `tofu-lockfile-check.yml` | PR touching `tofu/` | Validates lockfile is current |
+-| `tofu-lockfile-update.yml` | Manual dispatch | Regenerates lockfile across platforms |
+-| `generate-local-env.yml` | Manual dispatch | Generates `frontend/.env` and `backend/.env` from infra outputs |
+-| `snapshot.yml` | Every 4 hours / manual | Generates SQLite snapshot from Cosmos DB and commits it to the repo (`frontend/public/snapshot.db`) |
++| `lint.yaml` | PR to main | Repository lint checks |
+ 
+ ## Development
+ 
+@@ -268,7 +259,6 @@ All workflows delegate to **nelsong6/pipeline-templates** reusable templates:
+ - Node 20+
+ - Azure CLI (`az login` for local Cosmos DB access)
+ - Backend `.env` with `AZURE_APP_CONFIG_ENDPOINT`
+-- Frontend `.env` with `VITE_API_URL` (Microsoft sign-in is delegated upstream to auth.romaine.life)
+ 
+ ### Running locally
+ 
+@@ -278,7 +268,8 @@ cd backend && npm run dev   # Backend only (Express :3000)
+ cd frontend && npm run dev  # Frontend only (Vite :5173)
+ ```
+ 
+-The frontend reads `VITE_API_URL`. The auth service URL is fetched at runtime from the backend's `/api/config` endpoint.
++The frontend uses same-origin `/api/*` routes. Microsoft sign-in is delegated to
++auth.romaine.life; no frontend environment file is required.
+ 
+ Admin mode is available only on localhost in dev mode when signed in as admin. It
+ holds the day-override control; database initialization and the hand-run data
+@@ -304,7 +295,7 @@ Working method (dev server started via `devctl`, see the dev-servers skill —
+ chrome --headless=new --disable-gpu --hide-scrollbars \
+   --user-data-dir="<temp>/chrome-prof" \
+   --window-size=390,844 \          # 390w = mobile; app's isMobile triggers <760px
+-  --virtual-time-budget=9000 \     # let async load (sql.js WASM + snapshot.db) settle
++  --virtual-time-budget=9000 \     # let async API data settle
+   --screenshot="<temp>/shot.png" \
+   "http://127.0.0.1:<vite-port>/<route>"
+ ```
+diff --git a/backend/auth.js b/backend/auth.js
+index 90502615..3a82f3e6 100644
+--- a/backend/auth.js
++++ b/backend/auth.js
+@@ -13,6 +13,7 @@
+ 
+ const AUTH_URL = 'https://auth.romaine.life';
+ const SESSION_CACHE_TTL_MS = 60_000;
++const AUTH_REQUEST_TIMEOUT_MS = 5_000;
+ const ALLOWED_ROLES = new Set(['admin', 'user']);
+ 
+ // LOCAL DEV ONLY. When DEV_AUTH is set (e.g. DEV_AUTH=admin), skip the
+@@ -37,6 +38,7 @@ async function fetchSessionFromAuth(cookie) {
+   try {
+     const res = await fetch(`${AUTH_URL}/api/auth/get-session`, {
+       headers: { Cookie: cookie },
++      signal: AbortSignal.timeout(AUTH_REQUEST_TIMEOUT_MS),
+     });
+     if (!res.ok) return null;
+     const body = await res.json();
+diff --git a/backend/migrations/memory-container.js b/backend/migrations/memory-container.js
+index 61ed2e86..8dfd3c71 100644
+--- a/backend/migrations/memory-container.js
++++ b/backend/migrations/memory-container.js
+@@ -2,9 +2,8 @@
+ // shapes the migrations actually use.
+ //
+ // It exists so migrations can be run against a copy of real data without writing
+-// anything: the dry run uses it to show what would change, and the snapshot
+-// generator uses it to preview what the anonymous snapshot will look like once
+-// pending migrations have been applied.
++// anything: the dry run uses it to show what would change and to prove that pending
++// migrations are safe to retry.
+ //
+ // It deliberately throws 404 on a missing delete, exactly as Cosmos does, so a
+ // migration that assumes a document is still there fails here instead of in
+@@ -17,8 +16,8 @@ export function memoryContainer(documents) {
+   const matches = (doc, sql, parameters) => {
+     const p = Object.fromEntries(parameters.map(({ name, value }) => [name, value]));
+ 
+-    // The migrations parameterise the type; the snapshot generator writes it as a
+-    // literal. Both shapes have to filter, or a preview silently returns everything.
++    // Migration queries normally parameterise the type, but the in-memory adapter
++    // also accepts literals so it faithfully handles every migration query shape.
+     const literalType = sql.match(/c\.type = "([^"]+)"/);
+     if (literalType && doc.type !== literalType[1]) return false;
+ 
+diff --git a/backend/server.js b/backend/server.js
+index 6d23de31..ec7e1b32 100644
+--- a/backend/server.js
++++ b/backend/server.js
+@@ -25,6 +25,7 @@ import { runMigrations, pendingMigrations } from './migrations/runner.js';
+ 
+ const __dirname = path.dirname(fileURLToPath(import.meta.url));
+ const FRONTEND_DIR = path.join(__dirname, '..', 'frontend', 'dist');
++const FRONTEND_ASSETS_DIR = path.join(FRONTEND_DIR, 'assets');
+ 
+ const app = express();
+ const PORT = process.env.PORT || 3000;
+@@ -89,8 +90,36 @@ async function start() {
+   app.use(createSorenessRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
+   app.use(createCardioRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
+ 
+-  app.use(express.static(FRONTEND_DIR));
++  // Hashed Vite assets are immutable. Keep their routing separate so a stale
++  // document requesting a removed hash receives a real 404 instead of the SPA
++  // HTML shell (which browsers reject as the wrong JS/CSS MIME type).
++  app.use('/assets', express.static(FRONTEND_ASSETS_DIR, {
++    immutable: true,
++    maxAge: '1y',
++  }));
++  app.use('/assets', (req, res) => {
++    res.status(404).type('text/plain').send('Asset not found');
++  });
++
++  app.use(express.static(FRONTEND_DIR, {
++    setHeaders(res, filePath) {
++      if (path.basename(filePath) === 'index.html') {
++        res.setHeader('Cache-Control', 'no-store');
++      }
++    },
++  }));
++
++  app.use('/api', (req, res) => {
++    res.status(404).json({ error: 'API route not found' });
++  });
++
++  // Missing static files must stay missing. Only extensionless browser routes
++  // are eligible for the History API fallback.
++  app.get(/.*\.[^/]+$/, (req, res) => {
++    res.status(404).type('text/plain').send('File not found');
++  });
+   app.get(/.*/, (req, res) => {
++    res.setHeader('Cache-Control', 'no-store');
+     res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
+   });
+ 
+diff --git a/docs/decisions/0003-remove-browser-snapshot-data-path.md b/docs/decisions/0003-remove-browser-snapshot-data-path.md
+new file mode 100644
+index 00000000..c80d114d
+--- /dev/null
++++ b/docs/decisions/0003-remove-browser-snapshot-data-path.md
+@@ -0,0 +1,101 @@
++# 0003: Remove the browser snapshot data path
++
++- Status: Accepted
++- Date: 2026-08-26
++- Deciders: Nelson
++
++## Context
++
++Anonymous visitors previously downloaded a committed SQLite database and sql.js
++WebAssembly runtime, while authenticated visitors read Cosmos DB through the API.
++A scheduled workflow regenerated the database every four hours, committed it to
++Git, rebuilt the application image, and rolled the AKS pod.
++
++That distribution mechanism coupled ordinary data refreshes to code releases.
++Dormant browser tabs retained references to retired Vite asset hashes, and the
++server's broad SPA fallback returned `index.html` for those missing assets. The
++browser rejected the HTML responses as JavaScript and CSS, leaving an empty page.
++
++The original snapshot avoided backend cold starts. The application now runs as
++an always-on Express pod in AKS, and its public API payload is substantially
++smaller than the SQLite database plus WebAssembly runtime.
++
++## Decision
++
++- Cosmos DB is the sole application data source.
++- Anonymous and authenticated reads use the same public, same-origin API.
++- Authentication resolves independently and only enables protected editing.
++- Remove the snapshot generator, committed database, sql.js runtime, and scheduled
++  snapshot workflow.
++- Database backup remains an infrastructure concern and never publishes frontend
++  data or triggers an application deployment.
++- Serve the SPA HTML without caching, serve existing hashed assets as immutable,
++  and return a real 404 for missing assets.
++- Use a single-replica `Recreate` rollout while the frontend and API share one
++  image, preventing old and new pods from serving incompatible builds together.
++
++## Rationale
++
++One live data path removes schema duplication, four-hour staleness, scheduled
++image churn, and the browser-side SQLite startup gate. AKS already supplies the
++long-lived compute the public API needs. A database backup protects recovery;
++it does not need to be a user-facing read replica.
++
++## Alternatives considered
++
++### Generate the snapshot with an AKS CronJob
++
++Rejected because it preserves two query implementations and two schemas while
++only moving the scheduler. It does not solve stale data or frontend complexity.
++
++### Publish the SQLite database separately to Blob Storage
++
++Rejected for the current scale. It would stop application rollouts but retain
++the duplicate browser database and WASM runtime without a demonstrated latency
++or availability need.
++
++### Add Redis or another shared API cache
++
++Deferred. Current traffic and payload sizes do not justify another stateful
++service. Add caching only after observed Cosmos request charges or latency demand
++it.
++
++## Consequences
++
++- Public reads require the AKS API and Cosmos DB to be available.
++- Data changes become visible immediately instead of after the next snapshot job.
++- Local frontend development always starts the backend; there is no frontend-only
++  snapshot mode.
++- Real application releases can briefly interrupt the single pod during a
++  `Recreate` rollout.
++- If multi-replica zero-downtime delivery becomes necessary, immutable frontend
++  assets should move to durable static storage that retains old hashes.
++
++## Safety constraints
++
++- Public endpoints must continue returning only data intentionally designated for
++  public viewing.
++- Protected writes remain fail-closed when authentication is unavailable.
++- Missing static assets must never fall through to the SPA HTML response.
++
++## Revisit when
++
++- Public API latency or Cosmos request charges become material.
++- Offline viewing becomes a product requirement.
++- The application moves to multiple serving replicas or requires zero-downtime
++  frontend releases.
++
++## Evidence and references
++
++- Live Azure inspection on 2026-08-26 confirmed that
++  `infra-cosmos-serverless` uses the Cosmos DB `Continuous` backup policy.
++- Production measurement on 2026-08-26: all public JSON endpoints totalled about
++  118 KB, while `snapshot.db` plus `sql-wasm.wasm` totalled about 815 KB before
++  the browser-side sql.js code.
++- [Azure Cosmos DB partitioning](https://learn.microsoft.com/en-us/azure/cosmos-db/partitioning)
++- [Kubernetes Deployments](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
++
++## Related work
++
++- Supersedes the snapshot architecture previously documented in `CLAUDE.md`.
++- Removes `.github/workflows/snapshot.yaml` and the `snapshot/` generator.
+diff --git a/docs/decisions/README.md b/docs/decisions/README.md
+index 4d038948..932655ec 100644
+--- a/docs/decisions/README.md
++++ b/docs/decisions/README.md
+@@ -14,6 +14,7 @@ what would cause the choice to be revisited.
+ | --- | --- | --- |
+ | [0001](0001-synergy-16-program-architecture.md) | Accepted | Adopt the Synergy 16 coverage-first program architecture |
+ | [0002](0002-add-dedicated-vertical-press-day.md) | Accepted | Add a dedicated vertical-press day and advance to Synergy 17 |
++| [0003](0003-remove-browser-snapshot-data-path.md) | Accepted | Remove the browser SQLite snapshot and use the AKS API for every read |
+ 
+ ## Process
+ 
+diff --git a/frontend/index.html b/frontend/index.html
+index 931ae04b..48b539df 100644
+--- a/frontend/index.html
++++ b/frontend/index.html
+@@ -5,6 +5,22 @@
+     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+     <title>synergy-16</title>
++    <script>
++      // A suspended tab can retain an old HTML document across a deployment.
++      // If one of its hashed assets has been retired, fetch a fresh document
++      // once; main.jsx clears the guard only after the current module executes.
++      window.addEventListener('error', (event) => {
++        const target = event.target;
++        const assetUrl = target?.src || target?.href || '';
++        if (!assetUrl.includes('/assets/')) return;
++        if (sessionStorage.getItem('synergy-asset-reload')) return;
++
++        sessionStorage.setItem('synergy-asset-reload', '1');
++        const url = new URL(window.location.href);
++        url.searchParams.set('_asset_retry', Date.now().toString());
++        window.location.replace(url);
++      }, true);
++    </script>
+   </head>
+   <body>
+     <div id="root"></div>
+diff --git a/frontend/package-lock.json b/frontend/package-lock.json
+index ead0fdcb..312d2079 100644
+--- a/frontend/package-lock.json
++++ b/frontend/package-lock.json
+@@ -13,7 +13,6 @@
+         "lucide-react": "^0.564.0",
+         "react": "^19.2.0",
+         "react-dom": "^19.2.0",
+-        "sql.js": "^1.12.0",
+         "tailwind-merge": "^3.4.1"
+       },
+       "devDependencies": {
+@@ -2958,12 +2957,6 @@
+         "node": ">=0.10.0"
+       }
+     },
+-    "node_modules/sql.js": {
+-      "version": "1.14.1",
+-      "resolved": "https://registry.npmjs.org/sql.js/-/sql.js-1.14.1.tgz",
+-      "integrity": "sha512-gcj8zBWU5cFsi9WUP+4bFNXAyF1iRpA3LLyS/DP5xlrNzGmPIizUeBggKa8DbDwdqaKwUcTEnChtd2grWo/x/A==",
+-      "license": "MIT"
+-    },
+     "node_modules/strip-json-comments": {
+       "version": "3.1.1",
+       "resolved": "https://registry.npmjs.org/strip-json-comments/-/strip-json-comments-3.1.1.tgz",
+diff --git a/frontend/package.json b/frontend/package.json
+index 4c02be6f..f4d6f9a8 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -15,7 +15,6 @@
+     "lucide-react": "^0.564.0",
+     "react": "^19.2.0",
+     "react-dom": "^19.2.0",
+-    "sql.js": "^1.12.0",
+     "tailwind-merge": "^3.4.1"
+   },
+   "devDependencies": {
+diff --git a/frontend/public/snapshot.db b/frontend/public/snapshot.db
+deleted file mode 100644
+index 594961f6..00000000
+Binary files a/frontend/public/snapshot.db and /dev/null differ
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 7927fba3..13d8be40 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -43,7 +43,7 @@ const pathFromTab = (tab) => (tab === 'soreness' ? '/' : `/${tab}`);
+ 
+ function App() {
+   const [activeTab, setActiveTab] = useState(() => tabFromPath(window.location.pathname));
+-  const { isAdmin, loading } = useAuth();
++  const { isAdmin } = useAuth();
+   const { currentDay, setDay, setCurrentDay } = useWorkouts();
+   const [logInitialDay, setLogInitialDay] = useState(null);
+   const [logInitialDate, setLogInitialDate] = useState(null);
+@@ -192,14 +192,6 @@ function App() {
+ 
+   const activeDetail = detailStack[detailStack.length - 1] || null;
+ 
+-  if (loading) {
+-    return (
+-      <div style={{ ...styles.app, alignItems: 'center', justifyContent: 'center' }}>
+-        <div style={{ color: 'var(--fg-muted)', fontSize: 16 }}>Loading...</div>
+-      </div>
+-    );
+-  }
+-
+   return (
+     <div style={styles.app}>
+       <TopBar
+diff --git a/frontend/src/api/client.js b/frontend/src/api/client.js
+index a83296c9..685b78d3 100644
+--- a/frontend/src/api/client.js
++++ b/frontend/src/api/client.js
+@@ -1,15 +1,37 @@
+ // Same-origin: backend serves frontend/dist and the API on the same port.
+ // Auth flows via the .romaine.life session cookie, auto-attached by the
+ // browser. Set credentials: 'include' so fetch sends it.
++import { startLogin } from '../auth/index.js';
++
+ export async function apiFetch(path, options = {}) {
++  const { timeoutMs = 10_000, ...fetchOptions } = options;
+   const headers = {
+     'Content-Type': 'application/json',
+-    ...options.headers,
++    ...fetchOptions.headers,
+   };
+ 
+   let res;
+   for (let attempt = 0; attempt < 3; attempt++) {
+-    res = await fetch(path, { ...options, headers, credentials: 'include' });
++    const controller = new AbortController();
++    const timeout = setTimeout(() => controller.abort(), timeoutMs);
++    const abortFromCaller = () => controller.abort();
++    fetchOptions.signal?.addEventListener('abort', abortFromCaller, { once: true });
++    try {
++      res = await fetch(path, {
++        ...fetchOptions,
++        headers,
++        credentials: 'include',
++        signal: controller.signal,
++      });
++    } catch (error) {
++      if (error.name === 'AbortError') {
++        throw new Error(`Request timed out after ${timeoutMs / 1000}s`);
++      }
++      throw error;
++    } finally {
++      clearTimeout(timeout);
++      fetchOptions.signal?.removeEventListener('abort', abortFromCaller);
++    }
+     if (res.status !== 503) break;
+     await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+   }
+@@ -19,7 +41,6 @@ export async function apiFetch(path, options = {}) {
+   if (res.status === 401) {
+     // Only redirect for authenticated actions, not public reads.
+     if (options.method && options.method !== 'GET') {
+-      const { startLogin } = await import('../auth/index.js');
+       startLogin();
+     }
+     throw new Error('Unauthorized');
+diff --git a/frontend/src/api/snapshot.js b/frontend/src/api/snapshot.js
+deleted file mode 100644
+index 2a085dda..00000000
+--- a/frontend/src/api/snapshot.js
++++ /dev/null
+@@ -1,202 +0,0 @@
+-// SQLite snapshot query layer — mirrors the backend's public API response shapes.
+-//
+-// Each function takes an open sql.js database and returns data in the same
+-// format as the corresponding API endpoint, so components can use either
+-// source transparently via useDataSource().
+-
+-// Get the active workout model — the whole cycle in one read
+-export function getWorkoutModel(db) {
+-  const result = db.exec('SELECT version, name, days FROM workout_model LIMIT 1');
+-
+-  if (result.length === 0 || result[0].values.length === 0) {
+-    return { model: null };
+-  }
+-
+-  const [version, name, days] = result[0].values[0];
+-  return { model: { version, name, days: days ? JSON.parse(days) : [] } };
+-}
+-
+-// Get the day the cycle is currently on
+-export function getCurrentDay(db) {
+-  const row = db.exec('SELECT value FROM settings WHERE key = ?', ['currentDaySlug']);
+-  const currentDaySlug = row.length > 0 && row[0].values.length > 0
+-    ? row[0].values[0][0]
+-    : getWorkoutModel(db).model?.days?.[0]?.slug ?? null;
+-  return { currentDaySlug };
+-}
+-
+-// Get one day's definition out of the active model
+-export function getWorkoutDay(db, daySlug) {
+-  const { model } = getWorkoutModel(db);
+-  return { workoutDay: model?.days.find((day) => day.slug === daySlug) ?? null };
+-}
+-
+-// Get exercises for a specific day
+-export function getExercisesForDay(db, daySlug) {
+-  const result = db.exec(
+-    'SELECT id, day_slug, day_number, name, equipment, location, notes, variations, tags FROM exercises WHERE day_slug = ?',
+-    [daySlug]
+-  );
+-
+-  if (result.length === 0) {
+-    return { exercises: [] };
+-  }
+-
+-  const exercises = result[0].values.map(([id, daySlug, dn, name, equipment, location, notes, variations, tags]) => ({
+-    id,
+-    daySlug,
+-    dayNumber: dn,
+-    name,
+-    equipment,
+-    location,
+-    notes,
+-    variations: variations ? JSON.parse(variations) : [{ name: 'Standard', default: true }],
+-    tags: tags ? JSON.parse(tags) : [],
+-  }));
+-
+-  return { exercises };
+-}
+-
+-// Get all exercises across all days
+-export function getAllExercises(db) {
+-  const result = db.exec(
+-    'SELECT id, day_slug, day_number, name, equipment, location, notes, variations, tags FROM exercises ORDER BY day_number'
+-  );
+-
+-  if (result.length === 0) {
+-    return { exercises: [] };
+-  }
+-
+-  const exercises = result[0].values.map(([id, daySlug, dn, name, equipment, location, notes, variations, tags]) => ({
+-    id,
+-    daySlug,
+-    dayNumber: dn,
+-    name,
+-    equipment,
+-    location,
+-    notes,
+-    variations: variations ? JSON.parse(variations) : [{ name: 'Standard', default: true }],
+-    tags: tags ? JSON.parse(tags) : [],
+-  }));
+-
+-  return { exercises };
+-}
+-
+-// Get all logged workouts, sorted by date descending
+-export function getLoggedWorkouts(db) {
+-  const result = db.exec(
+-    'SELECT id, day_slug, day_number, day_name, model_version, date, time, mode, exercises, timestamp, created_at FROM logged_workouts ORDER BY date DESC'
+-  );
+-
+-  if (result.length === 0) {
+-    return { workouts: [] };
+-  }
+-
+-  const workouts = result[0].values.map(([id, daySlug, dn, dayName, modelVersion, date, time, mode, exercises, timestamp, createdAt]) => ({
+-    id,
+-    daySlug,
+-    dayNumber: dn,
+-    dayName,
+-    modelVersion,
+-    date,
+-    time,
+-    mode,
+-    exercises: exercises ? JSON.parse(exercises) : [],
+-    timestamp,
+-    createdAt,
+-  }));
+-
+-  return { workouts };
+-}
+-
+-// Get all soreness entries, sorted by date descending.
+-// Several entries can share both a date and originating workout, so `id` is the
+-// identity. Entries predating workout attribution have a null source_workout_id.
+-export function getSorenessEntries(db) {
+-  // Older bundled snapshots stored intensity only on individual muscles.
+-  const columns = db.exec('PRAGMA table_info(soreness_entries)');
+-  const hasLevel = columns[0]?.values.some((row) => row[1] === 'level');
+-  const levelColumn = hasLevel ? 'level' : 'NULL AS level';
+-  const result = db.exec(
+-    `SELECT id, date, ${levelColumn}, muscles, source_workout_id, source_workout_day_slug, source_workout_day, source_workout_date FROM soreness_entries ORDER BY date DESC`
+-  );
+-
+-  if (result.length === 0) {
+-    return { entries: [] };
+-  }
+-
+-  const entries = result[0].values.map(([id, date, level, muscles, sourceWorkoutId, sourceWorkoutDaySlug, sourceWorkoutDay, sourceWorkoutDate]) => {
+-    const parsedMuscles = JSON.parse(muscles);
+-    return {
+-      id,
+-      date,
+-      level: level ?? (parsedMuscles.length ? Math.max(...parsedMuscles.map((m) => m.level)) : null),
+-      muscles: parsedMuscles,
+-      sourceWorkoutId,
+-      sourceWorkoutDaySlug,
+-      sourceWorkoutDay,
+-      sourceWorkoutDate,
+-    };
+-  });
+-
+-  return { entries };
+-}
+-
+-// Get all cardio sessions, sorted by date descending
+-export function getCardioSessions(db) {
+-  const result = db.exec(
+-    'SELECT id, date, time, activity, duration_minutes, notes, treadmill, bike, timestamp, created_at FROM cardio_sessions ORDER BY date DESC'
+-  );
+-
+-  if (result.length === 0) {
+-    return { sessions: [] };
+-  }
+-
+-  const sessions = result[0].values.map(([id, date, time, activity, durationMinutes, notes, treadmill, bike, timestamp, createdAt]) => ({
+-    id,
+-    date,
+-    time,
+-    activity,
+-    durationMinutes,
+-    notes,
+-    treadmill: treadmill ? JSON.parse(treadmill) : null,
+-    bike: bike ? JSON.parse(bike) : null,
+-    timestamp,
+-    createdAt,
+-  }));
+-
+-  return { sessions };
+-}
+-
+-// Get all treadmill templates, ordered for the dropdown
+-export function getCardioTemplates(db) {
+-  const result = db.exec(
+-    'SELECT template_id, activity, name, description, intervals, sort_order FROM cardio_templates ORDER BY sort_order'
+-  );
+-
+-  if (result.length === 0) {
+-    return { templates: [] };
+-  }
+-
+-  const templates = result[0].values.map(([id, activity, name, description, intervals]) => ({
+-    id,
+-    activity,
+-    name,
+-    description,
+-    intervals: intervals ? JSON.parse(intervals) : [],
+-  }));
+-
+-  return { templates };
+-}
+-
+-// Get snapshot metadata (generated_at timestamp)
+-export function getSnapshotMeta(db) {
+-  const result = db.exec('SELECT key, value FROM snapshot_meta');
+-  if (result.length === 0) return {};
+-
+-  const meta = {};
+-  for (const [key, value] of result[0].values) {
+-    meta[key] = value;
+-  }
+-  return meta;
+-}
+diff --git a/frontend/src/api/snapshotContext.jsx b/frontend/src/api/snapshotContext.jsx
+deleted file mode 100644
+index 6b6f6de8..00000000
+--- a/frontend/src/api/snapshotContext.jsx
++++ /dev/null
+@@ -1,166 +0,0 @@
+-// Snapshot data layer — loads a SQLite snapshot for anonymous visitors.
+-//
+-// When no signed-in user is detected, fetches /snapshot.db and opens it with
+-// sql.js (SQLite compiled to WASM). Provides a useDataSource() hook that
+-// routes reads to either the local snapshot or the live API depending on
+-// auth state.
+-//
+-// If the snapshot is missing (404) or fails to load, falls back to live API
+-// calls for all users.
+-
+-import { createContext, useContext, useState, useEffect, useRef } from 'react';
+-import { useAuth } from '../auth/AuthContext.jsx';
+-import { apiFetch } from './client.js';
+-import {
+-  getCurrentDay,
+-  getWorkoutModel,
+-  getWorkoutDay,
+-  getExercisesForDay,
+-  getAllExercises,
+-  getLoggedWorkouts,
+-  getSorenessEntries,
+-  getCardioSessions,
+-  getCardioTemplates,
+-} from './snapshot.js';
+-
+-const SnapshotContext = createContext(null);
+-
+-// Load sql.js WASM and open the snapshot database
+-async function loadSnapshot() {
+-  const initSqlJs = (await import('sql.js')).default;
+-  const SQL = await initSqlJs({
+-    locateFile: () => '/sql-wasm.wasm',
+-  });
+-
+-  const response = await fetch('/snapshot.db');
+-  if (!response.ok) return null;
+-
+-  const buffer = await response.arrayBuffer();
+-  return new SQL.Database(new Uint8Array(buffer));
+-}
+-
+-export function SnapshotProvider({ children }) {
+-  const { user, loading: authLoading } = useAuth();
+-  const [db, setDb] = useState(null);
+-  const [loading, setLoading] = useState(true);
+-  const loadAttempted = useRef(false);
+-
+-  useEffect(() => {
+-    // Wait for the boot-time /api/auth/me probe to settle before deciding
+-    // whether to spin up the snapshot. Once we know: signed-in → skip;
+-    // anonymous → load snapshot (once).
+-    if (authLoading) return;
+-    if (user || loadAttempted.current) {
+-      setLoading(false);
+-      return;
+-    }
+-    loadAttempted.current = true;
+-
+-    loadSnapshot()
+-      .then((database) => setDb(database))
+-      .catch((err) => console.warn('Snapshot load failed, using live API:', err))
+-      .finally(() => setLoading(false));
+-  }, [user, authLoading]);
+-
+-  // Clean up the database when the user authenticates (switch to live API)
+-  useEffect(() => {
+-    if (user && db) {
+-      db.close();
+-      setDb(null);
+-    }
+-  }, [user]);
+-
+-  return (
+-    <SnapshotContext.Provider value={{ db, loading }}>
+-      {children}
+-    </SnapshotContext.Provider>
+-  );
+-}
+-
+-export function useSnapshot() {
+-  const ctx = useContext(SnapshotContext);
+-  if (!ctx) throw new Error('useSnapshot must be used within SnapshotProvider');
+-  return ctx;
+-}
+-
+-// Unified data source hook — routes reads to snapshot or live API.
+-// Write operations always go through apiFetch regardless of auth state.
+-//
+-// IMPORTANT: Callers MUST check `isReady` before calling any fetch function.
+-// On first render the snapshot is still loading (WASM init + fetch). During
+-// that window `db` is null, so `isLive` evaluates to true and fetches hit the
+-// live API — which doesn't exist for anonymous visitors. The result is a
+-// permanent loading spinner. Correct usage:
+-//
+-//   const { fetchWorkouts, isReady } = useDataSource();
+-//   useEffect(() => {
+-//     if (!isReady) return;
+-//     fetchWorkouts().then(setWorkouts);
+-//   }, [isReady]);
+-//
+-export function useDataSource() {
+-  const { user } = useAuth();
+-  const { db, loading: snapshotLoading } = useSnapshot();
+-
+-  const isLive = !!user || !db;
+-  const isReady = !snapshotLoading;
+-
+-  async function fetchWorkoutModel() {
+-    if (isLive) return apiFetch('/api/workout-model');
+-    return getWorkoutModel(db);
+-  }
+-
+-  async function fetchCurrentDay() {
+-    if (isLive) return apiFetch('/api/current-day');
+-    return getCurrentDay(db);
+-  }
+-
+-  async function fetchWorkoutDay(daySlug) {
+-    if (isLive) return apiFetch(`/api/workout-days/${daySlug}`);
+-    return getWorkoutDay(db, daySlug);
+-  }
+-
+-  async function fetchExercises(daySlug) {
+-    if (isLive) return apiFetch(`/api/exercises/day/${daySlug}`);
+-    return getExercisesForDay(db, daySlug);
+-  }
+-
+-  async function fetchAllExercises() {
+-    if (isLive) return apiFetch('/api/exercises');
+-    return getAllExercises(db);
+-  }
+-
+-  async function fetchWorkouts() {
+-    if (isLive) return apiFetch('/api/logged-workouts');
+-    return getLoggedWorkouts(db);
+-  }
+-
+-  async function fetchSoreness() {
+-    if (isLive) return apiFetch('/api/soreness');
+-    return getSorenessEntries(db);
+-  }
+-
+-  async function fetchCardioSessions() {
+-    if (isLive) return apiFetch('/api/cardio-sessions');
+-    return getCardioSessions(db);
+-  }
+-
+-  async function fetchCardioTemplates() {
+-    if (isLive) return apiFetch('/api/cardio-templates');
+-    return getCardioTemplates(db);
+-  }
+-
+-  return {
+-    fetchWorkoutModel,
+-    fetchCurrentDay,
+-    fetchWorkoutDay,
+-    fetchExercises,
+-    fetchAllExercises,
+-    fetchWorkouts,
+-    fetchSoreness,
+-    fetchCardioSessions,
+-    fetchCardioTemplates,
+-    isLive,
+-    isReady,
+-  };
+-}
+diff --git a/frontend/src/api/useApi.js b/frontend/src/api/useApi.js
+new file mode 100644
+index 00000000..c3f593ef
+--- /dev/null
++++ b/frontend/src/api/useApi.js
+@@ -0,0 +1,23 @@
++// Public reads and authenticated writes share the same same-origin AKS API.
++//
++// This intentionally has no readiness state: Cosmos DB is the single source of
++// truth for every visitor, and each screen owns its ordinary request loading and
++// error state.
++
++import { apiFetch } from './client.js';
++
++const api = Object.freeze({
++  fetchWorkoutModel: () => apiFetch('/api/workout-model'),
++  fetchCurrentDay: () => apiFetch('/api/current-day'),
++  fetchWorkoutDay: (daySlug) => apiFetch(`/api/workout-days/${daySlug}`),
++  fetchExercises: (daySlug) => apiFetch(`/api/exercises/day/${daySlug}`),
++  fetchAllExercises: () => apiFetch('/api/exercises'),
++  fetchWorkouts: () => apiFetch('/api/logged-workouts'),
++  fetchSoreness: () => apiFetch('/api/soreness'),
++  fetchCardioSessions: () => apiFetch('/api/cardio-sessions'),
++  fetchCardioTemplates: () => apiFetch('/api/cardio-templates'),
++});
++
++export function useApi() {
++  return api;
++}
+diff --git a/frontend/src/api/workoutModelContext.jsx b/frontend/src/api/workoutModelContext.jsx
+index 51c13146..691c27c5 100644
+--- a/frontend/src/api/workoutModelContext.jsx
++++ b/frontend/src/api/workoutModelContext.jsx
+@@ -1,31 +1,28 @@
+ // Loads the active workout model once at boot and installs it for the rest of the app.
+ //
+ // The cycle used to be a literal in the bundle, which meant the code and the database
+-// could disagree about what day 8 was. It is data now: it comes from the API when
+-// signed in, or from the SQLite snapshot when anonymous, and everything downstream
+-// reads it through utils/dayConfig.js.
++// could disagree about what day 8 was. It is data now: it comes from the public API,
++// and everything downstream reads it through utils/dayConfig.js.
+ //
+ // Children do not render until it has loaded. Every day-aware component would
+ // otherwise have to handle an empty cycle for the first frame, and there is nothing
+ // meaningful to show without one.
+ 
+ import { createContext, useContext, useEffect, useState } from 'react';
+-import { useDataSource } from './snapshotContext.jsx';
++import { useApi } from './useApi.js';
+ import { setWorkoutModel } from '../utils/dayConfig';
+ 
+ const WorkoutModelContext = createContext(null);
+ 
+ export function WorkoutModelProvider({ children, fallback = null }) {
+-  const { fetchWorkoutModel, isReady } = useDataSource();
++  const { fetchWorkoutModel } = useApi();
+   const [model, setModel] = useState(null);
+   const [error, setError] = useState(null);
++  const [attempt, setAttempt] = useState(0);
+ 
+   useEffect(() => {
+-    // isReady gates on the snapshot having finished loading. Fetching before that
+-    // silently hits the live API, which anonymous visitors cannot reach.
+-    if (!isReady) return;
+-
+     let cancelled = false;
++    setError(null);
+     fetchWorkoutModel()
+       .then((data) => {
+         if (cancelled) return;
+@@ -41,17 +38,28 @@ export function WorkoutModelProvider({ children, fallback = null }) {
+     return () => {
+       cancelled = true;
+     };
+-  }, [isReady]);
++  }, [attempt, fetchWorkoutModel]);
+ 
+   if (error) {
+     return (
+-      <div style={{ padding: 24, color: '#ef6f6f', fontFamily: 'system-ui, sans-serif' }}>
+-        Could not load the workout cycle. {error.message}
++      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, color: '#ef6f6f', fontFamily: 'system-ui, sans-serif' }}>
++        <div style={{ textAlign: 'center' }}>
++          <p>Could not load the workout cycle. {error.message}</p>
++          <button type="button" onClick={() => setAttempt((value) => value + 1)}>
++            Retry
++          </button>
++        </div>
+       </div>
+     );
+   }
+ 
+-  if (!model) return fallback;
++  if (!model) {
++    return fallback ?? (
++      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: '#8a8a8a', fontFamily: 'system-ui, sans-serif' }}>
++        Loading workout data…
++      </div>
++    );
++  }
+ 
+   return <WorkoutModelContext.Provider value={model}>{children}</WorkoutModelContext.Provider>;
+ }
+diff --git a/frontend/src/auth/index.js b/frontend/src/auth/index.js
+index 9798bebc..a2d53378 100644
+--- a/frontend/src/auth/index.js
++++ b/frontend/src/auth/index.js
+@@ -5,18 +5,26 @@
+ // auth.romaine.life/api/auth/get-session and gates on role).
+ 
+ const AUTH_URL = 'https://auth.romaine.life';
++const AUTH_TIMEOUT_MS = 5_000;
+ 
+ /**
+  * Boot-time "who am I?" probe. Returns the user record from auth.romaine.life
+  * (via this app's /api/auth/me) if there's a valid session, or null.
+  */
+ export async function bootstrapAuth() {
++  const controller = new AbortController();
++  const timeout = setTimeout(() => controller.abort(), AUTH_TIMEOUT_MS);
+   try {
+-    const res = await fetch('/api/auth/me', { credentials: 'include' });
++    const res = await fetch('/api/auth/me', {
++      credentials: 'include',
++      signal: controller.signal,
++    });
+     if (!res.ok) return null;
+     return await res.json();
+   } catch {
+     return null;
++  } finally {
++    clearTimeout(timeout);
+   }
+ }
+ 
+diff --git a/frontend/src/components/ActivityRecordDetail.jsx b/frontend/src/components/ActivityRecordDetail.jsx
+index 43bb6298..e73e440b 100644
+--- a/frontend/src/components/ActivityRecordDetail.jsx
++++ b/frontend/src/components/ActivityRecordDetail.jsx
+@@ -1,6 +1,6 @@
+ import { createElement, useEffect, useMemo, useRef, useState } from 'react';
+ import { Activity, Bike, ChevronLeft, Dumbbell, Wrench } from 'lucide-react';
+-import { useDataSource } from '../api/snapshotContext.jsx';
++import { useApi } from '../api/useApi.js';
+ import { colors } from '../colors';
+ import { cardioColor, cardioName } from '../utils/cardioConfig';
+ import { formatTime12h } from '../utils/dateUtils';
+@@ -63,7 +63,7 @@ export function ActivityRecordDetail({
+   onOpenRecord,
+   onAddSoreness,
+ }) {
+-  const { fetchWorkouts, fetchCardioSessions, fetchSoreness, isReady } = useDataSource();
++  const { fetchWorkouts, fetchCardioSessions, fetchSoreness } = useApi();
+   const fetchers = useRef({ fetchWorkouts, fetchCardioSessions, fetchSoreness });
+   useEffect(() => {
+     fetchers.current = { fetchWorkouts, fetchCardioSessions, fetchSoreness };
+@@ -73,7 +73,6 @@ export function ActivityRecordDetail({
+   const [error, setError] = useState(null);
+ 
+   useEffect(() => {
+-    if (!isReady) return;
+     let active = true;
+     setLoading(true);
+     setError(null);
+@@ -99,7 +98,7 @@ export function ActivityRecordDetail({
+     return () => {
+       active = false;
+     };
+-  }, [isReady, kind, record]);
++  }, [kind, record]);
+ 
+   const context = useMemo(() => {
+     if (kind === 'workout') {
+diff --git a/frontend/src/components/ExercisesTab.jsx b/frontend/src/components/ExercisesTab.jsx
+index 1fb60f18..f35ec535 100644
+--- a/frontend/src/components/ExercisesTab.jsx
++++ b/frontend/src/components/ExercisesTab.jsx
+@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
+ import { motion, AnimatePresence } from 'framer-motion';
+ import { ChevronLeft, ChevronRight, Plus, Copy, X, Search } from 'lucide-react';
+ import { apiFetch } from '../api/client.js';
+-import { useDataSource } from '../api/snapshotContext.jsx';
++import { useApi } from '../api/useApi.js';
+ import { getDays, getDaySlugs, getDayInfo } from '../utils/dayConfig.js';
+ import { AnatomyDiagram } from './AnatomyDiagrams.jsx';
+ import { ExercisePose } from './ExercisePoses.jsx';
+@@ -85,7 +85,7 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise
+   const [loading, setLoading] = useState(true);
+   const [currentIndex, setCurrentIndex] = useState(0);
+   const [direction, setDirection] = useState(0);
+-  const { fetchAllExercises, isReady } = useDataSource();
++  const { fetchAllExercises } = useApi();
+ 
+   // Filters
+   const [searchText, setSearchText] = useState('');
+@@ -117,7 +117,6 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise
+ 
+   // Fetch all exercises on mount
+   useEffect(() => {
+-    if (!isReady) return;
+     const load = async () => {
+       setLoading(true);
+       try {
+@@ -130,15 +129,7 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise
+       }
+     };
+     load();
+-  }, [isReady]);
+-
+-  // When navigated from another tab with a specific exercise, find it after load
+-  useEffect(() => {
+-    if (!loading && initialExercise && allExercises.length > 0) {
+-      const idx = filteredExercises.findIndex(e => e.name === initialExercise);
+-      if (idx >= 0) setCurrentIndex(idx);
+-    }
+-  }, [loading, initialExercise, allExercises]);
++  }, [fetchAllExercises]);
+ 
+   const allTags = useMemo(() => collectAllTags(allExercises), [allExercises]);
+ 
+@@ -173,12 +164,20 @@ export function ExercisesTab({ currentDay, isAdmin, initialDay, initialExercise
+     return result;
+   }, [allExercises, enabledDays, activeTags, searchText]);
+ 
++  // When navigated from another tab with a specific exercise, find it after load.
++  useEffect(() => {
++    if (!loading && initialExercise && filteredExercises.length > 0) {
++      const idx = filteredExercises.findIndex(e => e.name === initialExercise);
++      if (idx >= 0) setCurrentIndex(idx);
++    }
++  }, [loading, initialExercise, filteredExercises]);
++
+   // Clamp index when filter changes
+   useEffect(() => {
+     if (currentIndex >= filteredExercises.length) {
+       setCurrentIndex(Math.max(0, filteredExercises.length - 1));
+     }
+-  }, [filteredExercises.length]);
++  }, [currentIndex, filteredExercises.length]);
+ 
+   // Exercises available for "add existing" (not already on target day)
+   const addableExercises = useMemo(() => {
+diff --git a/frontend/src/components/HistoryTab.jsx b/frontend/src/components/HistoryTab.jsx
+index 62476bf7..ce1cd1e2 100644
+--- a/frontend/src/components/HistoryTab.jsx
++++ b/frontend/src/components/HistoryTab.jsx
+@@ -11,12 +11,12 @@
+ //
+ // The chronological list view is a separate tab (ListTab.jsx).
+ 
+-import { useState, useEffect } from 'react';
++import { useState, useEffect, useCallback } from 'react';
+ import { motion } from 'framer-motion';
+ import { getDays } from '../utils/dayConfig';
+ import { dayColor } from '../utils/dayDesign';
+ import { CARDIO_CONFIG, cardioColor } from '../utils/cardioConfig';
+-import { useDataSource } from '../api/snapshotContext.jsx';
++import { useApi } from '../api/useApi.js';
+ import { dateToLocal } from '../utils/dateUtils';
+ 
+ const SORENESS_COLOR = '#f97316'; // orange-500
+@@ -38,14 +38,9 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, onSorene
+   });
+   // Hover state: tracks which workout type is currently being hovered
+   const [hoveredWorkoutType, setHoveredWorkoutType] = useState(null);
+-  const { fetchWorkouts: fetchWorkoutsFromSource, fetchCardioSessions, fetchSoreness, isReady } = useDataSource();
++  const { fetchWorkouts: fetchWorkoutsFromSource, fetchCardioSessions, fetchSoreness } = useApi();
+ 
+-  useEffect(() => {
+-    if (!isReady) return;
+-    loadData();
+-  }, [isReady]);
+-
+-  const loadData = async () => {
++  const loadData = useCallback(async () => {
+     setLoading(true);
+     try {
+       const [workoutData, cardioData, sorenessData] = await Promise.all([
+@@ -61,7 +56,11 @@ export function HistoryTab({ onDayClick, onWorkoutClick, onCardioClick, onSorene
+     } finally {
+       setLoading(false);
+     }
+-  };
++  }, [fetchWorkoutsFromSource, fetchCardioSessions, fetchSoreness]);
++
++  useEffect(() => {
++    loadData();
++  }, [loadData]);
+ 
+   // Calendar helpers
+   const getDaysInMonth = (date) => {
+diff --git a/frontend/src/components/ListTab.jsx b/frontend/src/components/ListTab.jsx
+index a1105ce6..12655c0a 100644
+--- a/frontend/src/components/ListTab.jsx
++++ b/frontend/src/components/ListTab.jsx
+@@ -6,7 +6,7 @@
+ 
+ import { useState, useEffect, useMemo } from 'react';
+ import { describeLoggedDay, getDayInfo } from '../utils/dayConfig';
+-import { useDataSource } from '../api/snapshotContext.jsx';
++import { useApi } from '../api/useApi.js';
+ import { formatTime12h, todayLocal } from '../utils/dateUtils';
+ import { formatIntervalSummary } from '../utils/cardioTemplates.js';
+ import { cardioColor, cardioName } from '../utils/cardioConfig.js';
+@@ -36,10 +36,9 @@ export function ListTab({ onWorkoutClick, onCardioClick, onSorenessClick, viewTo
+   const [sorenessEntries, setSorenessEntries] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [filter, setFilter] = useState('all');
+-  const { fetchWorkouts, fetchCardioSessions, fetchSoreness, isReady } = useDataSource();
++  const { fetchWorkouts, fetchCardioSessions, fetchSoreness } = useApi();
+ 
+   useEffect(() => {
+-    if (!isReady) return;
+     let active = true;
+     (async () => {
+       setLoading(true);
+@@ -62,7 +61,7 @@ export function ListTab({ onWorkoutClick, onCardioClick, onSorenessClick, viewTo
+     return () => {
+       active = false;
+     };
+-  }, [isReady]);
++  }, [fetchWorkouts, fetchCardioSessions, fetchSoreness]);
+ 
+   const items = useMemo(() => {
+     const merged = [
+diff --git a/frontend/src/components/SorenessTab.jsx b/frontend/src/components/SorenessTab.jsx
+index 776b81f7..6de4d8ac 100644
+--- a/frontend/src/components/SorenessTab.jsx
++++ b/frontend/src/components/SorenessTab.jsx
+@@ -15,9 +15,9 @@
+ //               sourceWorkoutId, sourceWorkoutDaySlug, sourceWorkoutDay,
+ //               sourceWorkoutDate }.
+ 
+-import { useState, useEffect, useMemo, useRef } from 'react';
++import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+ import { apiFetch } from '../api/client';
+-import { useDataSource } from '../api/snapshotContext.jsx';
++import { useApi } from '../api/useApi.js';
+ import { MUSCLE_TAXONOMY, MUSCLE_GROUPS, searchMuscles } from '../utils/muscleTaxonomy';
+ import { todayLocal } from '../utils/dateUtils';
+ import { getDayInfo, describeLoggedDay } from '../utils/dayConfig';
+@@ -117,7 +117,7 @@ export function SorenessTab({
+   const [cardioSessions, setCardioSessions] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [error, setError] = useState(null);
+-  const { fetchSoreness, fetchWorkouts, fetchCardioSessions, isReady } = useDataSource();
++  const { fetchSoreness, fetchWorkouts, fetchCardioSessions } = useApi();
+   const isMobile = useIsMobile();
+ 
+   // Editor state
+@@ -145,14 +145,7 @@ export function SorenessTab({
+   const [pinnedMuscle, setPinnedMuscle] = useState(null); // { group, muscle }
+   const [listHover, setListHover] = useState(null); // { group, muscle }
+ 
+-  // Fetch the recovery records and the strength/cardio activity that gives
+-  // them context on the shared date rail.
+-  useEffect(() => {
+-    if (!isReady) return;
+-    loadData();
+-  }, [isReady]);
+-
+-  async function loadData() {
++  const loadData = useCallback(async () => {
+     try {
+       setLoading(true);
+       const [sorenessData, workoutData, cardioData] = await Promise.all([
+@@ -168,7 +161,13 @@ export function SorenessTab({
+     } finally {
+       setLoading(false);
+     }
+-  }
++  }, [fetchSoreness, fetchWorkouts, fetchCardioSessions]);
++
++  // Fetch the recovery records and the strength/cardio activity that gives
++  // them context on the shared date rail.
++  useEffect(() => {
++    loadData();
++  }, [loadData]);
+ 
+   // Workouts, newest first — the order both the source picker and timeline want.
+   const workoutsByDate = useMemo(
+diff --git a/frontend/src/components/UserProfile.jsx b/frontend/src/components/UserProfile.jsx
+index bd324779..f825d567 100644
+--- a/frontend/src/components/UserProfile.jsx
++++ b/frontend/src/components/UserProfile.jsx
+@@ -18,7 +18,7 @@ async function gravatarUrl(email, size = 64) {
+ }
+ 
+ export function UserProfile() {
+-  const { user, isAdmin, logout } = useAuth();
++  const { user, loading, isAdmin, logout } = useAuth();
+   const [avatarSrc, setAvatarSrc] = useState(null);
+   const [imgFailed, setImgFailed] = useState(false);
+   const [open, setOpen] = useState(false);
+@@ -48,6 +48,10 @@ export function UserProfile() {
+     };
+   }, [open]);
+ 
++  if (loading) {
++    return <span style={styles.checking}>Checking sign-in…</span>;
++  }
++
+   if (!user) {
+     return (
+       <button
+@@ -125,6 +129,11 @@ export function UserProfile() {
+ }
+ 
+ const styles = {
++  checking: {
++    color: colors.text.tertiary,
++    fontSize: 11,
++    fontFamily: 'monospace',
++  },
+   signInButton: {
+     display: 'inline-flex',
+     alignItems: 'center',
+diff --git a/frontend/src/components/WorkoutDrawer.jsx b/frontend/src/components/WorkoutDrawer.jsx
+index 71ee61ac..66722124 100644
+--- a/frontend/src/components/WorkoutDrawer.jsx
++++ b/frontend/src/components/WorkoutDrawer.jsx
+@@ -8,13 +8,13 @@
+ // The form looks and feels identical either way — you're always "editing a workout",
+ // it just happens to be new or existing. Backing out discards changes.
+ 
+-import { useState, useEffect, useRef } from 'react';
++import { useState, useEffect, useRef, useCallback } from 'react';
+ import { motion } from 'framer-motion';
+ import { getDayInfo, getDays } from '../utils/dayConfig';
+ import { ChevronRight, ChevronLeft } from 'lucide-react';
+ import { apiFetch } from '../api/client.js';
+ import { todayLocal, nowLocalTime } from '../utils/dateUtils';
+-import { useDataSource } from '../api/snapshotContext.jsx';
++import { useApi } from '../api/useApi.js';
+ import { getTotalDuration } from '../utils/cardioTemplates.js';
+ import { CARDIO_CONFIG, cardioColor } from '../utils/cardioConfig.js';
+ 
+@@ -35,6 +35,20 @@ const buildWeightEntries = (variation = {}, savedWeights = []) => {
+   });
+ };
+ 
++// Get the default variation for an exercise (handles pre-migration flat fields).
++const getDefaultVariation = (exercise) => {
++  const variations = exercise.variations;
++  if (!variations || !Array.isArray(variations) || variations.length === 0) {
++    return {
++      name: 'Standard',
++      targetWeight: exercise.targetWeight,
++      targetReps: exercise.targetReps,
++      targetSets: exercise.targetSets,
++    };
++  }
++  return variations.find((variation) => variation.default) || variations[0];
++};
++
+ export function LogTab({
+   initialDay = null,
+   initialDate = null,
+@@ -77,8 +91,8 @@ export function LogTab({
+   const [cardioActivity, setCardioActivity] = useState('treadmill');
+   const [cardioDate, setCardioDate] = useState(todayLocal());
+   const [cardioTime, setCardioTime] = useState(nowLocalTime());
+-  // Treadmill templates come entirely from the data source (Cosmos via the live
+-  // API, or the SQLite snapshot for anonymous visitors) — no hardcoded list.
++  // Treadmill templates come entirely from Cosmos through the public API — no
++  // hardcoded list.
+   const [templates, setTemplates] = useState([]);
+   const [cardioTemplateId, setCardioTemplateId] = useState('');
+   const [cardioNotes, setCardioNotes] = useState('');
+@@ -100,7 +114,7 @@ export function LogTab({
+ 
+   const dateInputRef = useRef(null);
+   const cardioDateRef = useRef(null);
+-  const { fetchCardioTemplates, isReady } = useDataSource();
++  const { fetchCardioTemplates } = useApi();
+ 
+   const dayInfo = getDayInfo(selectedDay);
+ 
+@@ -137,16 +151,8 @@ export function LogTab({
+     }
+   }, [viewWorkout, initialDay, initialDate, currentDay]);
+ 
+-  // Fetch exercise definitions when day changes, then overlay saved data if editing
++  // Load treadmill templates from the API.
+   useEffect(() => {
+-    if (selectedDay) {
+-      fetchExercises();
+-    }
+-  }, [selectedDay, viewWorkout]);
+-
+-  // Load treadmill templates from the data source (live API or snapshot).
+-  useEffect(() => {
+-    if (!isReady) return;
+     fetchCardioTemplates()
+       .then((data) => {
+         const list = data?.templates || [];
+@@ -163,7 +169,7 @@ export function LogTab({
+         console.warn('Cardio template load failed:', err);
+         setTemplates([]);
+       });
+-  }, [isReady, viewCardio]);
++  }, [fetchCardioTemplates, viewCardio]);
+ 
+   // Switch logType/step when viewCardio/viewWorkout changes. Edit mode jumps
+   // straight to the form; create mode starts on the type picker.
+@@ -217,21 +223,7 @@ export function LogTab({
+   // Data fetching
+   // ─────────────────────────────────────────────
+ 
+-  // Get the default variation for an exercise (handles pre-migration flat fields)
+-  const getDefaultVariation = (ex) => {
+-    const vars = ex.variations;
+-    if (!vars || !Array.isArray(vars) || vars.length === 0) {
+-      return {
+-        name: 'Standard',
+-        targetWeight: ex.targetWeight,
+-        targetReps: ex.targetReps,
+-        targetSets: ex.targetSets,
+-      };
+-    }
+-    return vars.find(v => v.default) || vars[0];
+-  };
+-
+-  const fetchExercises = async () => {
++  const fetchExercises = useCallback(async () => {
+     setLoading(true);
+     try {
+       const data = await apiFetch(`/api/exercises/day/${selectedDay}`);
+@@ -299,7 +291,14 @@ export function LogTab({
+     } finally {
+       setLoading(false);
+     }
+-  };
++  }, [selectedDay, viewWorkout]);
++
++  // Fetch exercise definitions when day changes, then overlay saved data if editing.
++  useEffect(() => {
++    if (selectedDay) {
++      fetchExercises();
++    }
++  }, [selectedDay, fetchExercises]);
+ 
+   // ─────────────────────────────────────────────
+   // Submit (create or update)
+diff --git a/frontend/src/hooks/useWorkouts.js b/frontend/src/hooks/useWorkouts.js
+index 79bcd2e1..65865462 100644
+--- a/frontend/src/hooks/useWorkouts.js
++++ b/frontend/src/hooks/useWorkouts.js
+@@ -2,21 +2,19 @@
+ // as a day slug — the day's permanent identity, not its position.
+ //
+ // It is persisted server-side as a `settings` document in Cosmos DB so it survives
+-// across devices and sessions. For anonymous visitors it comes from the SQLite
+-// snapshot via useDataSource().
++// across devices and sessions. Public reads use the same AKS API as signed-in reads.
+ 
+ import { useState, useEffect } from 'react';
+ import { apiFetch } from '../api/client.js';
+-import { useDataSource } from '../api/snapshotContext.jsx';
++import { useApi } from '../api/useApi.js';
+ import { getDays } from '../utils/dayConfig';
+ 
+ export const useWorkouts = () => {
+   const [currentDay, setCurrentDay] = useState(() => getDays()[0]?.slug ?? null);
+-  const { fetchCurrentDay, isReady } = useDataSource();
++  const { fetchCurrentDay } = useApi();
+ 
+-  // Fetch current day from snapshot or API
++  // Fetch current day from the public API.
+   useEffect(() => {
+-    if (!isReady) return;
+     const load = async () => {
+       try {
+         const data = await fetchCurrentDay();
+@@ -26,7 +24,7 @@ export const useWorkouts = () => {
+       }
+     };
+     load();
+-  }, [isReady]);
++  }, [fetchCurrentDay]);
+ 
+   // setDay always uses live API (admin-only write operation)
+   const setDay = async (daySlug) => {
+diff --git a/frontend/src/main.jsx b/frontend/src/main.jsx
+index 946f3160..bb3f0d8b 100644
+--- a/frontend/src/main.jsx
++++ b/frontend/src/main.jsx
+@@ -1,19 +1,26 @@
+ import { StrictMode } from 'react'
+ import { createRoot } from 'react-dom/client'
+ import { AuthProvider } from './auth/AuthContext.jsx'
+-import { SnapshotProvider } from './api/snapshotContext.jsx'
+ import { WorkoutModelProvider } from './api/workoutModelContext.jsx'
+ import './index.css'
+ import App from './App.jsx'
+ 
++// A stale document can request an asset removed by a newer deployment. The
++// inline loader in index.html performs one cache-busting reload; reaching this
++// module proves the current build loaded, so the guard can be cleared.
++sessionStorage.removeItem('synergy-asset-reload');
++const bootUrl = new URL(window.location.href);
++if (bootUrl.searchParams.has('_asset_retry')) {
++  bootUrl.searchParams.delete('_asset_retry');
++  window.history.replaceState(null, '', `${bootUrl.pathname}${bootUrl.search}${bootUrl.hash}`);
++}
++
+ createRoot(document.getElementById('root')).render(
+   <StrictMode>
+     <AuthProvider>
+-      <SnapshotProvider>
+-        <WorkoutModelProvider>
+-          <App />
+-        </WorkoutModelProvider>
+-      </SnapshotProvider>
++      <WorkoutModelProvider>
++        <App />
++      </WorkoutModelProvider>
+     </AuthProvider>
+   </StrictMode>,
+ )
+diff --git a/frontend/src/utils/cardioTemplates.js b/frontend/src/utils/cardioTemplates.js
+index a373ba49..a808b949 100644
+--- a/frontend/src/utils/cardioTemplates.js
++++ b/frontend/src/utils/cardioTemplates.js
+@@ -1,11 +1,10 @@
+ // Treadmill interval helpers.
+ //
+ // Templates themselves are DATA — they live in Cosmos DB as `cardio-template`
+-// documents and are loaded at runtime via useDataSource().fetchCardioTemplates()
+-// (live API when signed in, SQLite snapshot for anonymous visitors). There is no
+-// hardcoded template list in the frontend. These are the only things that stay
+-// in code: pure functions that summarize an interval array (which each logged
+-// cardio-session stores inline, so history is self-contained).
++// documents and are loaded at runtime through the public API. There is no hardcoded
++// template list in the frontend. These are the only things that stay in code: pure
++// functions that summarize an interval array (which each logged cardio-session
++// stores inline, so history is self-contained).
+ 
+ // Total duration of all intervals in a template (minutes)
+ export function getTotalDuration(intervals) {
+diff --git a/frontend/src/utils/dayConfig.js b/frontend/src/utils/dayConfig.js
+index 2750277b..c0878365 100644
+--- a/frontend/src/utils/dayConfig.js
++++ b/frontend/src/utils/dayConfig.js
+@@ -1,9 +1,9 @@
+ // Access to the active workout model — the cycle's days, their order, names, focus
+ // text and safety notes.
+ //
+-// None of that lives here any more. The model is data: it comes from the database
+-// (or the SQLite snapshot for anonymous visitors) and is installed once at boot by
+-// WorkoutModelProvider before anything renders. This module is the read side of it.
++// None of that lives here any more. The model is data: it comes from the public API
++// and is installed once at boot by WorkoutModelProvider before anything renders.
++// This module is the read side of it.
+ //
+ // A day is identified by its `slug`, which is permanent. `number` is only that day's
+ // position in this version of the model, so it may change when the cycle is
+diff --git a/frontend/vite.config.js b/frontend/vite.config.js
+index aab22d33..80e30b5f 100644
+--- a/frontend/vite.config.js
++++ b/frontend/vite.config.js
+@@ -2,10 +2,10 @@ import { defineConfig } from 'vite'
+ import react from '@vitejs/plugin-react'
+ import { createServer as createNetServer } from 'node:net'
+ import { spawn, execSync } from 'node:child_process'
+-import { readFileSync, writeFileSync, existsSync, unlinkSync, copyFileSync, mkdirSync } from 'node:fs'
++import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs'
+ import { tmpdir } from 'node:os'
+ import { createHash } from 'node:crypto'
+-import { resolve, dirname, join } from 'node:path'
++import { dirname, join } from 'node:path'
+ import { fileURLToPath } from 'node:url'
+ 
+ const __dirname = dirname(fileURLToPath(import.meta.url))
+@@ -22,22 +22,6 @@ const getGitCommit = () => {
+   }
+ }
+ 
+-// Copy sql.js WASM into public/ so it's served as a static asset (the in-browser
+-// SQLite engine anonymous visitors read snapshot.db with).
+-function copySqlJsWasm() {
+-  return {
+-    name: 'copy-sql-js-wasm',
+-    buildStart() {
+-      const src = resolve(__dirname, 'node_modules/sql.js/dist/sql-wasm.wasm')
+-      const dest = resolve(__dirname, 'public/sql-wasm.wasm')
+-      if (existsSync(src)) {
+-        mkdirSync(dirname(dest), { recursive: true })
+-        copyFileSync(src, dest)
+-      }
+-    },
+-  }
+-}
+-
+ // Ask the OS for a free port instead of hardcoding one, so parallel worktrees /
+ // dev servers never fight over a fixed number (several backends pinning one port
+ // is a crash loop). The backend and the /api proxy both use this exact port.
+@@ -59,8 +43,7 @@ function getFreePort() {
+ // proxy every /api call to it. The child is tied to vite's lifecycle — starts with
+ // the dev server, relaunches if it crashes, and is killed when vite exits — so
+ // `vite` ALONE is "full prod from dev". `apply:'serve'` means this NEVER touches a
+-// production build. Opt out with DEV_NO_BACKEND=1 to run the frontend alone against
+-// the committed sql.js snapshot (anonymous, no backend, no DB).
++// production build.
+ // The endpoint + identity are not secrets (the endpoint is a hostname; the sub is a
+ // user id); override any via the env.
+ function devBackend(port) {
+@@ -102,8 +85,7 @@ function devBackend(port) {
+       // The backend is a HARD dependency of the dev server: the frontend needs it
+       // for auth, workouts, cardio — everything under /api. If it can't come up we
+       // take the WHOLE dev server DOWN with a loud message instead of serving a
+-      // frontend that silently fails every /api call. The only sanctioned way to run
+-      // without it is the explicit DEV_NO_BACKEND=1 opt-in, which never reaches here.
++      // frontend that silently fails every /api call.
+       const stop = () => { stopping = true; if (child) { child.kill(); child = null } try { unlinkSync(pidFile) } catch { /* */ } }
+       const fatal = (why) => {
+         const bar = '━'.repeat(74)
+@@ -114,7 +96,6 @@ function devBackend(port) {
+         log.error('')
+         log.error('     The backend is NOT optional — the frontend talks to it for auth,')
+         log.error('     workouts, cardio, everything under /api. Fix it, then re-run `npm run dev`.')
+-        log.error('     (Want the frontend-only sql.js snapshot instead? Opt in: DEV_NO_BACKEND=1.)')
+         log.error(`${bar}\n`)
+         stop()
+         process.exit(1)
+@@ -229,15 +210,13 @@ function devctlHealth() {
+   }
+ }
+ 
+-const noBackend = process.env.DEV_NO_BACKEND === '1'
+-
+ // https://vite.dev/config/
+ export default defineConfig(async ({ command }) => {
+   // Only a dev server (command 'serve') spawns the backend + proxy; a production
+   // build touches none of this. A fresh free port is chosen each start, shared by
+   // both the spawned backend and the /api proxy.
+   const isVitest = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test'
+-  const useBackend = command === 'serve' && !noBackend && !isVitest
++  const useBackend = command === 'serve' && !isVitest
+   const backendPort = useBackend ? await getFreePort() : 0
+   // devctl owns the port when it is the launcher; honour what it assigned so the
+   // health endpoint above reports the port devctl recorded even if the flag is
+@@ -248,7 +227,6 @@ export default defineConfig(async ({ command }) => {
+   return {
+     plugins: [
+       react(),
+-      copySqlJsWasm(),
+       devctlHealth(),
+       ...(useBackend ? [devBackend(backendPort)] : []),
+     ],
+diff --git a/k8s/templates/deployment.yaml b/k8s/templates/deployment.yaml
+index 11060ee0..898ba90a 100644
+--- a/k8s/templates/deployment.yaml
++++ b/k8s/templates/deployment.yaml
+@@ -17,11 +17,12 @@ spec:
+   selector:
+     matchLabels:
+       app: {{ include "kill-me.resourceName" . }}
++  # The frontend and API share one image and production intentionally has one
++  # serving pod. Recreate avoids an old and new pod serving incompatible HTML
++  # and hashed assets during a rollout. Data refreshes no longer deploy the app,
++  # so this brief interruption happens only for real application releases.
+   strategy:
+-    type: RollingUpdate
+-    rollingUpdate:
+-      maxSurge: 1
+-      maxUnavailable: 0
++    type: Recreate
+   template:
+     metadata:
+       labels:
+diff --git a/snapshot/generate-snapshot.js b/snapshot/generate-snapshot.js
+deleted file mode 100644
+index b26bf6a7..00000000
+--- a/snapshot/generate-snapshot.js
++++ /dev/null
+@@ -1,332 +0,0 @@
+-// Generates a SQLite snapshot of public Cosmos DB data for static frontend serving.
+-//
+-// Connects to Cosmos DB via Azure identity, queries all public document types,
+-// and writes them into a SQLite file that the frontend loads via sql.js (WASM).
+-//
+-// Environment variables:
+-//   AZURE_APP_CONFIG_ENDPOINT  - Azure App Configuration endpoint
+-//   APP_CONFIG_PREFIX          - App Config key prefix (e.g. "workout")
+-//   COSMOS_DB_ENDPOINT         - Direct Cosmos DB endpoint (skips App Config lookup)
+-//   COSMOS_DB_DATABASE_NAME    - Database name (default: WorkoutTrackerDB)
+-//   COSMOS_DB_CONTAINER_NAME   - Container name (default: workouts)
+-//   OUTPUT_PATH                - Output .db file path (default: ../frontend/public/snapshot.db)
+-//
+-// Flags:
+-//   --output <path>        Where to write the .db file
+-//   --preview-migrations   Apply any pending migrations to an in-memory copy of the
+-//                          data first, and snapshot that. Nothing is written back to
+-//                          Cosmos. Use it to see what the anonymous experience will
+-//                          look like after a deploy, before deploying.
+-
+-import { CosmosClient } from '@azure/cosmos';
+-import { DefaultAzureCredential } from '@azure/identity';
+-import { AppConfigurationClient } from '@azure/app-configuration';
+-import Database from 'better-sqlite3';
+-import { runMigrations } from '../backend/migrations/runner.js';
+-import { memoryContainer } from '../backend/migrations/memory-container.js';
+-import { resolve, dirname } from 'path';
+-import { rmSync } from 'fs';
+-import { fileURLToPath } from 'url';
+-
+-const __dirname = dirname(fileURLToPath(import.meta.url));
+-
+-// Parse --output CLI arg or use env var or default
+-function getOutputPath() {
+-  const idx = process.argv.indexOf('--output');
+-  if (idx !== -1 && process.argv[idx + 1]) {
+-    return resolve(process.argv[idx + 1]);
+-  }
+-  return resolve(process.env.OUTPUT_PATH || `${__dirname}/../frontend/public/snapshot.db`);
+-}
+-
+-// Resolve Cosmos DB endpoint — either from env var directly or via App Configuration
+-async function getCosmosEndpoint(credential) {
+-  if (process.env.COSMOS_DB_ENDPOINT) {
+-    return process.env.COSMOS_DB_ENDPOINT;
+-  }
+-
+-  const appConfigEndpoint = process.env.AZURE_APP_CONFIG_ENDPOINT;
+-  if (!appConfigEndpoint) {
+-    throw new Error('Set COSMOS_DB_ENDPOINT or AZURE_APP_CONFIG_ENDPOINT');
+-  }
+-
+-  const client = new AppConfigurationClient(appConfigEndpoint, credential);
+-  const setting = await client.getConfigurationSetting({ key: 'cosmos_db_endpoint' });
+-  return setting.value;
+-}
+-
+-// Schema DDL — mirrors the public document types from Cosmos DB
+-const SCHEMA = `
+-  -- The active model, days and all. One row; the whole cycle travels together
+-  -- because it is read as a unit and never queried a day at a time.
+-  CREATE TABLE workout_model (
+-    version   INTEGER PRIMARY KEY,
+-    name      TEXT NOT NULL,
+-    days      TEXT NOT NULL
+-  );
+-
+-  CREATE TABLE exercises (
+-    id            TEXT PRIMARY KEY,
+-    day_slug      TEXT NOT NULL,
+-    day_number    INTEGER,
+-    name          TEXT NOT NULL,
+-    equipment     TEXT,
+-    location      TEXT,
+-    notes         TEXT,
+-    variations    TEXT,
+-    tags          TEXT
+-  );
+-  CREATE INDEX idx_exercises_day ON exercises(day_slug);
+-
+-  -- day_name is what the day was called when the workout happened, and day_slug is
+-  -- the day it was performed on. Both are recorded rather than resolved, so a log
+-  -- from a retired day still reads correctly.
+-  CREATE TABLE logged_workouts (
+-    id            TEXT PRIMARY KEY,
+-    day_slug      TEXT,
+-    day_number    INTEGER,
+-    day_name      TEXT,
+-    model_version INTEGER,
+-    date          TEXT NOT NULL,
+-    time          TEXT,
+-    mode          TEXT,
+-    exercises     TEXT,
+-    timestamp     TEXT,
+-    created_at    TEXT
+-  );
+-  CREATE INDEX idx_logged_workouts_date ON logged_workouts(date DESC);
+-
+-  CREATE TABLE settings (
+-    key   TEXT PRIMARY KEY,
+-    value TEXT NOT NULL
+-  );
+-
+-  -- Soreness records have unique ids. Date and source are attributes, not identity.
+-  CREATE TABLE soreness_entries (
+-    id                  TEXT PRIMARY KEY,
+-    date                TEXT NOT NULL,
+-    muscles             TEXT NOT NULL,
+-    level               INTEGER,
+-    source_workout_id        TEXT,
+-    source_workout_day_slug  TEXT,
+-    source_workout_day       INTEGER,
+-    source_workout_date      TEXT
+-  );
+-  CREATE INDEX idx_soreness_date ON soreness_entries(date DESC);
+-  CREATE INDEX idx_soreness_source ON soreness_entries(source_workout_id);
+-
+-  CREATE TABLE cardio_sessions (
+-    id                TEXT PRIMARY KEY,
+-    date              TEXT NOT NULL,
+-    time              TEXT,
+-    activity          TEXT NOT NULL,
+-    duration_minutes  REAL,
+-    notes             TEXT,
+-    treadmill         TEXT,
+-    bike              TEXT,
+-    timestamp         TEXT,
+-    created_at        TEXT
+-  );
+-  CREATE INDEX idx_cardio_date ON cardio_sessions(date DESC);
+-
+-  CREATE TABLE cardio_templates (
+-    template_id   TEXT PRIMARY KEY,
+-    activity      TEXT,
+-    name          TEXT NOT NULL,
+-    description   TEXT,
+-    intervals     TEXT NOT NULL,
+-    sort_order    INTEGER
+-  );
+-
+-  CREATE TABLE snapshot_meta (
+-    key   TEXT PRIMARY KEY,
+-    value TEXT NOT NULL
+-  );
+-`;
+-
+-async function main() {
+-  const outputPath = getOutputPath();
+-  console.log(`Output: ${outputPath}`);
+-
+-  const credential = new DefaultAzureCredential();
+-  const cosmosEndpoint = await getCosmosEndpoint(credential);
+-  console.log(`Cosmos DB endpoint: ${cosmosEndpoint}`);
+-
+-  const cosmosClient = new CosmosClient({
+-    endpoint: cosmosEndpoint,
+-    aadCredentials: credential,
+-  });
+-
+-  const databaseName = process.env.COSMOS_DB_DATABASE_NAME || 'WorkoutTrackerDB';
+-  const containerName = process.env.COSMOS_DB_CONTAINER_NAME || 'workouts';
+-  const container = cosmosClient.database(databaseName).container(containerName);
+-
+-  // Query all public document types
+-  console.log('Querying Cosmos DB...');
+-
+-  const queries = {
+-    workoutModels: 'SELECT * FROM c WHERE c.type = "workout-model" AND c.active = true',
+-    exercises: 'SELECT * FROM c WHERE c.type = "exercise"',
+-    loggedWorkouts: 'SELECT * FROM c WHERE c.type = "logged-workout" ORDER BY c.date DESC',
+-    settings: 'SELECT * FROM c WHERE c.type = "settings"',
+-    soreness: 'SELECT * FROM c WHERE c.type = "soreness-entry" ORDER BY c.date DESC',
+-    cardioSessions: 'SELECT * FROM c WHERE c.type = "cardio-session" ORDER BY c.date DESC',
+-    cardioTemplates: 'SELECT * FROM c WHERE c.type = "cardio-template" ORDER BY c.sortOrder',
+-  };
+-
+-  // With --preview-migrations, everything is read once, migrated in memory, and then
+-  // queried out of that copy instead of out of Cosmos.
+-  let source = container;
+-  if (process.argv.includes('--preview-migrations')) {
+-    const { resources: all } = await container.items.query('SELECT * FROM c').fetchAll();
+-    const memory = memoryContainer(all);
+-    console.log(`Previewing migrations against ${all.length} documents (nothing is written back)`);
+-    await runMigrations({ container: memory.container });
+-    source = memory.container;
+-  }
+-
+-  const results = {};
+-  for (const [key, query] of Object.entries(queries)) {
+-    const { resources } = await source.items.query(query).fetchAll();
+-    results[key] = resources;
+-    console.log(`  ${key}: ${resources.length} documents`);
+-  }
+-
+-  // Build SQLite database. The previous snapshot is checked into the repo, and
+-  // better-sqlite3 would happily open it and then fail on CREATE TABLE, so the file
+-  // is removed first rather than relying on the caller to have done it.
+-  rmSync(outputPath, { force: true });
+-  const db = new Database(outputPath);
+-  db.pragma('journal_mode = OFF');
+-  db.pragma('synchronous = OFF');
+-
+-  db.exec(SCHEMA);
+-
+-  const insertAll = db.transaction(() => {
+-    // The active workout model
+-    const model = results.workoutModels.sort((a, b) => b.version - a.version)[0];
+-    if (!model) {
+-      throw new Error('No active workout model in Cosmos — refusing to write a snapshot without a cycle');
+-    }
+-    db.prepare('INSERT INTO workout_model (version, name, days) VALUES (?, ?, ?)')
+-      .run(model.version, model.name, JSON.stringify(model.days ?? []));
+-
+-    // Exercises
+-    const insertExercise = db.prepare(
+-      'INSERT INTO exercises (id, day_slug, day_number, name, equipment, location, notes, variations, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+-    );
+-    for (const doc of results.exercises) {
+-      // Build variations — either from the doc's variations array or from
+-      // flat targetWeight/Reps/Sets (pre-migration compat)
+-      let variations = doc.variations;
+-      if (!variations || !Array.isArray(variations)) {
+-        const fallback = { name: 'Standard', default: true };
+-        if (doc.targetWeight != null) fallback.targetWeight = doc.targetWeight;
+-        if (doc.targetReps != null) fallback.targetReps = doc.targetReps;
+-        if (doc.targetSets != null) fallback.targetSets = doc.targetSets;
+-        variations = [fallback];
+-      }
+-      insertExercise.run(
+-        doc.id,
+-        doc.daySlug,
+-        doc.dayNumber ?? null,
+-        doc.name,
+-        doc.equipment || null,
+-        doc.location || null,
+-        doc.notes || null,
+-        JSON.stringify(variations),
+-        Array.isArray(doc.tags) ? JSON.stringify(doc.tags) : null,
+-      );
+-    }
+-
+-    // Logged workouts
+-    const insertWorkout = db.prepare(
+-      'INSERT INTO logged_workouts (id, day_slug, day_number, day_name, model_version, date, time, mode, exercises, timestamp, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+-    );
+-    for (const doc of results.loggedWorkouts) {
+-      insertWorkout.run(
+-        doc.id,
+-        doc.daySlug || null,
+-        doc.dayNumber ?? null,
+-        doc.dayName || null,
+-        doc.modelVersion ?? null,
+-        doc.date,
+-        doc.time || null,
+-        doc.mode || null,
+-        doc.exercises?.length ? JSON.stringify(doc.exercises) : null,
+-        doc.timestamp || null,
+-        doc.createdAt || null,
+-      );
+-    }
+-
+-    // Settings (current day)
+-    const insertSetting = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
+-    const currentDaySlug = results.settings[0]?.currentDaySlug || model.days?.[0]?.slug;
+-    insertSetting.run('currentDaySlug', String(currentDaySlug));
+-
+-    // Soreness entries
+-    const insertSoreness = db.prepare(
+-      'INSERT INTO soreness_entries (id, date, level, muscles, source_workout_id, source_workout_day_slug, source_workout_day, source_workout_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+-    );
+-    for (const doc of results.soreness) {
+-      insertSoreness.run(
+-        doc.id,
+-        doc.date,
+-        doc.level ?? (doc.muscles?.length ? Math.max(...doc.muscles.map((m) => m.level)) : null),
+-        JSON.stringify(doc.muscles),
+-        doc.sourceWorkoutId || null,
+-        doc.sourceWorkoutDaySlug || null,
+-        doc.sourceWorkoutDay ?? null,
+-        doc.sourceWorkoutDate || null
+-      );
+-    }
+-
+-    // Cardio sessions
+-    const insertCardio = db.prepare(
+-      'INSERT INTO cardio_sessions (id, date, time, activity, duration_minutes, notes, treadmill, bike, timestamp, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+-    );
+-    for (const doc of results.cardioSessions) {
+-      insertCardio.run(
+-        doc.id,
+-        doc.date,
+-        doc.time || null,
+-        doc.activity,
+-        doc.durationMinutes || null,
+-        doc.notes || null,
+-        doc.treadmill ? JSON.stringify(doc.treadmill) : null,
+-        doc.bike ? JSON.stringify(doc.bike) : null,
+-        doc.timestamp || null,
+-        doc.createdAt || null,
+-      );
+-    }
+-
+-    // Cardio templates (shared treadmill interval library)
+-    const insertTemplate = db.prepare(
+-      'INSERT INTO cardio_templates (template_id, activity, name, description, intervals, sort_order) VALUES (?, ?, ?, ?, ?, ?)'
+-    );
+-    for (const doc of results.cardioTemplates) {
+-      insertTemplate.run(
+-        doc.templateId,
+-        doc.activity || 'treadmill',
+-        doc.name,
+-        doc.description || null,
+-        JSON.stringify(Array.isArray(doc.intervals) ? doc.intervals : []),
+-        doc.sortOrder ?? 0,
+-      );
+-    }
+-
+-    // Snapshot metadata
+-    const insertMeta = db.prepare('INSERT INTO snapshot_meta (key, value) VALUES (?, ?)');
+-    insertMeta.run('generated_at', new Date().toISOString());
+-  });
+-
+-  insertAll();
+-  db.close();
+-
+-  console.log(`Snapshot written to ${outputPath}`);
+-}
+-
+-main().catch((err) => {
+-  console.error('Snapshot generation failed:', err);
+-  process.exit(1);
+-});
+diff --git a/snapshot/package-lock.json b/snapshot/package-lock.json
+deleted file mode 100644
+index a8c6b704..00000000
+--- a/snapshot/package-lock.json
++++ /dev/null
+@@ -1,1119 +0,0 @@
+-{
+-  "name": "kill-me-snapshot",
+-  "version": "1.0.0",
+-  "lockfileVersion": 3,
+-  "requires": true,
+-  "packages": {
+-    "": {
+-      "name": "kill-me-snapshot",
+-      "version": "1.0.0",
+-      "dependencies": {
+-        "@azure/app-configuration": "^1.11.0",
+-        "@azure/cosmos": "^4.0.0",
+-        "@azure/identity": "^4.13.1",
+-        "better-sqlite3": "^11.0.0"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      }
+-    },
+-    "node_modules/@azure-rest/core-client": {
+-      "version": "2.5.1",
+-      "resolved": "https://registry.npmjs.org/@azure-rest/core-client/-/core-client-2.5.1.tgz",
+-      "integrity": "sha512-EHaOXW0RYDKS5CFffnixdyRPak5ytiCtU7uXDcP/uiY+A6jFRwNGzzJBiznkCzvi5EYpY+YWinieqHb0oY916A==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure/abort-controller": "^2.1.2",
+-        "@azure/core-auth": "^1.10.0",
+-        "@azure/core-rest-pipeline": "^1.22.0",
+-        "@azure/core-tracing": "^1.3.0",
+-        "@typespec/ts-http-runtime": "^0.3.0",
+-        "tslib": "^2.6.2"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      }
+-    },
+-    "node_modules/@azure/abort-controller": {
+-      "version": "2.1.2",
+-      "resolved": "https://registry.npmjs.org/@azure/abort-controller/-/abort-controller-2.1.2.tgz",
+-      "integrity": "sha512-nBrLsEWm4J2u5LpAPjxADTlq3trDgVZZXHNKabeXZtpq3d3AbN/KGO82R87rdDz5/lYB024rtEf10/q0urNgsA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "tslib": "^2.6.2"
+-      },
+-      "engines": {
+-        "node": ">=18.0.0"
+-      }
+-    },
+-    "node_modules/@azure/app-configuration": {
+-      "version": "1.11.0",
+-      "resolved": "https://registry.npmjs.org/@azure/app-configuration/-/app-configuration-1.11.0.tgz",
+-      "integrity": "sha512-ehfTNvVyr4lFKz1Nfynubqg/kEWMFMjCQs8lADDa+U1HG96QIoelMYFbfWIixw4KhOqoCAIOWEp4bAXIZ0/V/w==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure/abort-controller": "^2.0.0",
+-        "@azure/core-auth": "^1.3.0",
+-        "@azure/core-client": "^1.5.0",
+-        "@azure/core-http-compat": "^2.0.0",
+-        "@azure/core-lro": "^2.5.1",
+-        "@azure/core-paging": "^1.4.0",
+-        "@azure/core-rest-pipeline": "^1.6.0",
+-        "@azure/core-tracing": "^1.0.0",
+-        "@azure/core-util": "^1.6.1",
+-        "@azure/logger": "^1.0.0",
+-        "tslib": "^2.2.0"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      }
+-    },
+-    "node_modules/@azure/core-auth": {
+-      "version": "1.10.1",
+-      "resolved": "https://registry.npmjs.org/@azure/core-auth/-/core-auth-1.10.1.tgz",
+-      "integrity": "sha512-ykRMW8PjVAn+RS6ww5cmK9U2CyH9p4Q88YJwvUslfuMmN98w/2rdGRLPqJYObapBCdzBVeDgYWdJnFPFb7qzpg==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure/abort-controller": "^2.1.2",
+-        "@azure/core-util": "^1.13.0",
+-        "tslib": "^2.6.2"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      }
+-    },
+-    "node_modules/@azure/core-client": {
+-      "version": "1.10.1",
+-      "resolved": "https://registry.npmjs.org/@azure/core-client/-/core-client-1.10.1.tgz",
+-      "integrity": "sha512-Nh5PhEOeY6PrnxNPsEHRr9eimxLwgLlpmguQaHKBinFYA/RU9+kOYVOQqOrTsCL+KSxrLLl1gD8Dk5BFW/7l/w==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure/abort-controller": "^2.1.2",
+-        "@azure/core-auth": "^1.10.0",
+-        "@azure/core-rest-pipeline": "^1.22.0",
+-        "@azure/core-tracing": "^1.3.0",
+-        "@azure/core-util": "^1.13.0",
+-        "@azure/logger": "^1.3.0",
+-        "tslib": "^2.6.2"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      }
+-    },
+-    "node_modules/@azure/core-http-compat": {
+-      "version": "2.3.2",
+-      "resolved": "https://registry.npmjs.org/@azure/core-http-compat/-/core-http-compat-2.3.2.tgz",
+-      "integrity": "sha512-Tf6ltdKzOJEgxZeWLCjMxrxbodB/ZeCbzzA1A2qHbhzAjzjHoBVSUeSl/baT/oHAxhc4qdqVaDKnc2+iE932gw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure/abort-controller": "^2.1.2"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      },
+-      "peerDependencies": {
+-        "@azure/core-client": "^1.10.0",
+-        "@azure/core-rest-pipeline": "^1.22.0"
+-      }
+-    },
+-    "node_modules/@azure/core-lro": {
+-      "version": "2.7.2",
+-      "resolved": "https://registry.npmjs.org/@azure/core-lro/-/core-lro-2.7.2.tgz",
+-      "integrity": "sha512-0YIpccoX8m/k00O7mDDMdJpbr6mf1yWo2dfmxt5A8XVZVVMz2SSKaEbMCeJRvgQ0IaSlqhjT47p4hVIRRy90xw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure/abort-controller": "^2.0.0",
+-        "@azure/core-util": "^1.2.0",
+-        "@azure/logger": "^1.0.0",
+-        "tslib": "^2.6.2"
+-      },
+-      "engines": {
+-        "node": ">=18.0.0"
+-      }
+-    },
+-    "node_modules/@azure/core-paging": {
+-      "version": "1.6.2",
+-      "resolved": "https://registry.npmjs.org/@azure/core-paging/-/core-paging-1.6.2.tgz",
+-      "integrity": "sha512-YKWi9YuCU04B55h25cnOYZHxXYtEvQEbKST5vqRga7hWY9ydd3FZHdeQF8pyh+acWZvppw13M/LMGx0LABUVMA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "tslib": "^2.6.2"
+-      },
+-      "engines": {
+-        "node": ">=18.0.0"
+-      }
+-    },
+-    "node_modules/@azure/core-rest-pipeline": {
+-      "version": "1.23.0",
+-      "resolved": "https://registry.npmjs.org/@azure/core-rest-pipeline/-/core-rest-pipeline-1.23.0.tgz",
+-      "integrity": "sha512-Evs1INHo+jUjwHi1T6SG6Ua/LHOQBCLuKEEE6efIpt4ZOoNonaT1kP32GoOcdNDbfqsD2445CPri3MubBy5DEQ==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure/abort-controller": "^2.1.2",
+-        "@azure/core-auth": "^1.10.0",
+-        "@azure/core-tracing": "^1.3.0",
+-        "@azure/core-util": "^1.13.0",
+-        "@azure/logger": "^1.3.0",
+-        "@typespec/ts-http-runtime": "^0.3.4",
+-        "tslib": "^2.6.2"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      }
+-    },
+-    "node_modules/@azure/core-tracing": {
+-      "version": "1.3.1",
+-      "resolved": "https://registry.npmjs.org/@azure/core-tracing/-/core-tracing-1.3.1.tgz",
+-      "integrity": "sha512-9MWKevR7Hz8kNzzPLfX4EAtGM2b8mr50HPDBvio96bURP/9C+HjdH3sBlLSNNrvRAr5/k/svoH457gB5IKpmwQ==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "tslib": "^2.6.2"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      }
+-    },
+-    "node_modules/@azure/core-util": {
+-      "version": "1.13.1",
+-      "resolved": "https://registry.npmjs.org/@azure/core-util/-/core-util-1.13.1.tgz",
+-      "integrity": "sha512-XPArKLzsvl0Hf0CaGyKHUyVgF7oDnhKoP85Xv6M4StF/1AhfORhZudHtOyf2s+FcbuQ9dPRAjB8J2KvRRMUK2A==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure/abort-controller": "^2.1.2",
+-        "@typespec/ts-http-runtime": "^0.3.0",
+-        "tslib": "^2.6.2"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      }
+-    },
+-    "node_modules/@azure/cosmos": {
+-      "version": "4.9.1",
+-      "resolved": "https://registry.npmjs.org/@azure/cosmos/-/cosmos-4.9.1.tgz",
+-      "integrity": "sha512-fPnfL4JsmJJ/jEYUhlznKfrEr2pMvJwBncGVcUC2Xi7Nlj0MrUMRE+UOrptl/lRV2W7l68Br+b9Ikzm0KiZZHg==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure/abort-controller": "^2.1.2",
+-        "@azure/core-auth": "^1.9.0",
+-        "@azure/core-rest-pipeline": "^1.19.1",
+-        "@azure/core-tracing": "^1.2.0",
+-        "@azure/core-util": "^1.11.0",
+-        "@azure/keyvault-keys": "^4.9.0",
+-        "@azure/logger": "^1.1.4",
+-        "fast-json-stable-stringify": "^2.1.0",
+-        "priorityqueuejs": "^2.0.0",
+-        "semaphore": "^1.1.0",
+-        "tslib": "^2.8.1"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      }
+-    },
+-    "node_modules/@azure/identity": {
+-      "version": "4.13.1",
+-      "resolved": "https://registry.npmjs.org/@azure/identity/-/identity-4.13.1.tgz",
+-      "integrity": "sha512-5C/2WD5Vb1lHnZS16dNQRPMjN6oV/Upba+C9nBIs15PmOi6A3ZGs4Lr2u60zw4S04gi+u3cEXiqTVP7M4Pz3kw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure/abort-controller": "^2.0.0",
+-        "@azure/core-auth": "^1.9.0",
+-        "@azure/core-client": "^1.9.2",
+-        "@azure/core-rest-pipeline": "^1.17.0",
+-        "@azure/core-tracing": "^1.0.0",
+-        "@azure/core-util": "^1.11.0",
+-        "@azure/logger": "^1.0.0",
+-        "@azure/msal-browser": "^5.5.0",
+-        "@azure/msal-node": "^5.1.0",
+-        "open": "^10.1.0",
+-        "tslib": "^2.2.0"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      }
+-    },
+-    "node_modules/@azure/keyvault-common": {
+-      "version": "2.0.0",
+-      "resolved": "https://registry.npmjs.org/@azure/keyvault-common/-/keyvault-common-2.0.0.tgz",
+-      "integrity": "sha512-wRLVaroQtOqfg60cxkzUkGKrKMsCP6uYXAOomOIysSMyt1/YM0eUn9LqieAWM8DLcU4+07Fio2YGpPeqUbpP9w==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure/abort-controller": "^2.0.0",
+-        "@azure/core-auth": "^1.3.0",
+-        "@azure/core-client": "^1.5.0",
+-        "@azure/core-rest-pipeline": "^1.8.0",
+-        "@azure/core-tracing": "^1.0.0",
+-        "@azure/core-util": "^1.10.0",
+-        "@azure/logger": "^1.1.4",
+-        "tslib": "^2.2.0"
+-      },
+-      "engines": {
+-        "node": ">=18.0.0"
+-      }
+-    },
+-    "node_modules/@azure/keyvault-keys": {
+-      "version": "4.10.0",
+-      "resolved": "https://registry.npmjs.org/@azure/keyvault-keys/-/keyvault-keys-4.10.0.tgz",
+-      "integrity": "sha512-eDT7iXoBTRZ2n3fLiftuGJFD+yjkiB1GNqzU2KbY1TLYeXeSPVTVgn2eJ5vmRTZ11978jy2Kg2wI7xa9Tyr8ag==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure-rest/core-client": "^2.3.3",
+-        "@azure/abort-controller": "^2.1.2",
+-        "@azure/core-auth": "^1.9.0",
+-        "@azure/core-http-compat": "^2.2.0",
+-        "@azure/core-lro": "^2.7.2",
+-        "@azure/core-paging": "^1.6.2",
+-        "@azure/core-rest-pipeline": "^1.19.0",
+-        "@azure/core-tracing": "^1.2.0",
+-        "@azure/core-util": "^1.11.0",
+-        "@azure/keyvault-common": "^2.0.0",
+-        "@azure/logger": "^1.1.4",
+-        "tslib": "^2.8.1"
+-      },
+-      "engines": {
+-        "node": ">=18.0.0"
+-      }
+-    },
+-    "node_modules/@azure/logger": {
+-      "version": "1.3.0",
+-      "resolved": "https://registry.npmjs.org/@azure/logger/-/logger-1.3.0.tgz",
+-      "integrity": "sha512-fCqPIfOcLE+CGqGPd66c8bZpwAji98tZ4JI9i/mlTNTlsIWslCfpg48s/ypyLxZTump5sypjrKn2/kY7q8oAbA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@typespec/ts-http-runtime": "^0.3.0",
+-        "tslib": "^2.6.2"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      }
+-    },
+-    "node_modules/@azure/msal-browser": {
+-      "version": "5.9.0",
+-      "resolved": "https://registry.npmjs.org/@azure/msal-browser/-/msal-browser-5.9.0.tgz",
+-      "integrity": "sha512-CzE+4PefDSJWj26zU7G1bKchlGRRHMBFreG4tAlGuzyI8hAPiYGobaJvZBgZBf6L63iphX7VH+ityL8VgEQz9Q==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure/msal-common": "16.5.2"
+-      },
+-      "engines": {
+-        "node": ">=0.8.0"
+-      }
+-    },
+-    "node_modules/@azure/msal-common": {
+-      "version": "16.5.2",
+-      "resolved": "https://registry.npmjs.org/@azure/msal-common/-/msal-common-16.5.2.tgz",
+-      "integrity": "sha512-GkDEL6TYo3HgT3UuqakdgE9PZfc1hMki6+Hwgy1uddb/EauvAKfu85vVhuofRSo22D1xTnWt8Ucwfg4vSCVwvA==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=0.8.0"
+-      }
+-    },
+-    "node_modules/@azure/msal-node": {
+-      "version": "5.1.5",
+-      "resolved": "https://registry.npmjs.org/@azure/msal-node/-/msal-node-5.1.5.tgz",
+-      "integrity": "sha512-ObTeMoNPmq19X3z40et9Xvs4ZoWVeJg43PZMRLG5iwVL+2nCtAerG3YTDItqPp1CfXNwmCXBbg8jn1DOx65c3g==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "@azure/msal-common": "16.5.2",
+-        "jsonwebtoken": "^9.0.0"
+-      },
+-      "engines": {
+-        "node": ">=20"
+-      }
+-    },
+-    "node_modules/@typespec/ts-http-runtime": {
+-      "version": "0.3.4",
+-      "resolved": "https://registry.npmjs.org/@typespec/ts-http-runtime/-/ts-http-runtime-0.3.4.tgz",
+-      "integrity": "sha512-CI0NhTrz4EBaa0U+HaaUZrJhPoso8sG7ZFya8uQoBA57fjzrjRSv87ekCjLZOFExN+gXE/z0xuN2QfH4H2HrLQ==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "http-proxy-agent": "^7.0.0",
+-        "https-proxy-agent": "^7.0.0",
+-        "tslib": "^2.6.2"
+-      },
+-      "engines": {
+-        "node": ">=20.0.0"
+-      }
+-    },
+-    "node_modules/agent-base": {
+-      "version": "7.1.4",
+-      "resolved": "https://registry.npmjs.org/agent-base/-/agent-base-7.1.4.tgz",
+-      "integrity": "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">= 14"
+-      }
+-    },
+-    "node_modules/base64-js": {
+-      "version": "1.5.1",
+-      "resolved": "https://registry.npmjs.org/base64-js/-/base64-js-1.5.1.tgz",
+-      "integrity": "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==",
+-      "funding": [
+-        {
+-          "type": "github",
+-          "url": "https://github.com/sponsors/feross"
+-        },
+-        {
+-          "type": "patreon",
+-          "url": "https://www.patreon.com/feross"
+-        },
+-        {
+-          "type": "consulting",
+-          "url": "https://feross.org/support"
+-        }
+-      ],
+-      "license": "MIT"
+-    },
+-    "node_modules/better-sqlite3": {
+-      "version": "11.10.0",
+-      "resolved": "https://registry.npmjs.org/better-sqlite3/-/better-sqlite3-11.10.0.tgz",
+-      "integrity": "sha512-EwhOpyXiOEL/lKzHz9AW1msWFNzGc/z+LzeB3/jnFJpxu+th2yqvzsSWas1v9jgs9+xiXJcD5A8CJxAG2TaghQ==",
+-      "hasInstallScript": true,
+-      "license": "MIT",
+-      "dependencies": {
+-        "bindings": "^1.5.0",
+-        "prebuild-install": "^7.1.1"
+-      }
+-    },
+-    "node_modules/bindings": {
+-      "version": "1.5.0",
+-      "resolved": "https://registry.npmjs.org/bindings/-/bindings-1.5.0.tgz",
+-      "integrity": "sha512-p2q/t/mhvuOj/UeLlV6566GD/guowlr0hHxClI0W9m7MWYkL1F0hLo+0Aexs9HSPCtR1SXQ0TD3MMKrXZajbiQ==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "file-uri-to-path": "1.0.0"
+-      }
+-    },
+-    "node_modules/bl": {
+-      "version": "4.1.0",
+-      "resolved": "https://registry.npmjs.org/bl/-/bl-4.1.0.tgz",
+-      "integrity": "sha512-1W07cM9gS6DcLperZfFSj+bWLtaPGSOHWhPiGzXmvVJbRLdG82sH/Kn8EtW1VqWVA54AKf2h5k5BbnIbwF3h6w==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "buffer": "^5.5.0",
+-        "inherits": "^2.0.4",
+-        "readable-stream": "^3.4.0"
+-      }
+-    },
+-    "node_modules/buffer": {
+-      "version": "5.7.1",
+-      "resolved": "https://registry.npmjs.org/buffer/-/buffer-5.7.1.tgz",
+-      "integrity": "sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ==",
+-      "funding": [
+-        {
+-          "type": "github",
+-          "url": "https://github.com/sponsors/feross"
+-        },
+-        {
+-          "type": "patreon",
+-          "url": "https://www.patreon.com/feross"
+-        },
+-        {
+-          "type": "consulting",
+-          "url": "https://feross.org/support"
+-        }
+-      ],
+-      "license": "MIT",
+-      "dependencies": {
+-        "base64-js": "^1.3.1",
+-        "ieee754": "^1.1.13"
+-      }
+-    },
+-    "node_modules/buffer-equal-constant-time": {
+-      "version": "1.0.1",
+-      "resolved": "https://registry.npmjs.org/buffer-equal-constant-time/-/buffer-equal-constant-time-1.0.1.tgz",
+-      "integrity": "sha512-zRpUiDwd/xk6ADqPMATG8vc9VPrkck7T07OIx0gnjmJAnHnTVXNQG3vfvWNuiZIkwu9KrKdA1iJKfsfTVxE6NA==",
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/bundle-name": {
+-      "version": "4.1.0",
+-      "resolved": "https://registry.npmjs.org/bundle-name/-/bundle-name-4.1.0.tgz",
+-      "integrity": "sha512-tjwM5exMg6BGRI+kNmTntNsvdZS1X8BFYS6tnJ2hdH0kVxM6/eVZ2xy+FqStSWvYmtfFMDLIxurorHwDKfDz5Q==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "run-applescript": "^7.0.0"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      },
+-      "funding": {
+-        "url": "https://github.com/sponsors/sindresorhus"
+-      }
+-    },
+-    "node_modules/chownr": {
+-      "version": "1.1.4",
+-      "resolved": "https://registry.npmjs.org/chownr/-/chownr-1.1.4.tgz",
+-      "integrity": "sha512-jJ0bqzaylmJtVnNgzTeSOs8DPavpbYgEr/b0YL8/2GO3xJEhInFmhKMUnEJQjZumK7KXGFhUy89PrsJWlakBVg==",
+-      "license": "ISC"
+-    },
+-    "node_modules/debug": {
+-      "version": "4.4.3",
+-      "resolved": "https://registry.npmjs.org/debug/-/debug-4.4.3.tgz",
+-      "integrity": "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "ms": "^2.1.3"
+-      },
+-      "engines": {
+-        "node": ">=6.0"
+-      },
+-      "peerDependenciesMeta": {
+-        "supports-color": {
+-          "optional": true
+-        }
+-      }
+-    },
+-    "node_modules/decompress-response": {
+-      "version": "6.0.0",
+-      "resolved": "https://registry.npmjs.org/decompress-response/-/decompress-response-6.0.0.tgz",
+-      "integrity": "sha512-aW35yZM6Bb/4oJlZncMH2LCoZtJXTRxES17vE3hoRiowU2kWHaJKFkSBDnDR+cm9J+9QhXmREyIfv0pji9ejCQ==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "mimic-response": "^3.1.0"
+-      },
+-      "engines": {
+-        "node": ">=10"
+-      },
+-      "funding": {
+-        "url": "https://github.com/sponsors/sindresorhus"
+-      }
+-    },
+-    "node_modules/deep-extend": {
+-      "version": "0.6.0",
+-      "resolved": "https://registry.npmjs.org/deep-extend/-/deep-extend-0.6.0.tgz",
+-      "integrity": "sha512-LOHxIOaPYdHlJRtCQfDIVZtfw/ufM8+rVj649RIHzcm/vGwQRXFt6OPqIFWsm2XEMrNIEtWR64sY1LEKD2vAOA==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=4.0.0"
+-      }
+-    },
+-    "node_modules/default-browser": {
+-      "version": "5.5.0",
+-      "resolved": "https://registry.npmjs.org/default-browser/-/default-browser-5.5.0.tgz",
+-      "integrity": "sha512-H9LMLr5zwIbSxrmvikGuI/5KGhZ8E2zH3stkMgM5LpOWDutGM2JZaj460Udnf1a+946zc7YBgrqEWwbk7zHvGw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "bundle-name": "^4.1.0",
+-        "default-browser-id": "^5.0.0"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      },
+-      "funding": {
+-        "url": "https://github.com/sponsors/sindresorhus"
+-      }
+-    },
+-    "node_modules/default-browser-id": {
+-      "version": "5.0.1",
+-      "resolved": "https://registry.npmjs.org/default-browser-id/-/default-browser-id-5.0.1.tgz",
+-      "integrity": "sha512-x1VCxdX4t+8wVfd1so/9w+vQ4vx7lKd2Qp5tDRutErwmR85OgmfX7RlLRMWafRMY7hbEiXIbudNrjOAPa/hL8Q==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=18"
+-      },
+-      "funding": {
+-        "url": "https://github.com/sponsors/sindresorhus"
+-      }
+-    },
+-    "node_modules/define-lazy-prop": {
+-      "version": "3.0.0",
+-      "resolved": "https://registry.npmjs.org/define-lazy-prop/-/define-lazy-prop-3.0.0.tgz",
+-      "integrity": "sha512-N+MeXYoqr3pOgn8xfyRPREN7gHakLYjhsHhWGT3fWAiL4IkAt0iDw14QiiEm2bE30c5XX5q0FtAA3CK5f9/BUg==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=12"
+-      },
+-      "funding": {
+-        "url": "https://github.com/sponsors/sindresorhus"
+-      }
+-    },
+-    "node_modules/detect-libc": {
+-      "version": "2.1.2",
+-      "resolved": "https://registry.npmjs.org/detect-libc/-/detect-libc-2.1.2.tgz",
+-      "integrity": "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==",
+-      "license": "Apache-2.0",
+-      "engines": {
+-        "node": ">=8"
+-      }
+-    },
+-    "node_modules/ecdsa-sig-formatter": {
+-      "version": "1.0.11",
+-      "resolved": "https://registry.npmjs.org/ecdsa-sig-formatter/-/ecdsa-sig-formatter-1.0.11.tgz",
+-      "integrity": "sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ==",
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "safe-buffer": "^5.0.1"
+-      }
+-    },
+-    "node_modules/end-of-stream": {
+-      "version": "1.4.5",
+-      "resolved": "https://registry.npmjs.org/end-of-stream/-/end-of-stream-1.4.5.tgz",
+-      "integrity": "sha512-ooEGc6HP26xXq/N+GCGOT0JKCLDGrq2bQUZrQ7gyrJiZANJ/8YDTxTpQBXGMn+WbIQXNVpyWymm7KYVICQnyOg==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "once": "^1.4.0"
+-      }
+-    },
+-    "node_modules/expand-template": {
+-      "version": "2.0.3",
+-      "resolved": "https://registry.npmjs.org/expand-template/-/expand-template-2.0.3.tgz",
+-      "integrity": "sha512-XYfuKMvj4O35f/pOXLObndIRvyQ+/+6AhODh+OKWj9S9498pHHn/IMszH+gt0fBCRWMNfk1ZSp5x3AifmnI2vg==",
+-      "license": "(MIT OR WTFPL)",
+-      "engines": {
+-        "node": ">=6"
+-      }
+-    },
+-    "node_modules/fast-json-stable-stringify": {
+-      "version": "2.1.0",
+-      "resolved": "https://registry.npmjs.org/fast-json-stable-stringify/-/fast-json-stable-stringify-2.1.0.tgz",
+-      "integrity": "sha512-lhd/wF+Lk98HZoTCtlVraHtfh5XYijIjalXck7saUtuanSDyLMxnHhSXEDJqHxD7msR8D0uCmqlkwjCV8xvwHw==",
+-      "license": "MIT"
+-    },
+-    "node_modules/file-uri-to-path": {
+-      "version": "1.0.0",
+-      "resolved": "https://registry.npmjs.org/file-uri-to-path/-/file-uri-to-path-1.0.0.tgz",
+-      "integrity": "sha512-0Zt+s3L7Vf1biwWZ29aARiVYLx7iMGnEUl9x33fbB/j3jR81u/O2LbqK+Bm1CDSNDKVtJ/YjwY7TUd5SkeLQLw==",
+-      "license": "MIT"
+-    },
+-    "node_modules/fs-constants": {
+-      "version": "1.0.0",
+-      "resolved": "https://registry.npmjs.org/fs-constants/-/fs-constants-1.0.0.tgz",
+-      "integrity": "sha512-y6OAwoSIf7FyjMIv94u+b5rdheZEjzR63GTyZJm5qh4Bi+2YgwLCcI/fPFZkL5PSixOt6ZNKm+w+Hfp/Bciwow==",
+-      "license": "MIT"
+-    },
+-    "node_modules/github-from-package": {
+-      "version": "0.0.0",
+-      "resolved": "https://registry.npmjs.org/github-from-package/-/github-from-package-0.0.0.tgz",
+-      "integrity": "sha512-SyHy3T1v2NUXn29OsWdxmK6RwHD+vkj3v8en8AOBZ1wBQ/hCAQ5bAQTD02kW4W9tUp/3Qh6J8r9EvntiyCmOOw==",
+-      "license": "MIT"
+-    },
+-    "node_modules/http-proxy-agent": {
+-      "version": "7.0.2",
+-      "resolved": "https://registry.npmjs.org/http-proxy-agent/-/http-proxy-agent-7.0.2.tgz",
+-      "integrity": "sha512-T1gkAiYYDWYx3V5Bmyu7HcfcvL7mUrTWiM6yOfa3PIphViJ/gFPbvidQ+veqSOHci/PxBcDabeUNCzpOODJZig==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "agent-base": "^7.1.0",
+-        "debug": "^4.3.4"
+-      },
+-      "engines": {
+-        "node": ">= 14"
+-      }
+-    },
+-    "node_modules/https-proxy-agent": {
+-      "version": "7.0.6",
+-      "resolved": "https://registry.npmjs.org/https-proxy-agent/-/https-proxy-agent-7.0.6.tgz",
+-      "integrity": "sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "agent-base": "^7.1.2",
+-        "debug": "4"
+-      },
+-      "engines": {
+-        "node": ">= 14"
+-      }
+-    },
+-    "node_modules/ieee754": {
+-      "version": "1.2.1",
+-      "resolved": "https://registry.npmjs.org/ieee754/-/ieee754-1.2.1.tgz",
+-      "integrity": "sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==",
+-      "funding": [
+-        {
+-          "type": "github",
+-          "url": "https://github.com/sponsors/feross"
+-        },
+-        {
+-          "type": "patreon",
+-          "url": "https://www.patreon.com/feross"
+-        },
+-        {
+-          "type": "consulting",
+-          "url": "https://feross.org/support"
+-        }
+-      ],
+-      "license": "BSD-3-Clause"
+-    },
+-    "node_modules/inherits": {
+-      "version": "2.0.4",
+-      "resolved": "https://registry.npmjs.org/inherits/-/inherits-2.0.4.tgz",
+-      "integrity": "sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ==",
+-      "license": "ISC"
+-    },
+-    "node_modules/ini": {
+-      "version": "1.3.8",
+-      "resolved": "https://registry.npmjs.org/ini/-/ini-1.3.8.tgz",
+-      "integrity": "sha512-JV/yugV2uzW5iMRSiZAyDtQd+nxtUnjeLt0acNdw98kKLrvuRVyB80tsREOE7yvGVgalhZ6RNXCmEHkUKBKxew==",
+-      "license": "ISC"
+-    },
+-    "node_modules/is-docker": {
+-      "version": "3.0.0",
+-      "resolved": "https://registry.npmjs.org/is-docker/-/is-docker-3.0.0.tgz",
+-      "integrity": "sha512-eljcgEDlEns/7AXFosB5K/2nCM4P7FQPkGc/DWLy5rmFEWvZayGrik1d9/QIY5nJ4f9YsVvBkA6kJpHn9rISdQ==",
+-      "license": "MIT",
+-      "bin": {
+-        "is-docker": "cli.js"
+-      },
+-      "engines": {
+-        "node": "^12.20.0 || ^14.13.1 || >=16.0.0"
+-      },
+-      "funding": {
+-        "url": "https://github.com/sponsors/sindresorhus"
+-      }
+-    },
+-    "node_modules/is-inside-container": {
+-      "version": "1.0.0",
+-      "resolved": "https://registry.npmjs.org/is-inside-container/-/is-inside-container-1.0.0.tgz",
+-      "integrity": "sha512-KIYLCCJghfHZxqjYBE7rEy0OBuTd5xCHS7tHVgvCLkx7StIoaxwNW3hCALgEUjFfeRk+MG/Qxmp/vtETEF3tRA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "is-docker": "^3.0.0"
+-      },
+-      "bin": {
+-        "is-inside-container": "cli.js"
+-      },
+-      "engines": {
+-        "node": ">=14.16"
+-      },
+-      "funding": {
+-        "url": "https://github.com/sponsors/sindresorhus"
+-      }
+-    },
+-    "node_modules/is-wsl": {
+-      "version": "3.1.1",
+-      "resolved": "https://registry.npmjs.org/is-wsl/-/is-wsl-3.1.1.tgz",
+-      "integrity": "sha512-e6rvdUCiQCAuumZslxRJWR/Doq4VpPR82kqclvcS0efgt430SlGIk05vdCN58+VrzgtIcfNODjozVielycD4Sw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "is-inside-container": "^1.0.0"
+-      },
+-      "engines": {
+-        "node": ">=16"
+-      },
+-      "funding": {
+-        "url": "https://github.com/sponsors/sindresorhus"
+-      }
+-    },
+-    "node_modules/jsonwebtoken": {
+-      "version": "9.0.3",
+-      "resolved": "https://registry.npmjs.org/jsonwebtoken/-/jsonwebtoken-9.0.3.tgz",
+-      "integrity": "sha512-MT/xP0CrubFRNLNKvxJ2BYfy53Zkm++5bX9dtuPbqAeQpTVe0MQTFhao8+Cp//EmJp244xt6Drw/GVEGCUj40g==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "jws": "^4.0.1",
+-        "lodash.includes": "^4.3.0",
+-        "lodash.isboolean": "^3.0.3",
+-        "lodash.isinteger": "^4.0.4",
+-        "lodash.isnumber": "^3.0.3",
+-        "lodash.isplainobject": "^4.0.6",
+-        "lodash.isstring": "^4.0.1",
+-        "lodash.once": "^4.0.0",
+-        "ms": "^2.1.1",
+-        "semver": "^7.5.4"
+-      },
+-      "engines": {
+-        "node": ">=12",
+-        "npm": ">=6"
+-      }
+-    },
+-    "node_modules/jwa": {
+-      "version": "2.0.1",
+-      "resolved": "https://registry.npmjs.org/jwa/-/jwa-2.0.1.tgz",
+-      "integrity": "sha512-hRF04fqJIP8Abbkq5NKGN0Bbr3JxlQ+qhZufXVr0DvujKy93ZCbXZMHDL4EOtodSbCWxOqR8MS1tXA5hwqCXDg==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "buffer-equal-constant-time": "^1.0.1",
+-        "ecdsa-sig-formatter": "1.0.11",
+-        "safe-buffer": "^5.0.1"
+-      }
+-    },
+-    "node_modules/jws": {
+-      "version": "4.0.1",
+-      "resolved": "https://registry.npmjs.org/jws/-/jws-4.0.1.tgz",
+-      "integrity": "sha512-EKI/M/yqPncGUUh44xz0PxSidXFr/+r0pA70+gIYhjv+et7yxM+s29Y+VGDkovRofQem0fs7Uvf4+YmAdyRduA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "jwa": "^2.0.1",
+-        "safe-buffer": "^5.0.1"
+-      }
+-    },
+-    "node_modules/lodash.includes": {
+-      "version": "4.3.0",
+-      "resolved": "https://registry.npmjs.org/lodash.includes/-/lodash.includes-4.3.0.tgz",
+-      "integrity": "sha512-W3Bx6mdkRTGtlJISOvVD/lbqjTlPPUDTMnlXZFnVwi9NKJ6tiAk6LVdlhZMm17VZisqhKcgzpO5Wz91PCt5b0w==",
+-      "license": "MIT"
+-    },
+-    "node_modules/lodash.isboolean": {
+-      "version": "3.0.3",
+-      "resolved": "https://registry.npmjs.org/lodash.isboolean/-/lodash.isboolean-3.0.3.tgz",
+-      "integrity": "sha512-Bz5mupy2SVbPHURB98VAcw+aHh4vRV5IPNhILUCsOzRmsTmSQ17jIuqopAentWoehktxGd9e/hbIXq980/1QJg==",
+-      "license": "MIT"
+-    },
+-    "node_modules/lodash.isinteger": {
+-      "version": "4.0.4",
+-      "resolved": "https://registry.npmjs.org/lodash.isinteger/-/lodash.isinteger-4.0.4.tgz",
+-      "integrity": "sha512-DBwtEWN2caHQ9/imiNeEA5ys1JoRtRfY3d7V9wkqtbycnAmTvRRmbHKDV4a0EYc678/dia0jrte4tjYwVBaZUA==",
+-      "license": "MIT"
+-    },
+-    "node_modules/lodash.isnumber": {
+-      "version": "3.0.3",
+-      "resolved": "https://registry.npmjs.org/lodash.isnumber/-/lodash.isnumber-3.0.3.tgz",
+-      "integrity": "sha512-QYqzpfwO3/CWf3XP+Z+tkQsfaLL/EnUlXWVkIk5FUPc4sBdTehEqZONuyRt2P67PXAk+NXmTBcc97zw9t1FQrw==",
+-      "license": "MIT"
+-    },
+-    "node_modules/lodash.isplainobject": {
+-      "version": "4.0.6",
+-      "resolved": "https://registry.npmjs.org/lodash.isplainobject/-/lodash.isplainobject-4.0.6.tgz",
+-      "integrity": "sha512-oSXzaWypCMHkPC3NvBEaPHf0KsA5mvPrOPgQWDsbg8n7orZ290M0BmC/jgRZ4vcJ6DTAhjrsSYgdsW/F+MFOBA==",
+-      "license": "MIT"
+-    },
+-    "node_modules/lodash.isstring": {
+-      "version": "4.0.1",
+-      "resolved": "https://registry.npmjs.org/lodash.isstring/-/lodash.isstring-4.0.1.tgz",
+-      "integrity": "sha512-0wJxfxH1wgO3GrbuP+dTTk7op+6L41QCXbGINEmD+ny/G/eCqGzxyCsh7159S+mgDDcoarnBw6PC1PS5+wUGgw==",
+-      "license": "MIT"
+-    },
+-    "node_modules/lodash.once": {
+-      "version": "4.1.1",
+-      "resolved": "https://registry.npmjs.org/lodash.once/-/lodash.once-4.1.1.tgz",
+-      "integrity": "sha512-Sb487aTOCr9drQVL8pIxOzVhafOjZN9UU54hiN8PU3uAiSV7lx1yYNpbNmex2PK6dSJoNTSJUUswT651yww3Mg==",
+-      "license": "MIT"
+-    },
+-    "node_modules/mimic-response": {
+-      "version": "3.1.0",
+-      "resolved": "https://registry.npmjs.org/mimic-response/-/mimic-response-3.1.0.tgz",
+-      "integrity": "sha512-z0yWI+4FDrrweS8Zmt4Ej5HdJmky15+L2e6Wgn3+iK5fWzb6T3fhNFq2+MeTRb064c6Wr4N/wv0DzQTjNzHNGQ==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=10"
+-      },
+-      "funding": {
+-        "url": "https://github.com/sponsors/sindresorhus"
+-      }
+-    },
+-    "node_modules/minimist": {
+-      "version": "1.2.8",
+-      "resolved": "https://registry.npmjs.org/minimist/-/minimist-1.2.8.tgz",
+-      "integrity": "sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==",
+-      "license": "MIT",
+-      "funding": {
+-        "url": "https://github.com/sponsors/ljharb"
+-      }
+-    },
+-    "node_modules/mkdirp-classic": {
+-      "version": "0.5.3",
+-      "resolved": "https://registry.npmjs.org/mkdirp-classic/-/mkdirp-classic-0.5.3.tgz",
+-      "integrity": "sha512-gKLcREMhtuZRwRAfqP3RFW+TK4JqApVBtOIftVgjuABpAtpxhPGaDcfvbhNvD0B8iD1oUr/txX35NjcaY6Ns/A==",
+-      "license": "MIT"
+-    },
+-    "node_modules/ms": {
+-      "version": "2.1.3",
+-      "resolved": "https://registry.npmjs.org/ms/-/ms-2.1.3.tgz",
+-      "integrity": "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==",
+-      "license": "MIT"
+-    },
+-    "node_modules/napi-build-utils": {
+-      "version": "2.0.0",
+-      "resolved": "https://registry.npmjs.org/napi-build-utils/-/napi-build-utils-2.0.0.tgz",
+-      "integrity": "sha512-GEbrYkbfF7MoNaoh2iGG84Mnf/WZfB0GdGEsM8wz7Expx/LlWf5U8t9nvJKXSp3qr5IsEbK04cBGhol/KwOsWA==",
+-      "license": "MIT"
+-    },
+-    "node_modules/node-abi": {
+-      "version": "3.89.0",
+-      "resolved": "https://registry.npmjs.org/node-abi/-/node-abi-3.89.0.tgz",
+-      "integrity": "sha512-6u9UwL0HlAl21+agMN3YAMXcKByMqwGx+pq+P76vii5f7hTPtKDp08/H9py6DY+cfDw7kQNTGEj/rly3IgbNQA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "semver": "^7.3.5"
+-      },
+-      "engines": {
+-        "node": ">=10"
+-      }
+-    },
+-    "node_modules/once": {
+-      "version": "1.4.0",
+-      "resolved": "https://registry.npmjs.org/once/-/once-1.4.0.tgz",
+-      "integrity": "sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==",
+-      "license": "ISC",
+-      "dependencies": {
+-        "wrappy": "1"
+-      }
+-    },
+-    "node_modules/open": {
+-      "version": "10.2.0",
+-      "resolved": "https://registry.npmjs.org/open/-/open-10.2.0.tgz",
+-      "integrity": "sha512-YgBpdJHPyQ2UE5x+hlSXcnejzAvD0b22U2OuAP+8OnlJT+PjWPxtgmGqKKc+RgTM63U9gN0YzrYc71R2WT/hTA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "default-browser": "^5.2.1",
+-        "define-lazy-prop": "^3.0.0",
+-        "is-inside-container": "^1.0.0",
+-        "wsl-utils": "^0.1.0"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      },
+-      "funding": {
+-        "url": "https://github.com/sponsors/sindresorhus"
+-      }
+-    },
+-    "node_modules/prebuild-install": {
+-      "version": "7.1.3",
+-      "resolved": "https://registry.npmjs.org/prebuild-install/-/prebuild-install-7.1.3.tgz",
+-      "integrity": "sha512-8Mf2cbV7x1cXPUILADGI3wuhfqWvtiLA1iclTDbFRZkgRQS0NqsPZphna9V+HyTEadheuPmjaJMsbzKQFOzLug==",
+-      "deprecated": "No longer maintained. Please contact the author of the relevant native addon; alternatives are available.",
+-      "license": "MIT",
+-      "dependencies": {
+-        "detect-libc": "^2.0.0",
+-        "expand-template": "^2.0.3",
+-        "github-from-package": "0.0.0",
+-        "minimist": "^1.2.3",
+-        "mkdirp-classic": "^0.5.3",
+-        "napi-build-utils": "^2.0.0",
+-        "node-abi": "^3.3.0",
+-        "pump": "^3.0.0",
+-        "rc": "^1.2.7",
+-        "simple-get": "^4.0.0",
+-        "tar-fs": "^2.0.0",
+-        "tunnel-agent": "^0.6.0"
+-      },
+-      "bin": {
+-        "prebuild-install": "bin.js"
+-      },
+-      "engines": {
+-        "node": ">=10"
+-      }
+-    },
+-    "node_modules/priorityqueuejs": {
+-      "version": "2.0.0",
+-      "resolved": "https://registry.npmjs.org/priorityqueuejs/-/priorityqueuejs-2.0.0.tgz",
+-      "integrity": "sha512-19BMarhgpq3x4ccvVi8k2QpJZcymo/iFUcrhPd4V96kYGovOdTsWwy7fxChYi4QY+m2EnGBWSX9Buakz+tWNQQ==",
+-      "license": "MIT"
+-    },
+-    "node_modules/pump": {
+-      "version": "3.0.4",
+-      "resolved": "https://registry.npmjs.org/pump/-/pump-3.0.4.tgz",
+-      "integrity": "sha512-VS7sjc6KR7e1ukRFhQSY5LM2uBWAUPiOPa/A3mkKmiMwSmRFUITt0xuj+/lesgnCv+dPIEYlkzrcyXgquIHMcA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "end-of-stream": "^1.1.0",
+-        "once": "^1.3.1"
+-      }
+-    },
+-    "node_modules/rc": {
+-      "version": "1.2.8",
+-      "resolved": "https://registry.npmjs.org/rc/-/rc-1.2.8.tgz",
+-      "integrity": "sha512-y3bGgqKj3QBdxLbLkomlohkvsA8gdAiUQlSBJnBhfn+BPxg4bc62d8TcBW15wavDfgexCgccckhcZvywyQYPOw==",
+-      "license": "(BSD-2-Clause OR MIT OR Apache-2.0)",
+-      "dependencies": {
+-        "deep-extend": "^0.6.0",
+-        "ini": "~1.3.0",
+-        "minimist": "^1.2.0",
+-        "strip-json-comments": "~2.0.1"
+-      },
+-      "bin": {
+-        "rc": "cli.js"
+-      }
+-    },
+-    "node_modules/readable-stream": {
+-      "version": "3.6.2",
+-      "resolved": "https://registry.npmjs.org/readable-stream/-/readable-stream-3.6.2.tgz",
+-      "integrity": "sha512-9u/sniCrY3D5WdsERHzHE4G2YCXqoG5FTHUiCC4SIbr6XcLZBY05ya9EKjYek9O5xOAwjGq+1JdGBAS7Q9ScoA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "inherits": "^2.0.3",
+-        "string_decoder": "^1.1.1",
+-        "util-deprecate": "^1.0.1"
+-      },
+-      "engines": {
+-        "node": ">= 6"
+-      }
+-    },
+-    "node_modules/run-applescript": {
+-      "version": "7.1.0",
+-      "resolved": "https://registry.npmjs.org/run-applescript/-/run-applescript-7.1.0.tgz",
+-      "integrity": "sha512-DPe5pVFaAsinSaV6QjQ6gdiedWDcRCbUuiQfQa2wmWV7+xC9bGulGI8+TdRmoFkAPaBXk8CrAbnlY2ISniJ47Q==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=18"
+-      },
+-      "funding": {
+-        "url": "https://github.com/sponsors/sindresorhus"
+-      }
+-    },
+-    "node_modules/safe-buffer": {
+-      "version": "5.2.1",
+-      "resolved": "https://registry.npmjs.org/safe-buffer/-/safe-buffer-5.2.1.tgz",
+-      "integrity": "sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==",
+-      "funding": [
+-        {
+-          "type": "github",
+-          "url": "https://github.com/sponsors/feross"
+-        },
+-        {
+-          "type": "patreon",
+-          "url": "https://www.patreon.com/feross"
+-        },
+-        {
+-          "type": "consulting",
+-          "url": "https://feross.org/support"
+-        }
+-      ],
+-      "license": "MIT"
+-    },
+-    "node_modules/semaphore": {
+-      "version": "1.1.0",
+-      "resolved": "https://registry.npmjs.org/semaphore/-/semaphore-1.1.0.tgz",
+-      "integrity": "sha512-O4OZEaNtkMd/K0i6js9SL+gqy0ZCBMgUvlSqHKi4IBdjhe7wB8pwztUk1BbZ1fmrvpwFrPbHzqd2w5pTcJH6LA==",
+-      "engines": {
+-        "node": ">=0.8.0"
+-      }
+-    },
+-    "node_modules/semver": {
+-      "version": "7.7.4",
+-      "resolved": "https://registry.npmjs.org/semver/-/semver-7.7.4.tgz",
+-      "integrity": "sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA==",
+-      "license": "ISC",
+-      "bin": {
+-        "semver": "bin/semver.js"
+-      },
+-      "engines": {
+-        "node": ">=10"
+-      }
+-    },
+-    "node_modules/simple-concat": {
+-      "version": "1.0.1",
+-      "resolved": "https://registry.npmjs.org/simple-concat/-/simple-concat-1.0.1.tgz",
+-      "integrity": "sha512-cSFtAPtRhljv69IK0hTVZQ+OfE9nePi/rtJmw5UjHeVyVroEqJXP1sFztKUy1qU+xvz3u/sfYJLa947b7nAN2Q==",
+-      "funding": [
+-        {
+-          "type": "github",
+-          "url": "https://github.com/sponsors/feross"
+-        },
+-        {
+-          "type": "patreon",
+-          "url": "https://www.patreon.com/feross"
+-        },
+-        {
+-          "type": "consulting",
+-          "url": "https://feross.org/support"
+-        }
+-      ],
+-      "license": "MIT"
+-    },
+-    "node_modules/simple-get": {
+-      "version": "4.0.1",
+-      "resolved": "https://registry.npmjs.org/simple-get/-/simple-get-4.0.1.tgz",
+-      "integrity": "sha512-brv7p5WgH0jmQJr1ZDDfKDOSeWWg+OVypG99A/5vYGPqJ6pxiaHLy8nxtFjBA7oMa01ebA9gfh1uMCFqOuXxvA==",
+-      "funding": [
+-        {
+-          "type": "github",
+-          "url": "https://github.com/sponsors/feross"
+-        },
+-        {
+-          "type": "patreon",
+-          "url": "https://www.patreon.com/feross"
+-        },
+-        {
+-          "type": "consulting",
+-          "url": "https://feross.org/support"
+-        }
+-      ],
+-      "license": "MIT",
+-      "dependencies": {
+-        "decompress-response": "^6.0.0",
+-        "once": "^1.3.1",
+-        "simple-concat": "^1.0.0"
+-      }
+-    },
+-    "node_modules/string_decoder": {
+-      "version": "1.3.0",
+-      "resolved": "https://registry.npmjs.org/string_decoder/-/string_decoder-1.3.0.tgz",
+-      "integrity": "sha512-hkRX8U1WjJFd8LsDJ2yQ/wWWxaopEsABU1XfkM8A+j0+85JAGppt16cr1Whg6KIbb4okU6Mql6BOj+uup/wKeA==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "safe-buffer": "~5.2.0"
+-      }
+-    },
+-    "node_modules/strip-json-comments": {
+-      "version": "2.0.1",
+-      "resolved": "https://registry.npmjs.org/strip-json-comments/-/strip-json-comments-2.0.1.tgz",
+-      "integrity": "sha512-4gB8na07fecVVkOI6Rs4e7T6NOTki5EmL7TUduTs6bu3EdnSycntVJ4re8kgZA+wx9IueI2Y11bfbgwtzuE0KQ==",
+-      "license": "MIT",
+-      "engines": {
+-        "node": ">=0.10.0"
+-      }
+-    },
+-    "node_modules/tar-fs": {
+-      "version": "2.1.4",
+-      "resolved": "https://registry.npmjs.org/tar-fs/-/tar-fs-2.1.4.tgz",
+-      "integrity": "sha512-mDAjwmZdh7LTT6pNleZ05Yt65HC3E+NiQzl672vQG38jIrehtJk/J3mNwIg+vShQPcLF/LV7CMnDW6vjj6sfYQ==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "chownr": "^1.1.1",
+-        "mkdirp-classic": "^0.5.2",
+-        "pump": "^3.0.0",
+-        "tar-stream": "^2.1.4"
+-      }
+-    },
+-    "node_modules/tar-stream": {
+-      "version": "2.2.0",
+-      "resolved": "https://registry.npmjs.org/tar-stream/-/tar-stream-2.2.0.tgz",
+-      "integrity": "sha512-ujeqbceABgwMZxEJnk2HDY2DlnUZ+9oEcb1KzTVfYHio0UE6dG71n60d8D2I4qNvleWrrXpmjpt7vZeF1LnMZQ==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "bl": "^4.0.3",
+-        "end-of-stream": "^1.4.1",
+-        "fs-constants": "^1.0.0",
+-        "inherits": "^2.0.3",
+-        "readable-stream": "^3.1.1"
+-      },
+-      "engines": {
+-        "node": ">=6"
+-      }
+-    },
+-    "node_modules/tslib": {
+-      "version": "2.8.1",
+-      "resolved": "https://registry.npmjs.org/tslib/-/tslib-2.8.1.tgz",
+-      "integrity": "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==",
+-      "license": "0BSD"
+-    },
+-    "node_modules/tunnel-agent": {
+-      "version": "0.6.0",
+-      "resolved": "https://registry.npmjs.org/tunnel-agent/-/tunnel-agent-0.6.0.tgz",
+-      "integrity": "sha512-McnNiV1l8RYeY8tBgEpuodCC1mLUdbSN+CYBL7kJsJNInOP8UjDDEwdk6Mw60vdLLrr5NHKZhMAOSrR2NZuQ+w==",
+-      "license": "Apache-2.0",
+-      "dependencies": {
+-        "safe-buffer": "^5.0.1"
+-      },
+-      "engines": {
+-        "node": "*"
+-      }
+-    },
+-    "node_modules/util-deprecate": {
+-      "version": "1.0.2",
+-      "resolved": "https://registry.npmjs.org/util-deprecate/-/util-deprecate-1.0.2.tgz",
+-      "integrity": "sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==",
+-      "license": "MIT"
+-    },
+-    "node_modules/wrappy": {
+-      "version": "1.0.2",
+-      "resolved": "https://registry.npmjs.org/wrappy/-/wrappy-1.0.2.tgz",
+-      "integrity": "sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==",
+-      "license": "ISC"
+-    },
+-    "node_modules/wsl-utils": {
+-      "version": "0.1.0",
+-      "resolved": "https://registry.npmjs.org/wsl-utils/-/wsl-utils-0.1.0.tgz",
+-      "integrity": "sha512-h3Fbisa2nKGPxCpm89Hk33lBLsnaGBvctQopaBSOW/uIs6FTe1ATyAnKFJrzVs9vpGdsTe73WF3V4lIsk4Gacw==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "is-wsl": "^3.1.0"
+-      },
+-      "engines": {
+-        "node": ">=18"
+-      },
+-      "funding": {
+-        "url": "https://github.com/sponsors/sindresorhus"
+-      }
+-    }
+-  }
+-}
+diff --git a/snapshot/package.json b/snapshot/package.json
+deleted file mode 100644
+index 5f00c5dd..00000000
+--- a/snapshot/package.json
++++ /dev/null
+@@ -1,19 +0,0 @@
+-{
+-  "name": "kill-me-snapshot",
+-  "private": true,
+-  "version": "1.0.0",
+-  "type": "module",
+-  "description": "Generates a SQLite snapshot of Cosmos DB data for static frontend serving",
+-  "scripts": {
+-    "generate": "node generate-snapshot.js"
+-  },
+-  "dependencies": {
+-    "@azure/app-configuration": "^1.11.0",
+-    "@azure/cosmos": "^4.0.0",
+-    "@azure/identity": "^4.13.1",
+-    "better-sqlite3": "^11.0.0"
+-  },
+-  "engines": {
+-    "node": ">=20.0.0"
+-  }
+-}

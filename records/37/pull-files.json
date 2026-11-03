@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 11,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/96ca6f6b34f352c7036fd596c3a2df7feedc3a00/tofu%2Fidentity.tf",
+    "changes": 12,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/tofu%2Fidentity.tf?ref=96ca6f6b34f352c7036fd596c3a2df7feedc3a00",
+    "deletions": 1,
+    "filename": "tofu/identity.tf",
+    "patch": "@@ -23,6 +23,16 @@ data \"azurerm_resource_group\" \"infra\" {\n   name = local.infra.resource_group_name\n }\n \n+# Live cluster OIDC issuer URL. Previously pinned via var.cluster_oidc_issuer_url\n+# default — that drifted silently when infra-bootstrap rebuilt the AKS cluster\n+# and the federated cred kept presenting the old issuer (AADSTS700211). Reading\n+# it from the cluster directly keeps the credential in lockstep with the\n+# current cluster — matches diagrams/tofu/identity.tf.\n+data \"azurerm_kubernetes_cluster\" \"infra\" {\n+  name                = \"infra-aks\"\n+  resource_group_name = local.infra.resource_group_name\n+}\n+\n resource \"azurerm_user_assigned_identity\" \"kill_me\" {\n   name                = \"kill-me-identity\"\n   resource_group_name = data.azurerm_resource_group.infra.name\n@@ -56,7 +66,7 @@ resource \"azurerm_federated_identity_credential\" \"kill_me\" {\n   resource_group_name = local.infra.resource_group_name\n   parent_id           = azurerm_user_assigned_identity.kill_me.id\n   audience            = [\"api://AzureADTokenExchange\"]\n-  issuer              = var.cluster_oidc_issuer_url\n+  issuer              = data.azurerm_kubernetes_cluster.infra.oidc_issuer_url\n   subject             = \"system:serviceaccount:kill-me:infra-shared\"\n }\n ",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/96ca6f6b34f352c7036fd596c3a2df7feedc3a00/tofu%2Fidentity.tf",
+    "sha": "49409e5cdfd35721ec62fe540dedeae931b551f1",
+    "status": "modified"
+  },
+  {
+    "additions": 0,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/96ca6f6b34f352c7036fd596c3a2df7feedc3a00/tofu%2Fvariables.tf",
+    "changes": 6,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/tofu%2Fvariables.tf?ref=96ca6f6b34f352c7036fd596c3a2df7feedc3a00",
+    "deletions": 6,
+    "filename": "tofu/variables.tf",
+    "patch": "@@ -3,9 +3,3 @@ variable \"location\" {\n   type        = string\n   default     = \"westus2\"\n }\n-\n-variable \"cluster_oidc_issuer_url\" {\n-  description = \"OIDC issuer URL for the active AKS cluster used for workload identity federation\"\n-  type        = string\n-  default     = \"https://westus2.oic.prod-aks.azure.com/2236b5e4-81d2-4d82-bde5-17b1037999ea/dca02d36-5485-474f-acfb-b2d897a982e1/\"\n-}",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/96ca6f6b34f352c7036fd596c3a2df7feedc3a00/tofu%2Fvariables.tf",
+    "sha": "2845767c956edf5768160de7be273e6d8d8bebc4",
+    "status": "modified"
+  }
+]

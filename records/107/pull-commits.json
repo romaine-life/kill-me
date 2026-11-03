@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/0f2ab96c50465c0e39fff8fe0a65d0200a25d5f0/comments",
+    "commit": {
+      "author": {
+        "date": "2026-09-16T06:33:54Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-09-16T06:33:54Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "fix: land on Overview after logging a workout\n\nSaving a workout set the Activity view to List while the app's own landing\nview had moved to Overview, so finishing a log dropped onto a different page\nthan opening the app did. Both paths now read one landing-view constant.",
+      "tree": {
+        "sha": "9963ce403c49d4ba5d73386a1c0241d50cceb45a",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/9963ce403c49d4ba5d73386a1c0241d50cceb45a"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/0f2ab96c50465c0e39fff8fe0a65d0200a25d5f0",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/0f2ab96c50465c0e39fff8fe0a65d0200a25d5f0",
+    "node_id": "C_kwDORV0mMdoAKDBmMmFiOTZjNTA0NjVjMGUzOWZmZjhmZTBhNjVkMDIwMGEyNWQ1ZjA",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/60d8b3c33e59ab79db3c9a090876bd339cbe681f",
+        "sha": "60d8b3c33e59ab79db3c9a090876bd339cbe681f",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/60d8b3c33e59ab79db3c9a090876bd339cbe681f"
+      }
+    ],
+    "sha": "0f2ab96c50465c0e39fff8fe0a65d0200a25d5f0",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/0f2ab96c50465c0e39fff8fe0a65d0200a25d5f0"
+  }
+]

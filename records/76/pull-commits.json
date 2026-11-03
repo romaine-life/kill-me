@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/7d02dcfbf3548877ee7badcb32dbd5ede2935b39/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-16T23:56:48Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-16T23:56:53Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "chore: ignore backend/package-lock.json\n\nThe dev launcher runs npm install in backend on first use of a worktree, so the\ngenerated lockfile showed up as untracked in every new one. Nothing consumes it:\nthe Dockerfile installs backend deps with `npm install --omit=dev`, and only\nfrontend/package-lock.json is tracked (used by its `npm ci`).",
+      "tree": {
+        "sha": "881cbc633b8ea182f1a6ef8a37644105be156c0b",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/881cbc633b8ea182f1a6ef8a37644105be156c0b"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/7d02dcfbf3548877ee7badcb32dbd5ede2935b39",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/7d02dcfbf3548877ee7badcb32dbd5ede2935b39",
+    "node_id": "C_kwDORV0mMdoAKDdkMDJkY2ZiZjM1NDg4NzdlZTdiYWRjYjMyZGJkNWVkZTI5MzViMzk",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/8686daa9d4a988a6f66fb241f449f2972bf96ee3",
+        "sha": "8686daa9d4a988a6f66fb241f449f2972bf96ee3",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/8686daa9d4a988a6f66fb241f449f2972bf96ee3"
+      }
+    ],
+    "sha": "7d02dcfbf3548877ee7badcb32dbd5ede2935b39",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/7d02dcfbf3548877ee7badcb32dbd5ede2935b39"
+  }
+]

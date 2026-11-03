@@ -1,0 +1,36 @@
+diff --git a/.github/workflows/build-and-deploy.yaml b/.github/workflows/build-and-deploy.yaml
+index bf205971..4b3ccffd 100644
+--- a/.github/workflows/build-and-deploy.yaml
++++ b/.github/workflows/build-and-deploy.yaml
+@@ -30,6 +30,7 @@ jobs:
+   build-and-deploy:
+     name: Build image, push, bump Helm values tag
+     runs-on: ubuntu-latest
++    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v6
+diff --git a/.github/workflows/docker-build-check.yaml b/.github/workflows/docker-build-check.yaml
+index 70653a2c..f0c9ae04 100644
+--- a/.github/workflows/docker-build-check.yaml
++++ b/.github/workflows/docker-build-check.yaml
+@@ -22,6 +22,7 @@ jobs:
+   build:
+     name: Build app image
+     runs-on: ubuntu-latest
++    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v6
+diff --git a/.github/workflows/snapshot.yaml b/.github/workflows/snapshot.yaml
+index d4ef4de6..a0aea287 100644
+--- a/.github/workflows/snapshot.yaml
++++ b/.github/workflows/snapshot.yaml
+@@ -21,6 +21,7 @@ jobs:
+     name: Generate snapshot.db and commit
+     needs: tofu-outputs
+     runs-on: ubuntu-latest
++    environment: ${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v6

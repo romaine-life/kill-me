@@ -1,0 +1,599 @@
+diff --git a/.github/workflows/build-and-deploy.yaml b/.github/workflows/build-and-deploy.yaml
+index 4bd5bdda..bf205971 100644
+--- a/.github/workflows/build-and-deploy.yaml
++++ b/.github/workflows/build-and-deploy.yaml
+@@ -8,9 +8,15 @@ on:
+       - frontend/**
+       - Dockerfile
+       - .dockerignore
++      - scripts/image-fingerprint.sh
+       - k8s/**
+-      - .github/workflows/build-and-deploy.yml
++      - .github/workflows/build-and-deploy.yaml
+   workflow_dispatch:
++    inputs:
++      git_ref:
++        description: "Git ref or commit SHA to build. Leave blank to build the dispatch revision."
++        required: false
++        type: string
+ 
+ permissions:
+   id-token: write
+@@ -22,7 +28,7 @@ concurrency:
+ 
+ jobs:
+   build-and-deploy:
+-    name: Build image, push, bump kustomization tag
++    name: Build image, push, bump Helm values tag
+     runs-on: ubuntu-latest
+     steps:
+       - name: Checkout
+@@ -30,6 +36,29 @@ jobs:
+         with:
+           fetch-depth: 0
+ 
++      - name: Resolve requested ref
++        env:
++          INPUT_REF: ${{ inputs.git_ref }}
++        run: |
++          set -euo pipefail
++          git fetch --force --tags origin '+refs/heads/*:refs/remotes/origin/*'
++
++          target_ref="${INPUT_REF:-$GITHUB_SHA}"
++          if full_sha="$(git rev-parse --verify "${target_ref}^{commit}" 2>/dev/null)"; then
++            :
++          elif git show-ref --verify --quiet "refs/remotes/origin/${target_ref}"; then
++            full_sha="$(git rev-parse "refs/remotes/origin/${target_ref}^{commit}")"
++          elif git show-ref --verify --quiet "refs/tags/${target_ref}"; then
++            full_sha="$(git rev-parse "refs/tags/${target_ref}^{commit}")"
++          else
++            echo "::error::Unable to resolve git_ref '${target_ref}' to a commit."
++            exit 1
++          fi
++
++          git checkout --detach "$full_sha"
++          echo "Resolved ${target_ref} -> ${full_sha}"
++          echo "BUILD_NUMBER=${full_sha::7}" >> "$GITHUB_ENV"
++
+       - name: Azure Login (OIDC)
+         uses: azure/login@v3
+         with:
+@@ -40,24 +69,88 @@ jobs:
+       - name: ACR login
+         run: az acr login --name romainecr
+ 
++      - name: Set up Buildx
++        uses: docker/setup-buildx-action@v4
++
++      - name: Compute image fingerprint
++        id: fingerprint
++        shell: bash
++        run: |
++          set -euo pipefail
++          fingerprint="$(scripts/image-fingerprint.sh \
++            --image app \
++            --dockerfile Dockerfile \
++            --context . \
++            --paths 'Dockerfile .dockerignore backend frontend' \
++            | tee /tmp/kill-me-image-fingerprint.txt \
++            | awk -F= '$1 == "fingerprint" { print $2 }')"
++          echo "ALIAS_TAG=app-${fingerprint}" >> "$GITHUB_ENV"
++
++      - name: Check existing image
++        id: image
++        shell: bash
++        run: |
++          set -euo pipefail
++          if az acr repository show-tags \
++              --name romainecr \
++              --repository kill-me \
++              --query "[?@=='${ALIAS_TAG}'] | [0]" \
++              --output tsv | grep -qx "${ALIAS_TAG}"; then
++            echo "exists=true" >>"${GITHUB_OUTPUT}"
++            echo "Found reusable image romainecr.azurecr.io/kill-me:${ALIAS_TAG}"
++          else
++            echo "exists=false" >>"${GITHUB_OUTPUT}"
++            echo "No reusable image found for app fingerprint ${{ steps.fingerprint.outputs.fingerprint }}"
++          fi
++
+       - name: Build and push image
++        if: steps.image.outputs.exists != 'true'
++        uses: docker/build-push-action@v7
++        with:
++          context: .
++          file: Dockerfile
++          push: true
++          tags: romainecr.azurecr.io/kill-me:${{ env.ALIAS_TAG }}
++          build-args: |
++            BUILD_NUMBER=${{ env.BUILD_NUMBER }}
++          cache-from: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app
++          cache-to: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app,mode=max
++
++      - name: Compute ACR lookup tag
++        id: lookup
++        shell: bash
++        env:
++          REF_NAME: ${{ inputs.git_ref || github.ref_name || github.ref }}
++        run: |
++          set -euo pipefail
++          ref_hash="$(printf '%s' "${REF_NAME:-unknown}" | sha256sum | cut -c1-16)"
++          lookup_tag="ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
++          echo "tag=${lookup_tag}" >>"${GITHUB_OUTPUT}"
++          echo "Computed lookup tag ${lookup_tag}"
++
++      - name: Create ACR lookup tag
++        shell: bash
+         run: |
+-          TAG="${GITHUB_SHA::7}"
+-          IMAGE="romainecr.azurecr.io/kill-me:${TAG}"
+-          docker build \
+-            --build-arg BUILD_NUMBER="${TAG}" \
+-            -t "$IMAGE" .
+-          docker push "$IMAGE"
+-          echo "TAG=${TAG}" >> $GITHUB_ENV
++          set -euo pipefail
++          canonical="${ALIAS_TAG}"
++          lookup='${{ steps.lookup.outputs.tag }}'
++          az acr import --name romainecr \
++            --source "romainecr.azurecr.io/kill-me:${canonical}" \
++            --image "kill-me:${lookup}" \
++            --force
++          echo "Tagged romainecr.azurecr.io/kill-me:${lookup} -> ${canonical}"
+ 
+       - name: Bump image tag in k8s/values.yaml
++        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+         run: |
+-          # Quote the tag: short SHAs like 4255e97 are valid YAML scientific
+-          # notation and parse as a float (4.255e+100) unless quoted.
+-          sed -i "s|^  tag: .*|  tag: \"${{ env.TAG }}\"|" k8s/values.yaml
++          set -euo pipefail
++          # Quote the tag so YAML never reinterprets image tags.
++          sed -i "s|^  tag: .*|  tag: \"${ALIAS_TAG}\"|" k8s/values.yaml
+ 
+       - name: Commit and push tag bump
++        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+         run: |
++          set -euo pipefail
+           git config user.name "github-actions[bot]"
+           git config user.email "github-actions[bot]@users.noreply.github.com"
+           git add k8s/values.yaml
+@@ -65,5 +158,5 @@ jobs:
+             echo "No values changes to commit"
+             exit 0
+           fi
+-          git commit -m "chore: bump kill-me image to ${{ env.TAG }} [skip ci]"
+-          git push
++          git commit -m "chore: bump kill-me image to fingerprint ${{ env.ALIAS_TAG }} [skip ci]"
++          git push origin HEAD:main
+diff --git a/.github/workflows/docker-build-check.yaml b/.github/workflows/docker-build-check.yaml
+index 397d7bb0..70653a2c 100644
+--- a/.github/workflows/docker-build-check.yaml
++++ b/.github/workflows/docker-build-check.yaml
+@@ -22,41 +22,41 @@ jobs:
+   build:
+     name: Build app image
+     runs-on: ubuntu-latest
+-    env:
+-      # Default tag is the PR head commit's full SHA. github.sha on a
+-      # pull_request event is the synthetic merge commit, which the
+-      # deploy-to-image resolver never sees (it resolves git_ref to the head
+-      # commit). Full SHA, not the short-7 form the post-merge build-and-deploy
+-      # tag uses. Matches tank-operator #1256 / glimmung / ambience.
+-      IMAGE_TAG: ${{ github.event.pull_request.head.sha || github.sha }}
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v6
+         with:
+           fetch-depth: 0
++          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+ 
+-      - name: Resolve requested ref
+-        if: github.event_name == 'workflow_dispatch' && inputs.git_ref != ''
++      - name: Resolve image source ref
++        id: source
+         env:
+           INPUT_REF: ${{ inputs.git_ref }}
++          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+         run: |
+           set -euo pipefail
+           git fetch --force --tags origin '+refs/heads/*:refs/remotes/origin/*'
+-          if full_sha="$(git rev-parse --verify "${INPUT_REF}^{commit}" 2>/dev/null)"; then
+-            :
+-          elif git show-ref --verify --quiet "refs/remotes/origin/${INPUT_REF}"; then
+-            full_sha="$(git rev-parse "refs/remotes/origin/${INPUT_REF}^{commit}")"
+-          elif git show-ref --verify --quiet "refs/tags/${INPUT_REF}"; then
+-            full_sha="$(git rev-parse "refs/tags/${INPUT_REF}^{commit}")"
++          if [ -n "${PR_HEAD_SHA}" ]; then
++            full_sha="${PR_HEAD_SHA}"
++          elif [ -n "${INPUT_REF}" ]; then
++            if full_sha="$(git rev-parse --verify "${INPUT_REF}^{commit}" 2>/dev/null)"; then
++              :
++            elif git show-ref --verify --quiet "refs/remotes/origin/${INPUT_REF}"; then
++              full_sha="$(git rev-parse "refs/remotes/origin/${INPUT_REF}^{commit}")"
++            elif git show-ref --verify --quiet "refs/tags/${INPUT_REF}"; then
++              full_sha="$(git rev-parse "refs/tags/${INPUT_REF}^{commit}")"
++            else
++              echo "::error::Unable to resolve git_ref '${INPUT_REF}' to a commit."
++              exit 1
++            fi
+           else
+-            echo "::error::Unable to resolve git_ref '${INPUT_REF}' to a commit."
+-            exit 1
++            full_sha="$(git rev-parse HEAD)"
+           fi
+           git checkout --detach "$full_sha"
+-          echo "Resolved ${INPUT_REF} -> ${full_sha}"
+-          # Publish under the resolved full SHA so deploy-to-image can find
+-          # the image for the exact requested commit.
+-          echo "IMAGE_TAG=${full_sha}" >> "$GITHUB_ENV"
++          echo "Resolved image source -> ${full_sha}"
++          echo "sha=${full_sha}" >> "${GITHUB_OUTPUT}"
++          echo "BUILD_NUMBER=${full_sha}" >> "$GITHUB_ENV"
+ 
+       - name: Set up Buildx
+         uses: docker/setup-buildx-action@v4
+@@ -78,17 +78,94 @@ jobs:
+         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+         run: az acr login --name romainecr
+ 
+-      # Single build step: pushes the full head-sha-tagged image on trusted
+-      # events, and stays build-only (push: false) on fork PRs.
+-      - name: Build app image
++      - name: Compute image fingerprint
++        id: fingerprint
++        shell: bash
++        run: |
++          set -euo pipefail
++          scripts/image-fingerprint.sh \
++            --image app \
++            --dockerfile Dockerfile \
++            --context . \
++            --paths 'Dockerfile .dockerignore backend frontend'
++
++      - name: Check ACR candidate image
++        id: candidate
++        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
++        shell: bash
++        run: |
++          set -euo pipefail
++          tag="${{ steps.fingerprint.outputs.proof_tag }}"
++          if az acr repository show-tags \
++              --name romainecr \
++              --repository kill-me \
++              --query "[?@=='${tag}'] | [0]" \
++              --output tsv | grep -qx "${tag}"; then
++            echo "hit=true" >>"${GITHUB_OUTPUT}"
++            echo "Found reusable image romainecr.azurecr.io/kill-me:${tag}"
++          else
++            echo "hit=false" >>"${GITHUB_OUTPUT}"
++            echo "No reusable image found for app fingerprint ${{ steps.fingerprint.outputs.fingerprint }}"
++          fi
++
++      - name: Build and push candidate image
++        if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && steps.candidate.outputs.hit != 'true'
++        uses: docker/build-push-action@v7
++        with:
++          context: .
++          file: Dockerfile
++          push: true
++          load: false
++          tags: romainecr.azurecr.io/kill-me:${{ steps.fingerprint.outputs.proof_tag }}
++          build-args: |
++            BUILD_NUMBER=${{ env.BUILD_NUMBER || github.event.pull_request.head.sha || github.sha }}
++          cache-from: |
++            type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app
++            type=gha,scope=app
++          cache-to: |
++            type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app,mode=max
++            type=gha,mode=max,scope=app
++
++      - name: Compute ACR lookup tag
++        id: lookup
++        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
++        shell: bash
++        env:
++          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
++          SOURCE_SHA: ${{ steps.source.outputs.sha }}
++        run: |
++          set -euo pipefail
++          if [[ -n "${PR_NUMBER}" ]]; then
++            lookup_tag="ci-pr-${PR_NUMBER}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
++          else
++            ref_hash="$(printf '%s' "${SOURCE_SHA}" | sha256sum | cut -c1-12)"
++            lookup_tag="ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}"
++          fi
++          echo "tag=${lookup_tag}" >>"${GITHUB_OUTPUT}"
++          echo "Computed lookup tag ${lookup_tag}"
++
++      - name: Create ACR lookup tag
++        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
++        shell: bash
++        run: |
++          set -euo pipefail
++          canonical='${{ steps.fingerprint.outputs.proof_tag }}'
++          lookup='${{ steps.lookup.outputs.tag }}'
++          az acr import --name romainecr \
++            --source "romainecr.azurecr.io/kill-me:${canonical}" \
++            --image "kill-me:${lookup}" \
++            --force
++          echo "Tagged romainecr.azurecr.io/kill-me:${lookup} -> ${canonical}"
++
++      - name: Build image without pushing
++        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+         uses: docker/build-push-action@v7
+         with:
+           context: .
+           file: Dockerfile
+-          push: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
++          push: false
+           load: false
+-          tags: romainecr.azurecr.io/kill-me:${{ env.IMAGE_TAG }}
+           build-args: |
+-            BUILD_NUMBER=${{ env.IMAGE_TAG }}
++            BUILD_NUMBER=${{ github.event.pull_request.head.sha }}
+           cache-from: type=gha
+           cache-to: type=gha,mode=max
+diff --git a/.github/workflows/lint.yaml b/.github/workflows/lint.yaml
+index 831b3426..c2d6a49c 100644
+--- a/.github/workflows/lint.yaml
++++ b/.github/workflows/lint.yaml
+@@ -25,3 +25,14 @@ jobs:
+           node-version: '20'
+       - name: Guard against MSAL/legacy-auth reintroduction
+         run: node scripts/check-removed-msal.mjs
++
++  check-image-fingerprint-config:
++    name: Image fingerprint config
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@v6
++      - uses: actions/setup-node@v6
++        with:
++          node-version: '20'
++      - name: Guard image tag identity
++        run: node scripts/check-image-fingerprint-config.mjs
+diff --git a/AGENTS.md b/AGENTS.md
+index 329b26cf..fbc75aea 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -6,7 +6,8 @@ Read `CLAUDE.md` for the project architecture and domain notes.
+ 
+ Agent pods are not expected to have Docker. Do not report missing local Docker
+ as a blocker. Run available repo checks first, then use PR CI as the normal
+-container build gate: `.github/workflows/docker-build-check.yml` performs a
+-throwaway Docker build with `push: false`. If image-packaging feedback is
+-needed before a PR is ready, manually dispatch that workflow with `git_ref`.
+-Release/deploy workflows are the only path that publishes images.
++container build gate: `.github/workflows/docker-build-check.yaml` builds the
++app image. Same-repo PRs and manual dispatches publish the canonical
++content-fingerprint tag (`romainecr.azurecr.io/kill-me:app-<sha256>`); fork PRs
++stay build-only with `push: false`. Release/deploy workflows publish or reuse
++that same fingerprint tag and bump `k8s/values.yaml` to it.
+diff --git a/CLAUDE.md b/CLAUDE.md
+index e2add8f9..f4913d60 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -9,10 +9,11 @@ agonizing set of leg extensions under hypnotherapy coaching.
+ 
+ Agent pods are not expected to have Docker. Do not report missing local Docker
+ as a blocker. Run available repo checks first, then use PR CI as the normal
+-container build gate: `.github/workflows/docker-build-check.yml` performs a
+-throwaway Docker build with `push: false`. If image-packaging feedback is
+-needed before a PR is ready, manually dispatch that workflow with `git_ref`.
+-Release/deploy workflows are the only path that publishes images.
++container build gate: `.github/workflows/docker-build-check.yaml` builds the
++app image. Same-repo PRs and manual dispatches publish the canonical
++content-fingerprint tag (`romainecr.azurecr.io/kill-me:app-<sha256>`); fork PRs
++stay build-only with `push: false`. Release/deploy workflows publish or reuse
++that same fingerprint tag and bump `k8s/values.yaml` to it.
+ 
+ ## The 12-Day Synergy System
+ 
+diff --git a/k8s/values.yaml b/k8s/values.yaml
+index 4ffb3e89..9442fb43 100644
+--- a/k8s/values.yaml
++++ b/k8s/values.yaml
+@@ -1,9 +1,10 @@
+ # The image tag is bumped by .github/workflows/build-and-deploy.yaml on every
+-# push to main (via `sed` on this file).
++# push to main. Tags use the app content fingerprint (`app-<sha256>`), not git
++# SHA identity.
+ image:
+   repository: romainecr.azurecr.io/kill-me
+-  # Quoted on purpose: a bare SHA like 4255e97 is valid YAML scientific notation; keep the quotes.
+-  tag: "61b3ba1"
++  # Quoted so YAML never reinterprets image tags.
++  tag: "app-db08f01873464c271e3c2389924015c5cb218a51bdcf77eef108556b962b3e81"
+   pullPolicy: IfNotPresent
+ 
+ name: kill-me
+diff --git a/scripts/check-image-fingerprint-config.mjs b/scripts/check-image-fingerprint-config.mjs
+new file mode 100755
+index 00000000..8e6120c7
+--- /dev/null
++++ b/scripts/check-image-fingerprint-config.mjs
+@@ -0,0 +1,44 @@
++#!/usr/bin/env node
++
++import fs from "node:fs";
++
++const dockerBuildCheck = fs.readFileSync(".github/workflows/docker-build-check.yaml", "utf8");
++const buildAndDeploy = fs.readFileSync(".github/workflows/build-and-deploy.yaml", "utf8");
++const values = fs.readFileSync("k8s/values.yaml", "utf8");
++
++function assertIncludes(text, needle, label) {
++  if (!text.includes(needle)) {
++    throw new Error(`${label}: expected to find ${JSON.stringify(needle)}`);
++  }
++}
++
++function assertNotIncludes(text, needle, label) {
++  if (text.includes(needle)) {
++    throw new Error(`${label}: unexpected SHA-tagging surface ${JSON.stringify(needle)}`);
++  }
++}
++
++assertIncludes(dockerBuildCheck, "scripts/image-fingerprint.sh", "docker-build-check");
++assertIncludes(dockerBuildCheck, "steps.fingerprint.outputs.proof_tag", "docker-build-check");
++assertIncludes(dockerBuildCheck, "romainecr.azurecr.io/kill-me:${{ steps.fingerprint.outputs.proof_tag }}", "docker-build-check");
++assertIncludes(dockerBuildCheck, "ci-pr-${PR_NUMBER}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}", "docker-build-check");
++assertIncludes(dockerBuildCheck, "ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}", "docker-build-check");
++assertIncludes(dockerBuildCheck, "az acr import --name romainecr", "docker-build-check");
++assertNotIncludes(dockerBuildCheck, "IMAGE_TAG:", "docker-build-check");
++assertNotIncludes(dockerBuildCheck, "romainecr.azurecr.io/kill-me:${{ env.IMAGE_TAG }}", "docker-build-check");
++
++assertIncludes(buildAndDeploy, "scripts/image-fingerprint.sh", "build-and-deploy");
++assertIncludes(buildAndDeploy, "ALIAS_TAG=app-${fingerprint}", "build-and-deploy");
++assertIncludes(buildAndDeploy, "romainecr.azurecr.io/kill-me:${{ env.ALIAS_TAG }}", "build-and-deploy");
++assertIncludes(buildAndDeploy, "ci-ref-${ref_hash}-run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}", "build-and-deploy");
++assertIncludes(buildAndDeploy, "az acr import --name romainecr", "build-and-deploy");
++assertNotIncludes(buildAndDeploy, 'TAG="${GITHUB_SHA::7}"', "build-and-deploy");
++assertNotIncludes(buildAndDeploy, '--build-arg BUILD_NUMBER="${TAG}"', "build-and-deploy");
++assertNotIncludes(buildAndDeploy, "tag: \\\"${{ env.TAG }}\\\"", "build-and-deploy");
++
++assertIncludes(values, "content fingerprint", "k8s values");
++if (!/^  tag: "app-[a-f0-9]{64}"$/m.test(values)) {
++  throw new Error("k8s values: image.tag must be pinned to app-<64 hex content fingerprint>");
++}
++
++console.log("image fingerprint workflow config OK");
+diff --git a/scripts/image-fingerprint.sh b/scripts/image-fingerprint.sh
+new file mode 100755
+index 00000000..c5ba6740
+--- /dev/null
++++ b/scripts/image-fingerprint.sh
+@@ -0,0 +1,134 @@
++#!/usr/bin/env bash
++
++set -euo pipefail
++
++usage() {
++  cat >&2 <<'EOF'
++usage: image-fingerprint.sh --image NAME --dockerfile PATH --context PATH --paths "PATH [PATH ...]"
++
++Computes a stable image-input fingerprint from tracked files, Docker build
++metadata, and resolved base image digests. Writes fingerprint, proof_tag, and
++proof_ref to $GITHUB_OUTPUT when present.
++EOF
++}
++
++image=""
++dockerfile=""
++context=""
++paths=""
++proof_repository="${PROOF_REPOSITORY:-kill-me}"
++registry_server="${REGISTRY_SERVER:-romainecr.azurecr.io}"
++include_base_digests="${INCLUDE_BASE_DIGESTS:-true}"
++
++while [[ $# -gt 0 ]]; do
++  case "$1" in
++    --image)
++      image="${2:-}"
++      shift 2
++      ;;
++    --dockerfile)
++      dockerfile="${2:-}"
++      shift 2
++      ;;
++    --context)
++      context="${2:-}"
++      shift 2
++      ;;
++    --paths)
++      paths="${2:-}"
++      shift 2
++      ;;
++    --proof-repository)
++      proof_repository="${2:-}"
++      shift 2
++      ;;
++    --registry-server)
++      registry_server="${2:-}"
++      shift 2
++      ;;
++    --no-base-digests)
++      include_base_digests="false"
++      shift
++      ;;
++    -h|--help)
++      usage
++      exit 0
++      ;;
++    *)
++      echo "unknown argument: $1" >&2
++      usage
++      exit 2
++      ;;
++  esac
++done
++
++if [[ -z "${image}" || -z "${dockerfile}" || -z "${context}" || -z "${paths}" ]]; then
++  usage
++  exit 2
++fi
++
++if [[ ! -f "${dockerfile}" ]]; then
++  echo "Dockerfile '${dockerfile}' does not exist" >&2
++  exit 1
++fi
++
++tmp="$(mktemp -d)"
++trap 'rm -rf "${tmp}"' EXIT
++manifest="${tmp}/manifest.txt"
++: >"${manifest}"
++
++for path in ${paths}; do
++  if [[ "${path}" == "." ]]; then
++    git ls-files -z \
++      | sort -z \
++      | xargs -0 sha256sum >>"${manifest}"
++  elif [[ -d "${path}" ]]; then
++    git ls-files -z -- "${path}" \
++      | sort -z \
++      | xargs -0 sha256sum >>"${manifest}"
++  elif [[ -f "${path}" ]]; then
++    sha256sum "${path}" >>"${manifest}"
++  else
++    echo "Fingerprint input '${path}' does not exist" >&2
++    exit 1
++  fi
++done
++
++{
++  printf 'image=%s\n' "${image}"
++  printf 'dockerfile=%s\n' "${dockerfile}"
++  printf 'context=%s\n' "${context}"
++  printf 'buildx=docker/build-push-action@v7\n'
++  sha256sum scripts/image-fingerprint.sh
++} >>"${manifest}"
++
++if [[ "${include_base_digests}" == "true" ]]; then
++  while IFS= read -r base_image; do
++    digest="$(docker buildx imagetools inspect "${base_image}" --format '{{json .Manifest.Digest}}' | tr -d '"')"
++    printf 'base=%s@%s\n' "${base_image}" "${digest}" >>"${manifest}"
++  done < <(
++    awk '
++      BEGIN { IGNORECASE = 1 }
++      $1 == "FROM" {
++        image = $2
++        if (tolower(image) != "scratch") print image
++      }
++    ' "${dockerfile}" | sort -u
++  )
++fi
++
++fingerprint="$(sha256sum "${manifest}" | cut -d' ' -f1)"
++proof_tag="${image}-${fingerprint}"
++proof_ref="${registry_server}/${proof_repository}:${proof_tag}"
++
++echo "fingerprint=${fingerprint}"
++echo "proof_tag=${proof_tag}"
++echo "proof_ref=${proof_ref}"
++
++if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
++  {
++    echo "fingerprint=${fingerprint}"
++    echo "proof_tag=${proof_tag}"
++    echo "proof_ref=${proof_ref}"
++  } >>"${GITHUB_OUTPUT}"
++fi

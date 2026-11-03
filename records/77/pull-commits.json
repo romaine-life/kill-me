@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/2b761584ff017c487b705bfbcfcd455f6b2d4395/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-20T07:34:34Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-20T07:34:34Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "feat: add Bayesian curl variation and make variation chips read as controls\n\nBayesian curl (13 lbs x 12 x 3) joins Cable Bicep Curl as a fourth variation\nalongside Standard / Rope Hammer / Single Arm. Already upserted into Cosmos, so\nthis keeps seed-data.js in sync for a fresh database init.\n\nThe variation chips in the detailed log were styled as dim gray pills that read\nas metadata tags rather than selectable options — the Concentration variation\nhad been sitting on Dumbbell Bicep Curl unnoticed. They now carry a VARIATION\nlabel, full-contrast text on a visible border, a larger tap target, and\naria-pressed for the selected one.",
+      "tree": {
+        "sha": "f1c903fca79f4bc979d845709e03d6081dc0a6c6",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/f1c903fca79f4bc979d845709e03d6081dc0a6c6"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/2b761584ff017c487b705bfbcfcd455f6b2d4395",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/2b761584ff017c487b705bfbcfcd455f6b2d4395",
+    "node_id": "C_kwDORV0mMdoAKDJiNzYxNTg0ZmYwMTdjNDg3YjcwNWJmYmNmY2Q0NTVmNmIyZDQzOTU",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/ee2636a1f9741206a6107e031e738664dd6a92fe",
+        "sha": "ee2636a1f9741206a6107e031e738664dd6a92fe",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/ee2636a1f9741206a6107e031e738664dd6a92fe"
+      }
+    ],
+    "sha": "2b761584ff017c487b705bfbcfcd455f6b2d4395",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/2b761584ff017c487b705bfbcfcd455f6b2d4395"
+  }
+]

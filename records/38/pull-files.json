@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/e2bc31d572e52b334e0a789a6f697dc65fe1e374/tofu%2Fidentity.tf",
+    "changes": 12,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/tofu%2Fidentity.tf?ref=e2bc31d572e52b334e0a789a6f697dc65fe1e374",
+    "deletions": 11,
+    "filename": "tofu/identity.tf",
+    "patch": "@@ -23,16 +23,6 @@ data \"azurerm_resource_group\" \"infra\" {\n   name = local.infra.resource_group_name\n }\n \n-# Live cluster OIDC issuer URL. Previously pinned via var.cluster_oidc_issuer_url\n-# default — that drifted silently when infra-bootstrap rebuilt the AKS cluster\n-# and the federated cred kept presenting the old issuer (AADSTS700211). Reading\n-# it from the cluster directly keeps the credential in lockstep with the\n-# current cluster — matches diagrams/tofu/identity.tf.\n-data \"azurerm_kubernetes_cluster\" \"infra\" {\n-  name                = \"infra-aks\"\n-  resource_group_name = local.infra.resource_group_name\n-}\n-\n resource \"azurerm_user_assigned_identity\" \"kill_me\" {\n   name                = \"kill-me-identity\"\n   resource_group_name = data.azurerm_resource_group.infra.name\n@@ -66,7 +56,7 @@ resource \"azurerm_federated_identity_credential\" \"kill_me\" {\n   resource_group_name = local.infra.resource_group_name\n   parent_id           = azurerm_user_assigned_identity.kill_me.id\n   audience            = [\"api://AzureADTokenExchange\"]\n-  issuer              = data.azurerm_kubernetes_cluster.infra.oidc_issuer_url\n+  issuer              = var.cluster_oidc_issuer_url\n   subject             = \"system:serviceaccount:kill-me:infra-shared\"\n }\n ",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/e2bc31d572e52b334e0a789a6f697dc65fe1e374/tofu%2Fidentity.tf",
+    "sha": "1e71eab33a3ed1c8a759bc4e3573296015fcf4f2",
+    "status": "modified"
+  },
+  {
+    "additions": 12,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/e2bc31d572e52b334e0a789a6f697dc65fe1e374/tofu%2Fvariables.tf",
+    "changes": 12,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/tofu%2Fvariables.tf?ref=e2bc31d572e52b334e0a789a6f697dc65fe1e374",
+    "deletions": 0,
+    "filename": "tofu/variables.tf",
+    "patch": "@@ -3,3 +3,15 @@ variable \"location\" {\n   type        = string\n   default     = \"westus2\"\n }\n+\n+# Pinned to the AKS cluster's current OIDC issuer URL. The cluster lives in\n+# a dedicated subscription (606a1ca1, \"romaine-life\"); this tofu stack runs\n+# in another (aee0cbd2, \"Azure subscription 1\"), so we can't read the live\n+# value via `data \"azurerm_kubernetes_cluster\"` without cross-subscription\n+# Reader on the CI principal — which we don't have today. Bump this value\n+# whenever infra-bootstrap rebuilds the cluster.\n+variable \"cluster_oidc_issuer_url\" {\n+  description = \"OIDC issuer URL for the active AKS cluster used for workload identity federation\"\n+  type        = string\n+  default     = \"https://westus2.oic.prod-aks.azure.com/2236b5e4-81d2-4d82-bde5-17b1037999ea/5aced6d5-4299-421b-84a9-6638aebbf4f0/\"\n+}",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/e2bc31d572e52b334e0a789a6f697dc65fe1e374/tofu%2Fvariables.tf",
+    "sha": "f5d16469e882f32185720e948b93cba7020ff4e5",
+    "status": "modified"
+  }
+]

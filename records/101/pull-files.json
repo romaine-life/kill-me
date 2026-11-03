@@ -1,0 +1,14 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/4692dbe1893a55d1cfa5f4bfe6720687a17240a9/.github%2Fworkflows%2Flint.yaml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Flint.yaml?ref=4692dbe1893a55d1cfa5f4bfe6720687a17240a9",
+    "deletions": 1,
+    "filename": ".github/workflows/lint.yaml",
+    "patch": "@@ -17,7 +17,7 @@ jobs:\n     runs-on: ubuntu-latest\n     steps:\n       - name: Require exactly one release label\n-        uses: actions/github-script@v8\n+        uses: actions/github-script@v9\n         with:\n           script: |\n             const allowed = new Set([",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/4692dbe1893a55d1cfa5f4bfe6720687a17240a9/.github%2Fworkflows%2Flint.yaml",
+    "sha": "cb400354224e7fd2ac2e1cb539c1d1ab221a8bfa",
+    "status": "modified"
+  }
+]

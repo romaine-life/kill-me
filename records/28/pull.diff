@@ -1,0 +1,26 @@
+diff --git a/.github/workflows/docker-build-check.yaml b/.github/workflows/docker-build-check.yaml
+index 782b6d1f..db9f8087 100644
+--- a/.github/workflows/docker-build-check.yaml
++++ b/.github/workflows/docker-build-check.yaml
+@@ -22,7 +22,7 @@ jobs:
+     runs-on: ubuntu-latest
+     steps:
+       - name: Checkout
+-        uses: actions/checkout@v4
++        uses: actions/checkout@v6
+         with:
+           fetch-depth: 0
+ 
+diff --git a/.github/workflows/lint.yaml b/.github/workflows/lint.yaml
+index a6a48b1e..6dd1cbff 100644
+--- a/.github/workflows/lint.yaml
++++ b/.github/workflows/lint.yaml
+@@ -19,7 +19,7 @@ jobs:
+     name: Removed MSAL surface
+     runs-on: ubuntu-latest
+     steps:
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v6
+       - uses: actions/setup-node@v4
+         with:
+           node-version: '20'

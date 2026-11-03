@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/in/29110?v=4",
+      "events_url": "https://api.github.com/users/dependabot%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/dependabot%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/dependabot%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/dependabot%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/dependabot",
+      "id": 49699333,
+      "login": "dependabot[bot]",
+      "node_id": "MDM6Qm90NDk2OTkzMzM=",
+      "organizations_url": "https://api.github.com/users/dependabot%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/dependabot%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/dependabot%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/dependabot%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/dependabot%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/dependabot%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/02246d97d3069da0cc65bad51b06e41581b8d76d/comments",
+    "commit": {
+      "author": {
+        "date": "2026-05-16T15:32:29Z",
+        "email": "49699333+dependabot[bot]@users.noreply.github.com",
+        "name": "dependabot[bot]"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-05-16T15:32:29Z",
+        "email": "noreply@github.com",
+        "name": "GitHub"
+      },
+      "message": "build(deps): bump actions/setup-node from 4 to 6\n\nBumps [actions/setup-node](https://github.com/actions/setup-node) from 4 to 6.\n- [Release notes](https://github.com/actions/setup-node/releases)\n- [Commits](https://github.com/actions/setup-node/compare/v4...v6)\n\n---\nupdated-dependencies:\n- dependency-name: actions/setup-node\n  dependency-version: '6'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] \u003csupport@github.com\u003e",
+      "tree": {
+        "sha": "3b3a65a26777e59b137a0051822c87331b1ad931",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/3b3a65a26777e59b137a0051822c87331b1ad931"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/02246d97d3069da0cc65bad51b06e41581b8d76d",
+      "verification": {
+        "payload": "tree 3b3a65a26777e59b137a0051822c87331b1ad931\nparent e0f723d8c2a32b71d13f38a91a26bd7a03d124fe\nauthor dependabot[bot] \u003c49699333+dependabot[bot]@users.noreply.github.com\u003e 1778945549 +0000\ncommitter GitHub \u003cnoreply@github.com\u003e 1778945549 +0000\n\nbuild(deps): bump actions/setup-node from 4 to 6\n\nBumps [actions/setup-node](https://github.com/actions/setup-node) from 4 to 6.\n- [Release notes](https://github.com/actions/setup-node/releases)\n- [Commits](https://github.com/actions/setup-node/compare/v4...v6)\n\n---\nupdated-dependencies:\n- dependency-name: actions/setup-node\n  dependency-version: '6'\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] \u003csupport@github.com\u003e",
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJqCI4OCRC1aQ7uu5UhlAAAVtwQABuwwycqHB6NRJhVL9lRyiWY\nMaPHFUZIEzZXPA4uSml+1dA0GmPOg8VmwFQs1rmILO61sC9AkZH3uEMykwdnL0pv\n3z/HHIzP3NMyIrlBYIv5sRZ0uASj3Vqq/4QXM5FuGLzIucO7YX8fU4Y2fsD6HMOa\nxB+RvgDlRMvcd1WzwBAKP43J39n43p4Jds7nDmSMzPDYxuobFh2Wp4UIemzTRb1J\nbvZzIGgV8OZFN/6s2AJs2YoTKv3dOZ/XZQKTuzRDUd/EcKxIb+utCYdjfBcvWjNq\ng+qgBDRjRIFcSTWMLWERdxvhmqD5trostofILkixSGgbcs072UBOdyBVLVXAuqVc\nzFHdJJ5I8MjlZ7qYZQggtQ7rNLDTqYd66mqgJDwCxl0/697bLmmfk7vDlBqIu49Y\n1t1G+qCeN5nSNs0/508HFI8bUU5j3EdmvkhdVVtm+T4TQSn7mVqBYH02vCtYBqxs\nWUzsm5xILD1r+zGLfeEV5yY3TgQGv2ca18hhyyW9HTuc5wxYPEK2I1s4GFA0vtWb\niTs8e80XHdv325cEdxp7E9ITj2UVZgbvNVEY+YG4TpUn1fnLlhau594IcoRDdAnR\nEMcT83zIfCUT+dzsFvQD/qr1UhbUEnijtFX9s/I9OSJDsf34nH5vtyRFRX6/yfOx\nKHCswUp+dJgFxW5a0Fhi\n=KXue\n-----END PGP SIGNATURE-----\n",
+        "verified": true,
+        "verified_at": "2026-05-16T15:32:30Z"
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/web-flow",
+      "id": 19864447,
+      "login": "web-flow",
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/web-flow",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/02246d97d3069da0cc65bad51b06e41581b8d76d",
+    "node_id": "C_kwDORV0mMdoAKDAyMjQ2ZDk3ZDMwNjlkYTBjYzY1YmFkNTFiMDZlNDE1ODFiOGQ3NmQ",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/e0f723d8c2a32b71d13f38a91a26bd7a03d124fe",
+        "sha": "e0f723d8c2a32b71d13f38a91a26bd7a03d124fe",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/e0f723d8c2a32b71d13f38a91a26bd7a03d124fe"
+      }
+    ],
+    "sha": "02246d97d3069da0cc65bad51b06e41581b8d76d",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/02246d97d3069da0cc65bad51b06e41581b8d76d"
+  }
+]

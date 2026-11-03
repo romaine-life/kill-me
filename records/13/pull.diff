@@ -1,0 +1,13 @@
+diff --git a/.github/workflows/publish-routes.yml b/.github/workflows/publish-routes.yml
+index a578f34c..1111a749 100644
+--- a/.github/workflows/publish-routes.yml
++++ b/.github/workflows/publish-routes.yml
+@@ -55,7 +55,7 @@ jobs:
+ 
+       - name: Generate GitHub App token
+         id: app-token
+-        uses: actions/create-github-app-token@v1
++        uses: actions/create-github-app-token@v3
+         with:
+           app-id: ${{ steps.app-creds.outputs.app_id }}
+           private-key: ${{ steps.app-creds.outputs.private_key }}

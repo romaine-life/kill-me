@@ -1,0 +1,827 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index cb2faff8..8073dae1 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -91,12 +91,13 @@ https://auth.romaine.life/admin.
+ 
+ **Critical `useDataSource()` contract:** Every consumer of `useDataSource()` MUST check `isReady` before calling any fetch function. The snapshot loads asynchronously (WASM init + network fetch). Until it's ready, `db` is null, `isLive` evaluates to true, and fetches silently hit the live API — which doesn't exist for anonymous visitors, causing a permanent loading spinner. Pattern: `const { fetchFoo, isReady } = useDataSource(); useEffect(() => { if (!isReady) return; fetchFoo()... }, [isReady]);`
+ 3. To edit, user clicks Sign in → redirects to `auth.romaine.life/sign-in/microsoft?callbackURL=...`
+-4. After Microsoft completes, auth.romaine.life sets a `.romaine.life` session cookie and bounces back here
+-5. Frontend's `bootstrapAuth()` (frontend/src/auth/index.js) fetches an RS256 JWT from `auth.romaine.life/api/auth/token` (cookie auto-attached cross-origin)
+-6. Frontend POSTs that JWT to `/api/auth/exchange`; backend verifies it against the auth.romaine.life JWKS, checks `role ∈ {admin, user}` (403 for `pending`), and mints a kill-me-signed HS256 JWT
+-7. Frontend stores the kill-me JWT in localStorage, attaches it as `Bearer` on writes
+-8. Backend's `requireAuth` middleware verifies the local JWT, exposes `req.user = { sub, email, name, role }`; `requireAdmin` gates admin-only routes on `role === 'admin'`
+-9. Backend queries/writes Cosmos DB, partitioned by userId (= JWT `sub`)
++4. After Microsoft completes, auth.romaine.life sets a `.romaine.life` session cookie and bounces back here. Browser auto-attaches that cookie on every request to `workout.romaine.life` because it's scoped to the parent `.romaine.life` domain.
++5. Frontend's `bootstrapAuth()` ([frontend/src/auth/index.js](frontend/src/auth/index.js)) asks the backend `GET /api/auth/me` — the backend forwards the cookie to `auth.romaine.life/api/auth/get-session` and returns the user record (or null). No tokens stored anywhere in the SPA.
++6. On every request to a protected route, `requireAuth` ([backend/auth.js](backend/auth.js)) does the same cookie-forward to `auth.romaine.life/api/auth/get-session` (60s in-process cache to amortize), and gates on `role ∈ {admin, user}` — `pending` returns 403.
++7. `requireAdmin` gates admin-only routes on `role === 'admin'`.
++8. Backend queries/writes Cosmos DB, partitioned by userId (= `req.user.sub`, i.e. the auth.romaine.life user id).
++
++No per-app HS256 signing, no Key Vault read, no Bearer-token handling on the frontend. auth.romaine.life is the single source of truth for sessions; this app just consults it.
+ 
+ ### Shared infrastructure
+ 
+@@ -109,10 +110,10 @@ This repo builds on shared resources provisioned by **infra-bootstrap**:
+ - DNS zone (`romaine.life`) — ExternalDNS manages records from HTTPRoute
+ - Key Vault (`romaine-kv`)
+ 
+-App-specific resources created by this repo: the Cosmos DB database and container,
+-and the per-app HS256 signing secret in Key Vault (`kill-me-jwt-signing-secret`).
++App-specific resources created by this repo: the Cosmos DB database and container.
+ Microsoft sign-in is delegated to **auth.romaine.life** — kill-me holds no Entra
+-app registration of its own. The frontend + backend run as a single Node+Express
++app registration of its own, and no per-app signing secret either (the cookie
++forward to auth.romaine.life is the only auth pathway). The frontend + backend run as a single Node+Express
+ pod in the `kill-me` namespace, served from `workout.romaine.life` via HTTPRoute
+ on the shared Envoy Gateway. The prior shared-API-at-`api.romaine.life/workout`
+ mount was retired when the api repo was archived and deleted on 2026-04-20.
+diff --git a/backend/auth-routes.js b/backend/auth-routes.js
+deleted file mode 100644
+index 5862f69b..00000000
+--- a/backend/auth-routes.js
++++ /dev/null
+@@ -1,61 +0,0 @@
+-import { Router } from 'express';
+-import jwt from 'jsonwebtoken';
+-import { exchangeRomaineLifeToken } from './auth.js';
+-
+-const AUTH_URL = 'https://auth.romaine.life';
+-const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days, same as the legacy issueToken default
+-
+-// Routes for the auth.romaine.life delegation flow. Microsoft sign-in itself
+-// happens upstream at auth.romaine.life; the SPA pulls a JWT from that
+-// service's /api/auth/token (the `.romaine.life` session cookie is auto-
+-// attached on cross-origin fetches because the auth service mounts CORS
+-// with credentials enabled for this origin) and POSTs it here to be
+-// exchanged for a kill-me-signed session JWT. We do not maintain any
+-// per-app email allowlist — the role claim from auth.romaine.life is
+-// the single gate.
+-export function createAuthRoutes({ jwtSecret, requireAuth }) {
+-  const router = Router();
+-
+-  function issueToken(user) {
+-    return jwt.sign(
+-      { sub: user.sub, email: user.email, name: user.name, role: user.role },
+-      jwtSecret,
+-      { expiresIn: SESSION_TTL_SECONDS },
+-    );
+-  }
+-
+-  // Frontend reads this on bootstrap to learn where the auth service lives.
+-  // Returning it from the backend (vs hardcoding the URL into the bundle)
+-  // keeps the SPA build environment-agnostic.
+-  router.get('/api/config', (_req, res) => {
+-    res.json({ auth_url: AUTH_URL });
+-  });
+-
+-  router.post('/api/auth/exchange', async (req, res) => {
+-    const { auth_jwt: authJWT } = req.body ?? {};
+-    if (!authJWT || typeof authJWT !== 'string') {
+-      return res.status(400).json({ error: 'missing auth_jwt' });
+-    }
+-    try {
+-      const user = await exchangeRomaineLifeToken(authJWT);
+-      const token = issueToken(user);
+-      res.json({ token, user });
+-    } catch (err) {
+-      const status = typeof err?.status === 'number' ? err.status : 500;
+-      res.status(status).json({ error: err.message || 'exchange failed' });
+-    }
+-  });
+-
+-  router.get('/api/auth/me', requireAuth, (req, res) => {
+-    res.json(req.user);
+-  });
+-
+-  // Bearer + localStorage is the primary session carrier; we also clear the
+-  // auth_token cookie for symmetry with anything that prefers cookies.
+-  router.post('/api/auth/logout', (_req, res) => {
+-    res.clearCookie('auth_token', { httpOnly: true, secure: true, sameSite: 'lax', path: '/' });
+-    res.json({ status: 'ok' });
+-  });
+-
+-  return router;
+-}
+diff --git a/backend/auth.js b/backend/auth.js
+index 47398ce1..a7603fec 100644
+--- a/backend/auth.js
++++ b/backend/auth.js
+@@ -1,104 +1,92 @@
+-import jwt from 'jsonwebtoken';
+-import { createRemoteJWKSet, jwtVerify, errors as joseErrors } from 'jose';
++// auth.romaine.life owns sessions. Each request comes in with the
++// .romaine.life session cookie auto-attached by the browser (Better Auth
++// sets the cookie on the parent domain via crossSubDomainCookies).
++//
++// requireAuth forwards the Cookie header to auth.romaine.life's
++// get-session endpoint and gates on the returned user's role claim. Result
++// is cached in-process for 60s per cookie value so a burst of requests
++// from the same logged-in user doesn't fan out into a round-trip per call.
++//
++// No local JWT signing, no per-app KV secret, no Bearer-token handling.
++// The frontend stores nothing — the cookie is the durable session state,
++// owned by auth.romaine.life.
+ 
+-// Single upstream identity provider. auth.romaine.life's Better Auth JWT
+-// plugin publishes RS256 keys at /api/auth/jwks; the issuer claim is the
+-// service's baseURL. jose's createRemoteJWKSet caches per-kid with a 5min
+-// stale-while-revalidate window — good enough that we don't roll our own.
+-const AUTH_ROMAINE_LIFE_JWKS = createRemoteJWKSet(
+-  new URL('https://auth.romaine.life/api/auth/jwks'),
+-);
+-const AUTH_ROMAINE_LIFE_ISSUER = 'https://auth.romaine.life';
++const AUTH_URL = 'https://auth.romaine.life';
++const SESSION_CACHE_TTL_MS = 60_000;
+ const ALLOWED_ROLES = new Set(['admin', 'user']);
+ 
+-/**
+- * Verify a JWT issued by auth.romaine.life and return the user identity
+- * plus role. Throws an Error with `status` (401|403) set so the caller can
+- * surface the right HTTP code. Gating is solely on the role claim:
+- * `pending` (auth.romaine.life's default for fresh Microsoft sign-ups)
+- * gets a 403; an admin must promote the user via auth.romaine.life/admin
+- * before they're useful here. No per-app email allowlist.
+- */
+-export async function exchangeRomaineLifeToken(authJWT) {
+-  let payload;
++// Map<cookieHeader, {expiry, user|null}>. null user = negative cache (we
++// know this cookie didn't resolve, so we don't keep retrying for 60s).
++const sessionCache = new Map();
++
++async function fetchSessionFromAuth(cookie) {
+   try {
+-    ({ payload } = await jwtVerify(authJWT, AUTH_ROMAINE_LIFE_JWKS, {
+-      issuer: AUTH_ROMAINE_LIFE_ISSUER,
+-      algorithms: ['RS256'],
+-      clockTolerance: '60s',
+-    }));
++    const res = await fetch(`${AUTH_URL}/api/auth/get-session`, {
++      headers: { Cookie: cookie },
++    });
++    if (!res.ok) return null;
++    const body = await res.json();
++    return body?.user ?? null;
+   } catch (err) {
+-    const reason = err instanceof joseErrors.JOSEError ? err.message : 'invalid token';
+-    const e = new Error(`invalid auth.romaine.life token: ${reason}`);
+-    e.status = 401;
+-    throw e;
+-  }
+-
+-  const role = typeof payload.role === 'string' ? payload.role : '';
+-  if (!ALLOWED_ROLES.has(role)) {
+-    const e = new Error(`role not approved by auth.romaine.life: ${role || '(missing)'}`);
+-    e.status = 403;
+-    throw e;
++    console.warn('[auth] get-session call failed:', err.message);
++    return null;
+   }
++}
+ 
+-  const email = typeof payload.email === 'string' ? payload.email.trim().toLowerCase() : '';
+-  if (!email) {
+-    const e = new Error('token missing email claim');
+-    e.status = 401;
+-    throw e;
+-  }
++async function resolveCaller(cookie) {
++  if (!cookie) return null;
++  const now = Date.now();
++  const cached = sessionCache.get(cookie);
++  if (cached && cached.expiry > now) return cached.user;
+ 
+-  return {
+-    sub: typeof payload.sub === 'string' ? payload.sub : '',
+-    email,
+-    name: typeof payload.name === 'string' ? payload.name : '',
+-    role,
+-  };
+-}
++  const user = await fetchSessionFromAuth(cookie);
++  sessionCache.set(cookie, { expiry: now + SESSION_CACHE_TTL_MS, user });
+ 
+-/**
+- * Creates Express middleware that verifies kill-me's own HS256 session JWTs
+- * (minted by /api/auth/exchange). Populates `req.user` with
+- * `{ sub, email, name, role }`.
+- */
+-export function createRequireAuth({ jwtSecret }) {
+-  return (req, res, next) => {
+-    let token;
+-    const authHeader = req.headers.authorization;
+-    if (authHeader?.startsWith('Bearer ')) {
+-      token = authHeader.slice(7);
+-    } else {
+-      const cookies = req.headers.cookie || '';
+-      const match = cookies.split(';').map(c => c.trim()).find(c => c.startsWith('auth_token='));
+-      if (match) token = match.slice('auth_token='.length);
++  // Opportunistic cleanup so the Map doesn't grow unbounded across hours
++  // of session churn. Cheap because we only walk on misses.
++  if (sessionCache.size > 200) {
++    for (const [key, entry] of sessionCache) {
++      if (entry.expiry <= now) sessionCache.delete(key);
+     }
++  }
++  return user;
++}
+ 
+-    if (!token) {
+-      return res.status(401).json({ error: 'Missing authentication' });
++export function createRequireAuth() {
++  return async (req, res, next) => {
++    const cookie = req.headers.cookie || '';
++    const user = await resolveCaller(cookie);
++    if (!user) {
++      return res.status(401).json({ error: 'Not signed in' });
+     }
+-
+-    try {
+-      const payload = jwt.verify(token, jwtSecret);
+-      req.user = {
+-        sub: payload.sub,
+-        email: payload.email,
+-        name: payload.name,
+-        role: payload.role,
+-      };
+-      next();
+-    } catch {
+-      return res.status(401).json({ error: 'Invalid or expired token' });
++    const role = user.role ?? 'pending';
++    if (!ALLOWED_ROLES.has(role)) {
++      return res.status(403).json({ error: `Role not approved by auth.romaine.life: ${role}` });
+     }
++    req.user = {
++      sub: user.id,
++      email: user.email,
++      name: user.name,
++      role,
++    };
++    next();
+   };
+ }
+ 
+-/**
+- * Middleware that requires the authenticated user to have the 'admin' role.
+- * Must be used after requireAuth.
+- */
+ export function requireAdmin(req, res, next) {
+   if (req.user.role !== 'admin') {
+     return res.status(403).json({ error: 'Admin only' });
+   }
+   next();
+ }
++
++// Used by the GET /api/auth/me handler to return the current user (or
++// null) without a 401 — useful for the boot-time "am I signed in?" probe.
++export async function currentCaller(req) {
++  const cookie = req.headers.cookie || '';
++  const user = await resolveCaller(cookie);
++  if (!user) return null;
++  const role = user.role ?? 'pending';
++  if (!ALLOWED_ROLES.has(role)) return null;
++  return { sub: user.id, email: user.email, name: user.name, role };
++}
+diff --git a/backend/config.js b/backend/config.js
+index eff915b1..45d1e361 100644
+--- a/backend/config.js
++++ b/backend/config.js
+@@ -1,29 +1,22 @@
+-// Loads runtime config from Azure App Configuration + Key Vault at startup.
+-// Workload identity: the pod's ServiceAccount is federated to kill-me-identity
+-// (tofu/identity.tf) which has narrow Cosmos + KV + App Config grants.
++// Loads runtime config from Azure App Configuration at startup. Workload
++// identity (the pod's ServiceAccount is federated to kill-me-identity in
++// tofu/identity.tf) supplies the credential.
++//
++// No more Key Vault read here — auth.romaine.life owns sessions, so this
++// backend doesn't sign anything and doesn't need a per-app signing secret.
+ import { AppConfigurationClient } from '@azure/app-configuration';
+-import { SecretClient } from '@azure/keyvault-secrets';
+ import { DefaultAzureCredential } from '@azure/identity';
+ 
+ export async function fetchConfig() {
+   const appConfigEndpoint = process.env.AZURE_APP_CONFIG_ENDPOINT;
+-  const keyVaultUrl = process.env.KEY_VAULT_URL;
+   if (!appConfigEndpoint) throw new Error('AZURE_APP_CONFIG_ENDPOINT unset');
+-  if (!keyVaultUrl) throw new Error('KEY_VAULT_URL unset');
+ 
+   const credential = new DefaultAzureCredential();
+   const appConfig = new AppConfigurationClient(appConfigEndpoint, credential);
+-  const kv = new SecretClient(keyVaultUrl, credential);
+ 
+   const cosmosEndpoint = await appConfig.getConfigurationSetting({ key: 'cosmos_db_endpoint' });
+ 
+-  // Per-app signing secret. Microsoft sign-in happens upstream at
+-  // auth.romaine.life — this secret only signs kill-me's own session JWTs
+-  // (minted at /api/auth/exchange after we've verified the upstream JWT).
+-  const jwtSigningSecret = (await kv.getSecret('kill-me-jwt-signing-secret')).value;
+-
+   return {
+     cosmosDbEndpoint: cosmosEndpoint.value,
+-    jwtSigningSecret,
+   };
+ }
+diff --git a/backend/package.json b/backend/package.json
+index 1dc2b09c..3a0f9d66 100644
+--- a/backend/package.json
++++ b/backend/package.json
+@@ -14,13 +14,10 @@
+     "@azure/app-configuration": "^1.11.0",
+     "@azure/cosmos": "^4.0.0",
+     "@azure/identity": "^4.0.0",
+-    "@azure/keyvault-secrets": "^4.11.1",
+     "cors": "^2.8.6",
+     "dotenv": "^17.4.2",
+     "express": "^5.2.1",
+     "helmet": "^8.1.0",
+-    "jose": "^5.9.6",
+-    "jsonwebtoken": "^9.0.3",
+     "morgan": "^1.10.0"
+   },
+   "engines": {
+diff --git a/backend/server.js b/backend/server.js
+index f799a35d..3c3c112d 100644
+--- a/backend/server.js
++++ b/backend/server.js
+@@ -1,6 +1,10 @@
+-// Per-app backend for workout.romaine.life. Serves the Vite-built React frontend,
+-// the kill-me route package under /*, and the auth.romaine.life delegation
+-// exchange under /api/auth/* on the same origin.
++// Per-app backend for workout.romaine.life. Serves the Vite-built React
++// frontend + the kill-me route package on the same origin.
++//
++// Auth: the .romaine.life session cookie is the durable session, owned by
++// auth.romaine.life. requireAuth (backend/auth.js) forwards the cookie
++// upstream on each request and gates on role. No local JWT signing, no
++// per-app KV secret, no frontend token storage.
+ import 'dotenv/config';
+ import express from 'express';
+ import helmet from 'helmet';
+@@ -16,13 +20,10 @@ import {
+   createCardioRoutes,
+   createAdminRoutes,
+ } from './routes/index.js';
+-import { createRequireAuth, requireAdmin } from './auth.js';
+-import { createAuthRoutes } from './auth-routes.js';
++import { createRequireAuth, requireAdmin, currentCaller } from './auth.js';
+ import { fetchConfig } from './config.js';
+ 
+ const __dirname = path.dirname(fileURLToPath(import.meta.url));
+-// Vite emits built assets to frontend/dist/. Multi-stage Dockerfile copies
+-// that into /app/frontend/dist.
+ const FRONTEND_DIR = path.join(__dirname, '..', 'frontend', 'dist');
+ 
+ const app = express();
+@@ -44,6 +45,14 @@ app.get('/health', (req, res) => {
+   res.json({ status: 'healthy' });
+ });
+ 
++// Boot-time "am I signed in?" probe used by the frontend. Returns null if
++// no valid session (rather than 401), so the SPA can simply render the
++// Sign-in button without treating the missing session as an error.
++app.get('/api/auth/me', async (req, res) => {
++  const user = await currentCaller(req);
++  res.json(user);
++});
++
+ async function start() {
+   const config = await fetchConfig();
+ 
+@@ -54,9 +63,8 @@ async function start() {
+   });
+   const workoutContainer = cosmosClient.database('WorkoutTrackerDB').container('workouts');
+ 
+-  const requireAuth = createRequireAuth({ jwtSecret: config.jwtSigningSecret });
++  const requireAuth = createRequireAuth();
+ 
+-  app.use(createAuthRoutes({ jwtSecret: config.jwtSigningSecret, requireAuth }));
+   app.use(createWorkoutRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
+   app.use(createSorenessRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
+   app.use(createCardioRoutes({ container: workoutContainer, requireAuth, requireAdmin }));
+diff --git a/frontend/src/api/client.js b/frontend/src/api/client.js
+index c401f4eb..a83296c9 100644
+--- a/frontend/src/api/client.js
++++ b/frontend/src/api/client.js
+@@ -1,19 +1,15 @@
+-// Same-origin: the backend (backend/server.js) serves both frontend/dist and
+-// the API on the same port, so every path is relative.
++// Same-origin: backend serves frontend/dist and the API on the same port.
++// Auth flows via the .romaine.life session cookie, auto-attached by the
++// browser. Set credentials: 'include' so fetch sends it.
+ export async function apiFetch(path, options = {}) {
+-  const token = localStorage.getItem('token');
+   const headers = {
+     'Content-Type': 'application/json',
+     ...options.headers,
+   };
+ 
+-  if (token) {
+-    headers['Authorization'] = `Bearer ${token}`;
+-  }
+-
+   let res;
+   for (let attempt = 0; attempt < 3; attempt++) {
+-    res = await fetch(path, { ...options, headers });
++    res = await fetch(path, { ...options, headers, credentials: 'include' });
+     if (res.status !== 503) break;
+     await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+   }
+@@ -21,11 +17,10 @@ export async function apiFetch(path, options = {}) {
+   if (!res) throw new Error('No response');
+ 
+   if (res.status === 401) {
+-    localStorage.removeItem('token');
+-    // Only redirect for authenticated actions, not public reads
++    // Only redirect for authenticated actions, not public reads.
+     if (options.method && options.method !== 'GET') {
+       const { startLogin } = await import('../auth/index.js');
+-      await startLogin();
++      startLogin();
+     }
+     throw new Error('Unauthorized');
+   }
+diff --git a/frontend/src/api/snapshotContext.jsx b/frontend/src/api/snapshotContext.jsx
+index 72b393f1..bbdebc78 100644
+--- a/frontend/src/api/snapshotContext.jsx
++++ b/frontend/src/api/snapshotContext.jsx
+@@ -1,8 +1,9 @@
+ // Snapshot data layer — loads a SQLite snapshot for anonymous visitors.
+ //
+-// When no auth token is present, fetches /snapshot.db and opens it with sql.js
+-// (SQLite compiled to WASM). Provides a useDataSource() hook that routes reads
+-// to either the local snapshot or the live API depending on auth state.
++// When no signed-in user is detected, fetches /snapshot.db and opens it with
++// sql.js (SQLite compiled to WASM). Provides a useDataSource() hook that
++// routes reads to either the local snapshot or the live API depending on
++// auth state.
+ //
+ // If the snapshot is missing (404) or fails to load, falls back to live API
+ // calls for all users.
+@@ -37,14 +38,17 @@ async function loadSnapshot() {
+ }
+ 
+ export function SnapshotProvider({ children }) {
+-  const { token } = useAuth();
++  const { user, loading: authLoading } = useAuth();
+   const [db, setDb] = useState(null);
+-  const [loading, setLoading] = useState(!token);
++  const [loading, setLoading] = useState(true);
+   const loadAttempted = useRef(false);
+ 
+   useEffect(() => {
+-    // Skip snapshot loading if user is authenticated or already attempted
+-    if (token || loadAttempted.current) {
++    // Wait for the boot-time /api/auth/me probe to settle before deciding
++    // whether to spin up the snapshot. Once we know: signed-in → skip;
++    // anonymous → load snapshot (once).
++    if (authLoading) return;
++    if (user || loadAttempted.current) {
+       setLoading(false);
+       return;
+     }
+@@ -54,15 +58,15 @@ export function SnapshotProvider({ children }) {
+       .then((database) => setDb(database))
+       .catch((err) => console.warn('Snapshot load failed, using live API:', err))
+       .finally(() => setLoading(false));
+-  }, [token]);
++  }, [user, authLoading]);
+ 
+   // Clean up the database when the user authenticates (switch to live API)
+   useEffect(() => {
+-    if (token && db) {
++    if (user && db) {
+       db.close();
+       setDb(null);
+     }
+-  }, [token]);
++  }, [user]);
+ 
+   return (
+     <SnapshotContext.Provider value={{ db, loading }}>
+@@ -93,10 +97,10 @@ export function useSnapshot() {
+ //   }, [isReady]);
+ //
+ export function useDataSource() {
+-  const { token } = useAuth();
++  const { user } = useAuth();
+   const { db, loading: snapshotLoading } = useSnapshot();
+ 
+-  const isLive = !!token || !db;
++  const isLive = !!user || !db;
+   const isReady = !snapshotLoading;
+ 
+   async function fetchCurrentDay() {
+diff --git a/frontend/src/auth/AuthContext.jsx b/frontend/src/auth/AuthContext.jsx
+index db51b818..88bc7a64 100644
+--- a/frontend/src/auth/AuthContext.jsx
++++ b/frontend/src/auth/AuthContext.jsx
+@@ -1,29 +1,21 @@
+ import { createContext, useContext, useState, useEffect } from 'react';
+-import { bootstrapAuth, logout as authLogout, getStoredToken, clearStoredToken } from './index.js';
++import { bootstrapAuth, logout as authLogout } from './index.js';
+ 
+ const AuthContext = createContext(null);
+ 
+ export function AuthProvider({ children }) {
+   const [user, setUser] = useState(null);
+-  const [token, setToken] = useState(() => getStoredToken());
+   const [loading, setLoading] = useState(true);
+ 
+-  // Boot-time auth check: try stored session → silent exchange via
+-  // .romaine.life cookie → fall through unauthenticated. Mirrors the
+-  // canonical pattern in tank-operator's frontend/src/auth.ts (the
+-  // template for all .romaine.life apps' delegation).
++  // Boot: ask the backend "am I signed in?". The backend forwards the
++  // .romaine.life session cookie to auth.romaine.life's get-session
++  // endpoint and returns the user record (or null). No token storage.
+   useEffect(() => {
+     let cancelled = false;
+     (async () => {
+       try {
+         const u = await bootstrapAuth();
+-        if (cancelled) return;
+-        if (u) {
+-          setUser(u);
+-          setToken(getStoredToken());
+-        }
+-      } catch (err) {
+-        console.error('bootstrapAuth threw:', err);
++        if (!cancelled) setUser(u);
+       } finally {
+         if (!cancelled) setLoading(false);
+       }
+@@ -31,21 +23,13 @@ export function AuthProvider({ children }) {
+     return () => { cancelled = true; };
+   }, []);
+ 
+-  function setSession(newToken, newUser) {
+-    localStorage.setItem('token', newToken);
+-    setToken(newToken);
+-    setUser(newUser);
+-  }
+-
+   async function logout() {
+     await authLogout();
+-    clearStoredToken();
+-    setToken(null);
+     setUser(null);
+   }
+ 
+   return (
+-    <AuthContext.Provider value={{ user, token, loading, isAdmin: user?.role === 'admin', setSession, logout }}>
++    <AuthContext.Provider value={{ user, loading, isAdmin: user?.role === 'admin', logout }}>
+       {children}
+     </AuthContext.Provider>
+   );
+diff --git a/frontend/src/auth/index.js b/frontend/src/auth/index.js
+index 5736aacb..9798bebc 100644
+--- a/frontend/src/auth/index.js
++++ b/frontend/src/auth/index.js
+@@ -1,132 +1,42 @@
+-// Microsoft sign-in happens upstream at auth.romaine.life. This SPA:
+-//   1. On boot, checks for a stored kill-me session JWT and validates it
+-//      via /api/auth/me.
+-//   2. If no valid session, tries to fetch an auth.romaine.life JWT from
+-//      that service's /api/auth/token endpoint — the auth-service session
+-//      cookie is on `.romaine.life` so it's auto-attached. If the user is
+-//      already signed into auth.romaine.life from another app, this is the
+-//      seamless path that lands them signed in here without any redirect.
+-//      The JWT is then exchanged at /api/auth/exchange for a kill-me-
+-//      signed session JWT.
+-//   3. If both fail, render the Sign-in button. Clicking it redirects to
+-//      auth.romaine.life's Microsoft sign-in flow, which sets the
+-//      .romaine.life session cookie and returns the user here. Step 2 then
+-//      runs again on bootstrap and succeeds.
++// auth.romaine.life owns the session via a cookie scoped to .romaine.life.
++// The browser auto-attaches the cookie on every request to *.romaine.life,
++// so this SPA doesn't hold or refresh any token. It just asks the backend
++// "who am I?" on boot (the backend forwards the cookie upstream to
++// auth.romaine.life/api/auth/get-session and gates on role).
+ 
+-const TOKEN_KEY = 'token';
+-
+-let cachedConfig = null;
+-
+-async function fetchConfig() {
+-  if (cachedConfig) return cachedConfig;
+-  const res = await fetch('/api/config');
+-  if (!res.ok) throw new Error(`config fetch failed: ${res.status}`);
+-  cachedConfig = await res.json();
+-  return cachedConfig;
+-}
+-
+-async function fetchUpstreamJWT(authURL) {
+-  try {
+-    const res = await fetch(`${authURL}/api/auth/token`, { credentials: 'include' });
+-    if (!res.ok) return null;
+-    const data = await res.json();
+-    return data.token ?? null;
+-  } catch {
+-    return null;
+-  }
+-}
+-
+-async function exchange(upstreamJWT) {
+-  const res = await fetch('/api/auth/exchange', {
+-    method: 'POST',
+-    headers: { 'Content-Type': 'application/json' },
+-    body: JSON.stringify({ auth_jwt: upstreamJWT }),
+-  });
+-  if (!res.ok) {
+-    const text = await res.text();
+-    const err = new Error(`Sign-in exchange failed (${res.status}): ${text}`);
+-    err.status = res.status;
+-    throw err;
+-  }
+-  const body = await res.json();
+-  storeToken(body.token);
+-  return body.user;
+-}
+-
+-function storeToken(token) {
+-  localStorage.setItem(TOKEN_KEY, token);
+-}
+-
+-export function getStoredToken() {
+-  return localStorage.getItem(TOKEN_KEY);
+-}
+-
+-export function clearStoredToken() {
+-  localStorage.removeItem(TOKEN_KEY);
+-}
++const AUTH_URL = 'https://auth.romaine.life';
+ 
+ /**
+- * Boot-time auth check. Resolves to the signed-in user, or null. Does NOT
+- * trigger a redirect on its own — the SPA shows a Sign-in button for that.
+- * Auto-redirecting on boot would silently re-SSO users who just signed out.
++ * Boot-time "who am I?" probe. Returns the user record from auth.romaine.life
++ * (via this app's /api/auth/me) if there's a valid session, or null.
+  */
+ export async function bootstrapAuth() {
+-  const existing = getStoredToken();
+-  if (existing) {
+-    const res = await fetch('/api/auth/me', {
+-      headers: { Authorization: `Bearer ${existing}` },
+-    });
+-    if (res.ok) return await res.json();
+-    clearStoredToken();
+-  }
+-
+-  let config;
+   try {
+-    config = await fetchConfig();
+-  } catch (e) {
+-    console.info('auth config unavailable; rendering unauthenticated', e);
++    const res = await fetch('/api/auth/me', { credentials: 'include' });
++    if (!res.ok) return null;
++    return await res.json();
++  } catch {
+     return null;
+   }
+-  const upstreamJWT = await fetchUpstreamJWT(config.auth_url);
+-  if (upstreamJWT) {
+-    try {
+-      return await exchange(upstreamJWT);
+-    } catch (e) {
+-      console.warn('silent exchange failed; user must click Sign-in', e);
+-    }
+-  }
+-
+-  return null;
+ }
+ 
+ /** User-initiated sign-in: redirect to auth.romaine.life's Microsoft flow. */
+-export async function startLogin() {
+-  const config = await fetchConfig();
++export function startLogin() {
+   const callbackURL = encodeURIComponent(window.location.origin + window.location.pathname);
+-  // auth.romaine.life exposes a GET endpoint at /sign-in/microsoft that
+-  // takes callbackURL as a query param, kicks off Better Auth's social
+-  // flow, and 302s back to the callback once Microsoft completes. The
+-  // Better Auth routes under /api/auth/* are POST-only, so a top-level
+-  // GET redirect there 404s.
+-  window.location.href = `${config.auth_url}/sign-in/microsoft?callbackURL=${callbackURL}`;
++  // GET handler at auth.romaine.life/sign-in/microsoft wraps Better Auth's
++  // social flow and 302s back to callbackURL after Microsoft completes.
++  window.location.href = `${AUTH_URL}/sign-in/microsoft?callbackURL=${callbackURL}`;
+ }
+ 
++/** Tell auth.romaine.life to invalidate the session, then reload. */
+ export async function logout() {
+-  clearStoredToken();
+-  try {
+-    await fetch('/api/auth/logout', { method: 'POST' });
+-  } catch {
+-    // best-effort
+-  }
+-  // Also clear the auth.romaine.life session cookie so the next page load
+-  // doesn't silently re-SSO via fetchUpstreamJWT.
+   try {
+-    const config = await fetchConfig();
+-    await fetch(`${config.auth_url}/api/auth/sign-out`, {
++    await fetch(`${AUTH_URL}/api/auth/sign-out`, {
+       method: 'POST',
+       credentials: 'include',
+     });
+   } catch {
+-    // best-effort
++    // best-effort; the reload still clears local SPA state
+   }
++  window.location.reload();
+ }
+diff --git a/k8s/templates/serviceaccount.yaml b/k8s/templates/serviceaccount.yaml
+index eee4fdf8..4d5d1a5a 100644
+--- a/k8s/templates/serviceaccount.yaml
++++ b/k8s/templates/serviceaccount.yaml
+@@ -1,8 +1,9 @@
+ # Federated to kill-me-identity (tofu/identity.tf::azurerm_federated_identity_credential.kill_me)
+ # instead of the shared infra-shared-identity. New identity is scoped to
+ # kill-me's actual surface: Cosmos data on dbs/WorkoutTrackerDB, KV
+-# narrowed to kill-me-jwt-signing-secret, App Config Data Reader at store
+-# level for the single cosmos_db_endpoint key config.js reads.
++# App Config Data Reader at store level for the single cosmos_db_endpoint
++# key config.js reads. (No Key Vault grant — sessions are delegated to
++# auth.romaine.life via cookie forward, this pod signs nothing locally.)
+ apiVersion: v1
+ kind: ServiceAccount
+ metadata:
+diff --git a/scripts/check-removed-msal.mjs b/scripts/check-removed-msal.mjs
+index cd9be48e..7627b2be 100644
+--- a/scripts/check-removed-msal.mjs
++++ b/scripts/check-removed-msal.mjs
+@@ -52,6 +52,14 @@ const blocked = [
+   { name: 'legacy createMicrosoftRoutes', pattern: /\bcreateMicrosoftRoutes\b/ },
+   { name: 'per-app email allowlist', pattern: /\bALLOWED_EMAILS?\b/ },
+   { name: 'shared api JWT secret', pattern: /\bapi-jwt-signing-secret\b/ },
++  { name: 'per-app JWT signing secret', pattern: /\bkill-me-jwt-signing-secret\b/ },
++  { name: 'jsonwebtoken dep / use', pattern: /\bjsonwebtoken\b/ },
++  { name: 'jose dep / use', pattern: /\bfrom\s+['"]jose['"]/ },
++  { name: 'jwt.sign / jwt.verify', pattern: /\bjwt\.(sign|verify)\b/ },
++  { name: 'createRemoteJWKSet', pattern: /\bcreateRemoteJWKSet\b/ },
++  { name: 'createRequireAuth jwtSecret param', pattern: /createRequireAuth\s*\(\s*\{\s*jwtSecret/ },
++  { name: 'POST /api/auth/exchange', pattern: /\/api\/auth\/exchange\b/ },
++  { name: 'localStorage token', pattern: /localStorage\.(get|set|remove)Item\(['"]token['"]/ },
+   { name: 'Microsoft client ID build arg', pattern: /\bVITE_MICROSOFT_CLIENT_ID\b/ },
+   { name: 'App Config microsoft client ID key', pattern: /microsoft_oauth_client_id/ },
+   { name: 'jwks-rsa Microsoft JWKS client', pattern: /\bjwks-rsa\b/ },
+diff --git a/tofu/identity.tf b/tofu/identity.tf
+index f11d9fc2..1e71eab3 100644
+--- a/tofu/identity.tf
++++ b/tofu/identity.tf
+@@ -8,11 +8,13 @@
+ # is scoped to kill-me's actual surface only:
+ #
+ #   - Cosmos DB Data Contributor on dbs/WorkoutTrackerDB
+-#   - Key Vault Secrets User on the one secret config.js reads
+-#     (kill-me-jwt-signing-secret) — narrow, not vault-wide
+ #   - App Configuration Data Reader at the store level — config.js reads
+ #     `cosmos_db_endpoint` from there
+ #
++# No Key Vault grant: sessions are delegated to auth.romaine.life via the
++# .romaine.life cookie, so this pod signs nothing locally and needs no
++# signing secret.
++#
+ # Pattern mirrors tank-operator/infra/{api_proxy,credential_refresher}.tf
+ # and glimmung/tofu/identity.tf.
+ # ============================================================================
+@@ -40,15 +42,6 @@ resource "azurerm_cosmosdb_sql_role_assignment" "kill_me_cosmos" {
+   scope               = "${data.azurerm_cosmosdb_account.infra.id}/dbs/${azurerm_cosmosdb_sql_database.workout.name}"
+ }
+ 
+-# KV: narrowed to the single secret config.js reads. If the backend later
+-# reads another secret, add a sibling role assignment here rather than
+-# widening to vault scope.
+-resource "azurerm_role_assignment" "kill_me_kv_jwt_secret" {
+-  scope                = "${data.azurerm_key_vault.main.id}/secrets/kill-me-jwt-signing-secret"
+-  role_definition_name = "Key Vault Secrets User"
+-  principal_id         = azurerm_user_assigned_identity.kill_me.principal_id
+-}
+-
+ # App Config: store-level Data Reader for the single `cosmos_db_endpoint`
+ # key config.js reads. (Microsoft sign-in moved to auth.romaine.life;
+ # config.js no longer enumerates per-app OAuth client keys.)
+diff --git a/tofu/keyvault.tf b/tofu/keyvault.tf
+deleted file mode 100644
+index 396f471f..00000000
+--- a/tofu/keyvault.tf
++++ /dev/null
+@@ -1,17 +0,0 @@
+-data "azurerm_key_vault" "main" {
+-  name                = "romaine-kv"
+-  resource_group_name = local.infra.resource_group_name
+-}
+-
+-# Self-signed JWT signing secret for the backend auth middleware.
+-# Generated once by Terraform; the backend reads it from Key Vault at startup.
+-resource "random_password" "jwt_signing_secret" {
+-  length  = 64
+-  special = false
+-}
+-
+-resource "azurerm_key_vault_secret" "jwt_signing_secret" {
+-  name         = "kill-me-jwt-signing-secret"
+-  value        = random_password.jwt_signing_secret.result
+-  key_vault_id = data.azurerm_key_vault.main.id
+-}

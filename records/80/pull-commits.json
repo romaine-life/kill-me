@@ -1,0 +1,44 @@
+[
+  {
+    "author": null,
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/cbe384cbb39d1cf509c26df7994192823028f64f/comments",
+    "commit": {
+      "author": {
+        "date": "2026-08-22T21:00:56Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-08-22T21:00:56Z",
+        "email": "fullnelsongrip@gmail.com",
+        "name": "Nelson"
+      },
+      "message": "Stop a soreness save from silently deleting the entry\n\nSaving with an empty muscle list meant \"you cleared this entry\", so it\nfired a DELETE, swallowed the 404 when no such document existed, and\nclosed the editor as though the entry had been written. A legs entry\nlogged against the Aug 14 workout vanished exactly that way: the pod log\nfor the whole session holds one DELETE and no POST.\n\nThree things were wrong, and they compound:\n\n- \"Change workout\" reused the fresh-entry setup, so returning from the\n  workout list emptied the muscles and reset the date to today even when\n  the same workout was re-picked. That is the one confirmed way to reach\n  an empty list without touching it.\n- An empty save was a covert delete with no confirmation and no error.\n- An entry naming no muscles could not be represented at all, which is\n  what made \"empty\" read as \"deleted\" in the first place.\n\nNow re-attributing keeps the date and muscles, an entry with no muscles\nis a real entry that draws its stripe (the `peak` label just drops off),\nand deleting is its own button rather than a side effect of emptying a\nlist.\n\nAlso drop the stripe opacity that encoded severity. Levels 3 and 5 came\nout at 0.50 and 0.64 opacity against a dark ground, which is not a\nreadable difference; colour now means one thing, which workout. And the\nsource picker heading is a directive rather than a question, since it is\na required step in a flow and not a conversational field.",
+      "tree": {
+        "sha": "557c931241f984de995aad738e888a855a70400a",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/557c931241f984de995aad738e888a855a70400a"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/cbe384cbb39d1cf509c26df7994192823028f64f",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": null,
+    "html_url": "https://github.com/romaine-life/kill-me/commit/cbe384cbb39d1cf509c26df7994192823028f64f",
+    "node_id": "C_kwDORV0mMdoAKGNiZTM4NGNiYjM5ZDFjZjUwOWMyNmRmNzk5NDE5MjgyMzAyOGY2NGY",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/3de4e22763ac94ae80657b4c747751c753a6a79c",
+        "sha": "3de4e22763ac94ae80657b4c747751c753a6a79c",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/3de4e22763ac94ae80657b4c747751c753a6a79c"
+      }
+    ],
+    "sha": "cbe384cbb39d1cf509c26df7994192823028f64f",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/cbe384cbb39d1cf509c26df7994192823028f64f"
+  }
+]

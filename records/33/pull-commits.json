@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/df886cad9ed35452a47c5e7e6591f81059d1300b/comments",
+    "commit": {
+      "author": {
+        "date": "2026-05-16T02:06:32Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-05-16T02:06:32Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "message": "Convert k8s/ from Kustomize to Helm\n\nPer the org-wide rule \"kustomize is forbidden\" (2026-05-16).\n\nSame pattern as auth#11:\n  k8s/\n    Chart.yaml         # leaf chart, no deps\n    values.yaml        # image.repository + image.tag (sed-bumped by CI)\n    templates/\n      serviceaccount.yaml\n      deployment.yaml  # image: `{{ .Values.image.repository }}:{{ .Values.image.tag }}`\n      service.yaml\n      certificate.yaml\n      xlistenerset.yaml\n      httproute.yaml\n\nvalues.yaml seeded with the currently-running tag (f02f97a) so ArgoCD's\nfirst re-render under Helm shows zero meaningful diff against the live\ncluster.\n\nbuild-and-deploy.yaml updates:\n- Drops the flaky `Install kustomize` step\n- Replaces `kustomize edit set image …` with sed on values.yaml\n- Updates the git-commit step to track values.yaml\n\nArgoCD auto-detects Helm by Chart.yaml presence — the\nk8s/apps/kill-me.yaml Application manifest in infra-bootstrap doesn't\nneed any changes; same `path: k8s` works.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) \u003cnoreply@anthropic.com\u003e",
+      "tree": {
+        "sha": "02120414bfdf8960431f3c1b96fcfc50d374e013",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/02120414bfdf8960431f3c1b96fcfc50d374e013"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/df886cad9ed35452a47c5e7e6591f81059d1300b",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/df886cad9ed35452a47c5e7e6591f81059d1300b",
+    "node_id": "C_kwDORV0mMdoAKGRmODg2Y2FkOWVkMzU0NTJhNDdjNWU3ZTY1OTFmODEwNTlkMTMwMGI",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/b03bde4b3192da5e719a987f91992f0709ad6bc7",
+        "sha": "b03bde4b3192da5e719a987f91992f0709ad6bc7",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/b03bde4b3192da5e719a987f91992f0709ad6bc7"
+      }
+    ],
+    "sha": "df886cad9ed35452a47c5e7e6591f81059d1300b",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/df886cad9ed35452a47c5e7e6591f81059d1300b"
+  }
+]

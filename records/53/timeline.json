@@ -1,0 +1,262 @@
+[
+  {
+    "author": {
+      "date": "2026-06-17T07:29:21Z",
+      "email": "tank-operator@romaine.life",
+      "name": "Tank Operator"
+    },
+    "committer": {
+      "date": "2026-06-17T07:29:21Z",
+      "email": "tank-operator@romaine.life",
+      "name": "Tank Operator"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/b8d6cddd47763441a6fd12e7e5f632ca512609b2",
+    "message": "Tank session 1065 start",
+    "node_id": "C_kwDORV0mMdoAKGI4ZDZjZGRkNDc3NjM0NDFhNmZkMTJlN2U1ZjYzMmNhNTEyNjA5YjI",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/1160d1c789c2c5d2d12186ed4f250bcaf57f5e08",
+        "sha": "1160d1c789c2c5d2d12186ed4f250bcaf57f5e08",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/1160d1c789c2c5d2d12186ed4f250bcaf57f5e08"
+      }
+    ],
+    "sha": "b8d6cddd47763441a6fd12e7e5f632ca512609b2",
+    "tree": {
+      "sha": "a107efbd03cbe5474593c883d51edca37178678e",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/a107efbd03cbe5474593c883d51edca37178678e"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/b8d6cddd47763441a6fd12e7e5f632ca512609b2",
+    "verification": {
+      "payload": null,
+      "reason": "unsigned",
+      "signature": null,
+      "verified": false,
+      "verified_at": null
+    }
+  },
+  {
+    "author": {
+      "date": "2026-06-17T07:32:31Z",
+      "email": "tank-operator-codex@romaine.life",
+      "name": "tank-operator-codex[bot]"
+    },
+    "committer": {
+      "date": "2026-06-17T07:32:31Z",
+      "email": "tank-operator-codex@romaine.life",
+      "name": "tank-operator-codex[bot]"
+    },
+    "event": "committed",
+    "html_url": "https://github.com/romaine-life/kill-me/commit/c1b672506b325f29e62d7105f53b64692fb2dec7",
+    "message": "ci: wire Azure OIDC jobs to environments",
+    "node_id": "C_kwDORV0mMdoAKGMxYjY3MjUwNmIzMjVmMjllNjJkNzEwNWY1M2I2NDY5MmZiMmRlYzc",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/b8d6cddd47763441a6fd12e7e5f632ca512609b2",
+        "sha": "b8d6cddd47763441a6fd12e7e5f632ca512609b2",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/b8d6cddd47763441a6fd12e7e5f632ca512609b2"
+      }
+    ],
+    "sha": "c1b672506b325f29e62d7105f53b64692fb2dec7",
+    "tree": {
+      "sha": "b79e49ddbae9e290a1aadecccc52eaeec1343f60",
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/b79e49ddbae9e290a1aadecccc52eaeec1343f60"
+    },
+    "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/c1b672506b325f29e62d7105f53b64692fb2dec7",
+    "verification": {
+      "payload": null,
+      "reason": "unsigned",
+      "signature": null,
+      "verified": false,
+      "verified_at": null
+    }
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-06-18T02:42:43Z",
+    "event": "deployed",
+    "id": 26890320091,
+    "node_id": "DEE_lADORV0mMc8AAAABFwPbRc8AAAAGQsm42w",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/26890320091"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/289759153?v=4",
+      "events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/tank-operator-host",
+      "id": 290467558,
+      "login": "tank-operator-host[bot]",
+      "node_id": "BOT_kgDOEVAu5g",
+      "organizations_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/tank-operator-host%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/tank-operator-host%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-06-18T02:43:21Z",
+    "event": "deployed",
+    "id": 26890334249,
+    "node_id": "DEE_lADORV0mMc8AAAABFwPbRc8AAAAGQsnwKQ",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/26890334249"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-06-18T02:48:16Z",
+    "event": "ready_for_review",
+    "id": 26890439226,
+    "node_id": "RFRE_lADORV0mMc8AAAABFwPbRc8AAAAGQsuKOg",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/26890439226"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "commit_id": "49f35a25ef3199d879de16d075ad241a78fe46be",
+    "commit_url": "https://api.github.com/repos/romaine-life/kill-me/commits/49f35a25ef3199d879de16d075ad241a78fe46be",
+    "created_at": "2026-06-18T02:48:19Z",
+    "event": "merged",
+    "id": 26890440224,
+    "node_id": "ME_lADORV0mMc8AAAABFwPbRc8AAAAGQsuOIA",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/26890440224"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-06-18T02:48:19Z",
+    "event": "closed",
+    "id": 26890440251,
+    "intent": null,
+    "node_id": "CE_lADORV0mMc8AAAABFwPbRc8AAAAGQsuOOw",
+    "performed_via_github_app": null,
+    "state_reason": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/26890440251"
+  },
+  {
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "commit_id": null,
+    "commit_url": null,
+    "created_at": "2026-06-18T02:48:21Z",
+    "event": "head_ref_deleted",
+    "id": 26890440912,
+    "node_id": "HRDE_lADORV0mMc8AAAABFwPbRc8AAAAGQsuQ0A",
+    "performed_via_github_app": null,
+    "url": "https://api.github.com/repos/romaine-life/kill-me/issues/events/26890440912"
+  }
+]

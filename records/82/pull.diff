@@ -1,0 +1,275 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index d75ca6dc..8cb44fae 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -278,7 +278,8 @@ right edge is invisible to a `scrollWidth` check because page overflow is hidden
+ those. So screenshots are required for any layout/mobile verification, not
+ optional.
+ 
+-Working method (dev server started via `devctl`, see the dev-servers skill):
++Working method (dev server started via `devctl`, see the dev-servers skill —
++`devctl up kill-me-frontend -Cwd <worktree>\frontend -Name <session>`):
+ 
+ ```bash
+ chrome --headless=new --disable-gpu --hide-scrollbars \
+@@ -286,12 +287,16 @@ chrome --headless=new --disable-gpu --hide-scrollbars \
+   --window-size=390,844 \          # 390w = mobile; app's isMobile triggers <760px
+   --virtual-time-budget=9000 \     # let async load (sql.js WASM + snapshot.db) settle
+   --screenshot="<temp>/shot.png" \
+-  "http://localhost:<vite-port>/<route>"
++  "http://127.0.0.1:<vite-port>/<route>"
+ ```
+ 
+-Then read the PNG. Notes: use an isolated `--user-data-dir` so it can't disturb
+-a real Chrome profile; bump `--virtual-time-budget` for data-heavy routes (the
+-History calendar needs ~20000); routes are `/`, `/today`, `/history`,
++Then read the PNG. Notes: address the server as `127.0.0.1`, never `localhost` —
++the dev server binds IPv4 loopback (devctl probes and routes over it), and
++`localhost` resolves to `::1` alone on Windows, which headless Chrome does not
++fall back from: you get a silent failure and no PNG at all. Use an isolated
++`--user-data-dir` so it can't disturb a real Chrome profile; bump
++`--virtual-time-budget` for data-heavy routes (the History calendar needs
++~20000); routes are `/`, `/today`, `/history`,
+ `/exercises`, `/cycle`, `/soreness`, `/log` (admin-gated). On Windows the binary
+ is typically `C:\Program Files\Google\Chrome\Application\chrome.exe` or Edge's
+ `msedge.exe`.
+diff --git a/frontend/src/components/SorenessLanes.jsx b/frontend/src/components/SorenessLanes.jsx
+index b8e3777e..28b8b092 100644
+--- a/frontend/src/components/SorenessLanes.jsx
++++ b/frontend/src/components/SorenessLanes.jsx
+@@ -61,7 +61,7 @@ function shiftDays(date, delta) {
+   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+ }
+ 
+-export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
++export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness, onEditEntry }) {
+   const [group, setGroup] = useState('workout');   // 'workout' | 'muscle'
+   const [gaps, setGaps] = useState('bridge');     // 'bridge' | 'break'
+   const [order, setOrder] = useState('oldest');    // 'oldest' | 'newest'
+@@ -310,6 +310,11 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
+                         />
+                       );
+                     }
++                    // A logged day is the entry itself, so clicking it opens
++                    // that entry in the editor — the same place the journal
++                    // wrench goes. Without this the only way to fix a mislogged
++                    // day was to leave the view you spotted it in.
++                    const editable = isAdmin && !!onEditEntry;
+                     return (
+                       <rect
+                         key={d}
+@@ -319,7 +324,10 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
+                         height={ROW_H - 2}
+                         rx={2}
+                         fill={color}
+-                        style={{ cursor: 'pointer' }}
++                        style={{ cursor: editable ? 'pointer' : 'default' }}
++                        onClick={() =>
++                          editable && onEditEntry({ date: d, sourceWorkoutId: t.sourceWorkoutId })
++                        }
+                         onMouseEnter={() =>
+                           setHover({
+                             workoutId: t.sourceWorkoutId,
+@@ -398,13 +406,20 @@ export function SorenessLanes({ entries, workouts, isAdmin, onLogSoreness }) {
+           </svg>
+         </div>
+ 
+-        <HoverPanel hover={hover} laneCount={laneCount} trackCount={tracks.length} group={group} narrow={narrow} />
++        <HoverPanel
++          hover={hover}
++          laneCount={laneCount}
++          trackCount={tracks.length}
++          group={group}
++          narrow={narrow}
++          canEdit={isAdmin && !!onEditEntry}
++        />
+       </div>
+     </div>
+   );
+ }
+ 
+-function HoverPanel({ hover, laneCount, trackCount, group, narrow }) {
++function HoverPanel({ hover, laneCount, trackCount, group, narrow, canEdit }) {
+   return (
+     <div
+       style={{
+@@ -444,7 +459,7 @@ function HoverPanel({ hover, laneCount, trackCount, group, narrow }) {
+         </>
+       ) : (
+         <div style={{ fontSize: 11, color: colors.text.tertiary, lineHeight: 1.6 }}>
+-          Hover a stripe for detail.
++          Hover a stripe for detail.{canEdit && ' Click one to edit that day’s log.'}
+           <div style={{ marginTop: 8, fontFamily: 'monospace', color: colors.text.disabled }}>
+             {trackCount} stripe{trackCount === 1 ? '' : 's'}
+             <br />
+diff --git a/frontend/src/components/SorenessTab.jsx b/frontend/src/components/SorenessTab.jsx
+index b658fa3f..35aa4686 100644
+--- a/frontend/src/components/SorenessTab.jsx
++++ b/frontend/src/components/SorenessTab.jsx
+@@ -255,6 +255,16 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+     resetPicker();
+   }
+ 
++  // Open the editor for whatever entry lives at (date, workout) — the identity
++  // pair every view already knows. Lets the graphical views hand off to the
++  // same editor the journal's wrench opens.
++  function editEntryAt(date, sourceWorkoutId) {
++    const entry = entries.find(
++      (e) => e.date === date && (e.sourceWorkoutId || null) === (sourceWorkoutId || null),
++    );
++    if (entry) startEdit(entry);
++  }
++
+   function resetPicker() {
+     setPickerOpen(false);
+     setExpandedGroup(null);
+@@ -628,6 +638,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+           workouts={workoutsByDate}
+           isAdmin={isAdmin}
+           onLogSoreness={(w) => beginEntryFor(toSource(w))}
++          onEditEntry={({ date, sourceWorkoutId }) => editEntryAt(date, sourceWorkoutId)}
+         />
+       </div>
+     );
+@@ -646,6 +657,7 @@ export function SorenessTab({ isAdmin, initialSource = null, onSourceConsumed })
+           isMobile={isMobile}
+           onLogSoreness={(w) => beginEntryFor(toSource(w))}
+           onEditEntry={startEdit}
++          onEditEntryAt={editEntryAt}
+         />
+       </div>
+     );
+@@ -825,7 +837,7 @@ function ViewToggle({ view, onChange }) {
+ // Every workout in reverse-chronological order with its recovery curve beneath
+ // it. Workouts with nothing logged are still listed — the gaps are part of the
+ // picture, and they double as the entry point for logging.
+-function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onLogSoreness, onEditEntry }) {
++function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onLogSoreness, onEditEntry, onEditEntryAt }) {
+   const curves = useMemo(() => buildRecoveryCurves(entries), [entries]);
+   const unattributed = useMemo(
+     () => entries.filter((e) => !e.sourceWorkoutId),
+@@ -846,6 +858,7 @@ function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onLogSoreness,
+           isAdmin={isAdmin}
+           isMobile={isMobile}
+           onLogSoreness={onLogSoreness}
++          onEditEntryAt={onEditEntryAt}
+         />
+       ))}
+ 
+@@ -878,7 +891,7 @@ function RecoveryTimeline({ workouts, entries, isAdmin, isMobile, onLogSoreness,
+   );
+ }
+ 
+-function WorkoutRecoveryCard({ workout, curve, isAdmin, isMobile, onLogSoreness }) {
++function WorkoutRecoveryCard({ workout, curve, isAdmin, isMobile, onLogSoreness, onEditEntryAt }) {
+   const color = dayColor(workout.daySlug);
+   const span = curve ? Math.max(1, ...curve.muscles.map((m) => m.spanDays)) : 0;
+   const columns = span + 1; // day 0 (the workout) through the last log
+@@ -964,14 +977,23 @@ function WorkoutRecoveryCard({ workout, curve, isAdmin, isMobile, onLogSoreness
+                 <div style={{ display: 'flex', gap: 2 }}>
+                   {Array.from({ length: columns }, (_, i) => {
+                     const point = m.points.find((p) => p.dayOffset === i);
++                    // A filled cell is a real logged entry, so it opens the
++                    // editor for that day rather than only showing a tooltip.
++                    const editable = isAdmin && point && onEditEntryAt;
+                     return (
+                       <span
+                         key={i}
+-                        title={point ? `${point.date} — level ${point.level}` : undefined}
++                        title={
++                          point
++                            ? `${point.date} — level ${point.level}${isAdmin ? ' · click to edit' : ''}`
++                            : undefined
++                        }
++                        onClick={() => editable && onEditEntryAt(point.date, workout.id)}
+                         style={{
+                           ...styles.levelCell,
+                           background: point ? sorenessTierColor(point.level) : 'rgba(255,255,255,0.04)',
+                           color: point ? '#101010' : 'transparent',
++                          cursor: editable ? 'pointer' : 'default',
+                         }}
+                       >
+                         {point ? point.level : ''}
+diff --git a/frontend/vite.config.js b/frontend/vite.config.js
+index 509746af..aab22d33 100644
+--- a/frontend/vite.config.js
++++ b/frontend/vite.config.js
+@@ -193,6 +193,42 @@ function devBackend(port) {
+   }
+ }
+ 
++// devctl — the local dev-server supervisor — refuses to mark an environment ready
++// until the process holding the port proves it is the exact instance, project,
++// worktree and revision it was asked for. It probes this endpoint over IPv4
++// loopback, so a managed run must also bind 127.0.0.1 (see `server.host` below);
++// Vite's default host resolves to ::1 only on Windows, which the probe and the
++// Caddy route in front of it can't reach. Serve-only, and inert unless devctl
++// launched us, so it can never exist in a production build.
++function devctlHealth() {
++  return {
++    name: 'devctl-health',
++    apply: 'serve',
++    configureServer(server) {
++      if (process.env.DEVCTL_MANAGED !== '1') return
++      server.middlewares.use('/__devctl/health', (req, res, next) => {
++        if (req.method !== 'GET') {
++          next()
++          return
++        }
++        res.statusCode = 200
++        res.setHeader('Cache-Control', 'no-store')
++        res.setHeader('Content-Type', 'application/json')
++        res.end(JSON.stringify({
++          managed: true,
++          environment: process.env.DEVCTL_ENVIRONMENT_NAME || '',
++          project: process.env.DEVCTL_PROJECT || '',
++          repo_dir: process.env.DEVCTL_REPO_DIR || '',
++          revision: process.env.DEVCTL_SOURCE_REVISION || '',
++          configuration_id: process.env.DEVCTL_CONFIGURATION_ID || '',
++          port: Number(process.env.DEVCTL_FRONTEND_PORT || process.env.PORT || 0),
++          pid: process.pid,
++        }))
++      })
++    },
++  }
++}
++
+ const noBackend = process.env.DEV_NO_BACKEND === '1'
+ 
+ // https://vite.dev/config/
+@@ -203,17 +239,32 @@ export default defineConfig(async ({ command }) => {
+   const isVitest = process.env.VITEST === 'true' || process.env.NODE_ENV === 'test'
+   const useBackend = command === 'serve' && !noBackend && !isVitest
+   const backendPort = useBackend ? await getFreePort() : 0
++  // devctl owns the port when it is the launcher; honour what it assigned so the
++  // health endpoint above reports the port devctl recorded even if the flag is
++  // ever dropped from the command line.
++  const devctlPort = Number.parseInt(process.env.DEVCTL_FRONTEND_PORT || '', 10)
++  const managedPort = process.env.DEVCTL_MANAGED === '1' && devctlPort > 0 ? devctlPort : 0
++
+   return {
+     plugins: [
+       react(),
+       copySqlJsWasm(),
++      devctlHealth(),
+       ...(useBackend ? [devBackend(backendPort)] : []),
+     ],
+     define: {
+       __BUILD_NUMBER__: JSON.stringify(getGitCommit()),
+     },
+-    ...(useBackend
+-      ? { server: { proxy: { '/api': { target: `http://localhost:${backendPort}`, changeOrigin: true, secure: false, ws: true } } } }
+-      : {}),
++    server: {
++      // Bind IPv4 loopback explicitly. Vite's default host is 'localhost', which
++      // Node resolves verbatim to ::1 alone on this platform — an address any
++      // tool reaching for 127.0.0.1 (devctl's probe, its Caddy route, curl)
++      // gets connection-refused on. A CLI --host still overrides this.
++      host: '127.0.0.1',
++      ...(managedPort ? { port: managedPort, strictPort: true } : {}),
++      ...(useBackend
++        ? { proxy: { '/api': { target: `http://localhost:${backendPort}`, changeOrigin: true, secure: false, ws: true } } }
++        : {}),
++    },
+   }
+ })

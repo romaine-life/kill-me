@@ -1,0 +1,248 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/a0a2df6ab2fb56279d5102850b410ea8aa366ca6/comments",
+    "commit": {
+      "author": {
+        "date": "2026-05-15T23:10:57Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-05-15T23:12:33Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "message": "Fix lint: rename workflow .yml→.yaml, add trailing newlines\n\nWorkflow files renamed to .yaml to satisfy the pipeline-templates\nYAML Extensions lint check (which standardizes on .yaml since Helm\nrequires Chart.yaml/values.yaml exactly and the k8s ecosystem emits\n.yaml by default).\n\nTrailing newlines added to flagged files (.github/dependabot.yml,\nREADME.md, and any other tracked text files) per the Trailing\nNewlines check.\n\nStill failing after this:\n- YAML Extensions on .github/dependabot.yml — GitHub's docs only\n  officially mention dependabot.yml. Safer to fix in the lint template\n  itself (exclude .github/dependabot.{yml,yaml}) than risk renaming\n  here.\n- Filename Underscores on Python files (plant-agent) and asset paths\n  (kill-me) — these have legitimate underscores. Should be excluded\n  in the lint template.\n\nFollowup PR going up against pipeline-templates to widen those\nexclusion lists.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) \u003cnoreply@anthropic.com\u003e",
+      "tree": {
+        "sha": "db716ff8f484f39f391948ffd0b183af308fb508",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/db716ff8f484f39f391948ffd0b183af308fb508"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/a0a2df6ab2fb56279d5102850b410ea8aa366ca6",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/a0a2df6ab2fb56279d5102850b410ea8aa366ca6",
+    "node_id": "C_kwDORV0mMdoAKGEwYTJkZjZhYjJmYjU2Mjc5ZDUxMDI4NTBiNDEwZWE4YWEzNjZjYTY",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/dcf94ec8c9aaca143203bcb6cfb6fa55394b9e5b",
+        "sha": "dcf94ec8c9aaca143203bcb6cfb6fa55394b9e5b",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/dcf94ec8c9aaca143203bcb6cfb6fa55394b9e5b"
+      }
+    ],
+    "sha": "a0a2df6ab2fb56279d5102850b410ea8aa366ca6",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/a0a2df6ab2fb56279d5102850b410ea8aa366ca6"
+  },
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/7aadf4aca64a377e3ebb277c5a743688420f921e/comments",
+    "commit": {
+      "author": {
+        "date": "2026-05-15T23:15:06Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-05-15T23:15:06Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "message": "Re-trigger CI after pipeline-templates#15 widened lint exclusions",
+      "tree": {
+        "sha": "db716ff8f484f39f391948ffd0b183af308fb508",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/db716ff8f484f39f391948ffd0b183af308fb508"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/7aadf4aca64a377e3ebb277c5a743688420f921e",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/7aadf4aca64a377e3ebb277c5a743688420f921e",
+    "node_id": "C_kwDORV0mMdoAKDdhYWRmNGFjYTY0YTM3N2UzZWJiMjc3YzVhNzQzNjg4NDIwZjkyMWU",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/a0a2df6ab2fb56279d5102850b410ea8aa366ca6",
+        "sha": "a0a2df6ab2fb56279d5102850b410ea8aa366ca6",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/a0a2df6ab2fb56279d5102850b410ea8aa366ca6"
+      }
+    ],
+    "sha": "7aadf4aca64a377e3ebb277c5a743688420f921e",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/7aadf4aca64a377e3ebb277c5a743688420f921e"
+  },
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/9689019eca1d01a4a419feae1376baa125705cd3/comments",
+    "commit": {
+      "author": {
+        "date": "2026-05-15T23:16:11Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-05-15T23:16:11Z",
+        "email": "nelson@romaine.life",
+        "name": "Nelson Romaine"
+      },
+      "message": "Remove committed Vite cache; add .vite/ to .gitignore\n\nfrontend/.vite/deps/{_metadata,package}.json are auto-generated by\nVite dev server and shouldn't be tracked. _metadata.json was also the\nlast remaining failure for the Filename Underscores lint check after\npipeline-templates#15 widened asset/Python extensions.\n\nCo-Authored-By: Claude Opus 4.7 (1M context) \u003cnoreply@anthropic.com\u003e",
+      "tree": {
+        "sha": "c32289459cb66a3479b73960e95ac0f189f5b552",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/c32289459cb66a3479b73960e95ac0f189f5b552"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/9689019eca1d01a4a419feae1376baa125705cd3",
+      "verification": {
+        "payload": null,
+        "reason": "unsigned",
+        "signature": null,
+        "verified": false,
+        "verified_at": null
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/18473267?v=4",
+      "events_url": "https://api.github.com/users/nelsong6/events{/privacy}",
+      "followers_url": "https://api.github.com/users/nelsong6/followers",
+      "following_url": "https://api.github.com/users/nelsong6/following{/other_user}",
+      "gists_url": "https://api.github.com/users/nelsong6/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/nelsong6",
+      "id": 18473267,
+      "login": "nelsong6",
+      "node_id": "MDQ6VXNlcjE4NDczMjY3",
+      "organizations_url": "https://api.github.com/users/nelsong6/orgs",
+      "received_events_url": "https://api.github.com/users/nelsong6/received_events",
+      "repos_url": "https://api.github.com/users/nelsong6/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/nelsong6/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/nelsong6/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/nelsong6",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/9689019eca1d01a4a419feae1376baa125705cd3",
+    "node_id": "C_kwDORV0mMdoAKDk2ODkwMTllY2ExZDAxYTRhNDE5ZmVhZTEzNzZiYWExMjU3MDVjZDM",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/7aadf4aca64a377e3ebb277c5a743688420f921e",
+        "sha": "7aadf4aca64a377e3ebb277c5a743688420f921e",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/7aadf4aca64a377e3ebb277c5a743688420f921e"
+      }
+    ],
+    "sha": "9689019eca1d01a4a419feae1376baa125705cd3",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/9689019eca1d01a4a419feae1376baa125705cd3"
+  }
+]

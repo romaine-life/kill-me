@@ -1,0 +1,26 @@
+[
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/1fc4fa4c74f386532822ef7456893b31edd0c573/.github%2Fworkflows%2Fdocker-build-check.yaml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Fdocker-build-check.yaml?ref=1fc4fa4c74f386532822ef7456893b31edd0c573",
+    "deletions": 1,
+    "filename": ".github/workflows/docker-build-check.yaml",
+    "patch": "@@ -22,7 +22,7 @@ jobs:\n     runs-on: ubuntu-latest\n     steps:\n       - name: Checkout\n-        uses: actions/checkout@v4\n+        uses: actions/checkout@v6\n         with:\n           fetch-depth: 0\n ",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/1fc4fa4c74f386532822ef7456893b31edd0c573/.github%2Fworkflows%2Fdocker-build-check.yaml",
+    "sha": "db9f80875c78875f37d7b37fe1d8acdba0473a00",
+    "status": "modified"
+  },
+  {
+    "additions": 1,
+    "blob_url": "https://github.com/romaine-life/kill-me/blob/1fc4fa4c74f386532822ef7456893b31edd0c573/.github%2Fworkflows%2Flint.yaml",
+    "changes": 2,
+    "contents_url": "https://api.github.com/repos/romaine-life/kill-me/contents/.github%2Fworkflows%2Flint.yaml?ref=1fc4fa4c74f386532822ef7456893b31edd0c573",
+    "deletions": 1,
+    "filename": ".github/workflows/lint.yaml",
+    "patch": "@@ -19,7 +19,7 @@ jobs:\n     name: Removed MSAL surface\n     runs-on: ubuntu-latest\n     steps:\n-      - uses: actions/checkout@v4\n+      - uses: actions/checkout@v6\n       - uses: actions/setup-node@v4\n         with:\n           node-version: '20'",
+    "raw_url": "https://github.com/romaine-life/kill-me/raw/1fc4fa4c74f386532822ef7456893b31edd0c573/.github%2Fworkflows%2Flint.yaml",
+    "sha": "6dd1cbffa3b8b08b70a9f81cdb52149411d50fff",
+    "status": "modified"
+  }
+]

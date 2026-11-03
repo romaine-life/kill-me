@@ -1,0 +1,13 @@
+diff --git a/.github/workflows/docker-build-check.yaml b/.github/workflows/docker-build-check.yaml
+index 8e8273e1..78a3df76 100644
+--- a/.github/workflows/docker-build-check.yaml
++++ b/.github/workflows/docker-build-check.yaml
+@@ -47,7 +47,7 @@ jobs:
+           echo "Resolved ${INPUT_REF} -> ${full_sha}"
+ 
+       - name: Set up Buildx
+-        uses: docker/setup-buildx-action@v3
++        uses: docker/setup-buildx-action@v4
+ 
+       - name: Build image without pushing
+         uses: docker/build-push-action@v6

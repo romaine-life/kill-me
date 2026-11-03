@@ -1,0 +1,84 @@
+[
+  {
+    "author": {
+      "avatar_url": "https://avatars.githubusercontent.com/in/29110?v=4",
+      "events_url": "https://api.github.com/users/dependabot%5Bbot%5D/events{/privacy}",
+      "followers_url": "https://api.github.com/users/dependabot%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/dependabot%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/dependabot%5Bbot%5D/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/apps/dependabot",
+      "id": 49699333,
+      "login": "dependabot[bot]",
+      "node_id": "MDM6Qm90NDk2OTkzMzM=",
+      "organizations_url": "https://api.github.com/users/dependabot%5Bbot%5D/orgs",
+      "received_events_url": "https://api.github.com/users/dependabot%5Bbot%5D/received_events",
+      "repos_url": "https://api.github.com/users/dependabot%5Bbot%5D/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/dependabot%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/dependabot%5Bbot%5D/subscriptions",
+      "type": "Bot",
+      "url": "https://api.github.com/users/dependabot%5Bbot%5D",
+      "user_view_type": "public"
+    },
+    "comments_url": "https://api.github.com/repos/romaine-life/kill-me/commits/ea7f80ea7588a7da2c85b9e2cb8a8b8f71766b9d/comments",
+    "commit": {
+      "author": {
+        "date": "2026-09-07T04:08:10Z",
+        "email": "49699333+dependabot[bot]@users.noreply.github.com",
+        "name": "dependabot[bot]"
+      },
+      "comment_count": 0,
+      "committer": {
+        "date": "2026-09-07T04:08:10Z",
+        "email": "noreply@github.com",
+        "name": "GitHub"
+      },
+      "message": "build(deps-dev): Bump browserslist from 4.28.1 to 4.28.9 in /frontend\n\nBumps [browserslist](https://github.com/browserslist/browserslist) from 4.28.1 to 4.28.9.\n- [Release notes](https://github.com/browserslist/browserslist/releases)\n- [Changelog](https://github.com/browserslist/browserslist/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/browserslist/browserslist/compare/4.28.1...4.28.9)\n\n---\nupdated-dependencies:\n- dependency-name: browserslist\n  dependency-version: 4.28.9\n  dependency-type: indirect\n...\n\nSigned-off-by: dependabot[bot] \u003csupport@github.com\u003e",
+      "tree": {
+        "sha": "c03d8136b128bf498d0579ca8f8d28b2f3487299",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/git/trees/c03d8136b128bf498d0579ca8f8d28b2f3487299"
+      },
+      "url": "https://api.github.com/repos/romaine-life/kill-me/git/commits/ea7f80ea7588a7da2c85b9e2cb8a8b8f71766b9d",
+      "verification": {
+        "payload": "tree c03d8136b128bf498d0579ca8f8d28b2f3487299\nparent 2263e9bdf8533ddb84fa1ee9c58c8b5714c34cc7\nauthor dependabot[bot] \u003c49699333+dependabot[bot]@users.noreply.github.com\u003e 1788754090 +0000\ncommitter GitHub \u003cnoreply@github.com\u003e 1788754090 +0000\n\nbuild(deps-dev): Bump browserslist from 4.28.1 to 4.28.9 in /frontend\n\nBumps [browserslist](https://github.com/browserslist/browserslist) from 4.28.1 to 4.28.9.\n- [Release notes](https://github.com/browserslist/browserslist/releases)\n- [Changelog](https://github.com/browserslist/browserslist/blob/main/CHANGELOG.md)\n- [Commits](https://github.com/browserslist/browserslist/compare/4.28.1...4.28.9)\n\n---\nupdated-dependencies:\n- dependency-name: browserslist\n  dependency-version: 4.28.9\n  dependency-type: indirect\n...\n\nSigned-off-by: dependabot[bot] \u003csupport@github.com\u003e",
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJqnjirCRC1aQ7uu5UhlAAAaDsQAH3GO6FAbOtAlLt4EFbrlVU0\nMEdVgZRfTPooRVFEBRQ5o91gQHw1l+2HUXEZIspguB9DNjVgi3jUi9kFKRKKrViB\nj+uiy/ZG+8vB2kXBDC+QAWn/tGaftRGDeAX5JRSMV9yYXeUYlKeGVN/36E8wjbur\ncbsy4xnXZccdtNF8jwflJhPy+KsQX8Id0rNpabgVdlimu+xjloLQeIQ627O0+F3p\nD65XsKiMAVxKQK0QJsSbMcia4dsMG0pdRsLl9QU5A62Y62Eldd5fQP7/1MhHFboy\nP59hBpFSHwwO4aS7OjwKG5vjf0hW6Wz5lX8vEaQgmeMrwO/30aXoGa0rjQi5bVGi\n74q6U6SQuvMCoInuvt9tkBTEDOC0rgC+hGQ4zPbIp2VpVOjWpTEHvTjnRAf+J/1s\n7argxWoZFkTRE3uRLBMstq99TQEGni7Q0NZFtoziWlWPYRvJ0Bx5TXAvzg5es6V/\nIZnivPKsYisBdtIG1rQnJXntvOr5M/LP047PqQIXOhhgZcJTWIUVTPwtNPIJ9fmJ\nADJK6XPUgYbf0KlkfH84qXw4s6jJDMjtylY0T7VzZRuWyjVqf8KJh9iH3LG8AL+H\noAvzlKiv1NzdVd/d6EbuYKTyJI7UhODqpONBI/o/G0Nfwj9B2X6F7RyBS1GMdCmb\n7FN5EGZM3zpKMUJolIox\n=cR4n\n-----END PGP SIGNATURE-----\n",
+        "verified": true,
+        "verified_at": "2026-09-07T04:08:11Z"
+      }
+    },
+    "committer": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/web-flow",
+      "id": 19864447,
+      "login": "web-flow",
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/web-flow",
+      "user_view_type": "public"
+    },
+    "html_url": "https://github.com/romaine-life/kill-me/commit/ea7f80ea7588a7da2c85b9e2cb8a8b8f71766b9d",
+    "node_id": "C_kwDORV0mMdoAKGVhN2Y4MGVhNzU4OGE3ZGEyYzg1YjllMmNiOGE4YjhmNzE3NjZiOWQ",
+    "parents": [
+      {
+        "html_url": "https://github.com/romaine-life/kill-me/commit/2263e9bdf8533ddb84fa1ee9c58c8b5714c34cc7",
+        "sha": "2263e9bdf8533ddb84fa1ee9c58c8b5714c34cc7",
+        "url": "https://api.github.com/repos/romaine-life/kill-me/commits/2263e9bdf8533ddb84fa1ee9c58c8b5714c34cc7"
+      }
+    ],
+    "sha": "ea7f80ea7588a7da2c85b9e2cb8a8b8f71766b9d",
+    "url": "https://api.github.com/repos/romaine-life/kill-me/commits/ea7f80ea7588a7da2c85b9e2cb8a8b8f71766b9d"
+  }
+]

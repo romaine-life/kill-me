@@ -1,0 +1,39 @@
+diff --git a/.github/workflows/lint.yaml b/.github/workflows/lint.yaml
+index b6ece547..831b3426 100644
+--- a/.github/workflows/lint.yaml
++++ b/.github/workflows/lint.yaml
+@@ -11,7 +11,7 @@ concurrency:
+ 
+ jobs:
+   code-quality:
+-    uses: nelsong6/pipeline-templates/.github/workflows/lint-template.yml@main
++    uses: romaine-life/pipeline-templates/.github/workflows/lint-template.yml@main
+     with:
+       working_directory: '.'
+ 
+diff --git a/.github/workflows/snapshot.yaml b/.github/workflows/snapshot.yaml
+index 228fb0a7..d4ef4de6 100644
+--- a/.github/workflows/snapshot.yaml
++++ b/.github/workflows/snapshot.yaml
+@@ -11,7 +11,7 @@ permissions:
+ 
+ jobs:
+   tofu-outputs:
+-    uses: nelsong6/pipeline-templates/.github/workflows/tofu-outputs-template.yml@main
++    uses: romaine-life/pipeline-templates/.github/workflows/tofu-outputs-template.yml@main
+     with:
+       storage_account: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+       state_key: kill-me.tfstate
+diff --git a/.github/workflows/tofu.yaml b/.github/workflows/tofu.yaml
+index 30e66452..6c162e32 100644
+--- a/.github/workflows/tofu.yaml
++++ b/.github/workflows/tofu.yaml
+@@ -20,7 +20,7 @@ permissions:
+ 
+ jobs:
+   tofu:
+-    uses: nelsong6/pipeline-templates/.github/workflows/tofu-plan-apply-template.yml@main
++    uses: romaine-life/pipeline-templates/.github/workflows/tofu-plan-apply-template.yml@main
+     with:
+       working_directory: tofu
+       backend_storage_account: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
