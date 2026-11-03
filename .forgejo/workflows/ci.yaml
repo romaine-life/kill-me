@@ -36,7 +36,7 @@ jobs:
         "GIT_CONFIG_KEY_$count=http.curloptResolve" | Add-Content $env:GITHUB_ENV
         "GIT_CONFIG_VALUE_$count=forgejo.romaine.life:443:$env:HOME_FORGEJO_IP" | Add-Content $env:GITHUB_ENV
         "GIT_CONFIG_COUNT=$($count+1)" | Add-Content $env:GITHUB_ENV
-    - uses: actions/checkout@v4
+    - uses: https://github.com/actions/checkout@v4
       with:
         fetch-depth: 0
     - name: Resolve checked source
@@ -74,7 +74,7 @@ jobs:
         }
         tofu fmt -recursive -check
         if($LASTEXITCODE){exit $LASTEXITCODE}
-    - uses: actions/setup-node@v4
+    - uses: https://github.com/actions/setup-node@v4
       with:
         node-version: '20'
     - name: Semantic version rules
@@ -83,6 +83,18 @@ jobs:
       run: node scripts/check-removed-msal.mjs
     - name: Image fingerprint contract
       run: node scripts/check-image-fingerprint-config.mjs
+    - name: Backend tests
+      run: |
+        npm test --prefix backend
+        if($LASTEXITCODE){exit $LASTEXITCODE}
+    - name: Frontend tests and lint
+      run: |
+        npm ci --prefix frontend
+        if($LASTEXITCODE){exit $LASTEXITCODE}
+        npm test --prefix frontend
+        if($LASTEXITCODE){exit $LASTEXITCODE}
+        npm run lint --prefix frontend
+        if($LASTEXITCODE){exit $LASTEXITCODE}
     - name: Require semantic release label
       if: github.event_name == 'pull_request'
       env:
@@ -108,7 +120,7 @@ jobs:
       run: |
         test -n "$HOME_FORGEJO_IP"
         printf '%s forgejo.romaine.life\n' "$HOME_FORGEJO_IP" | sudo tee -a /etc/hosts >/dev/null
-    - uses: actions/checkout@v4
+    - uses: https://github.com/actions/checkout@v4
       with:
         fetch-depth: 0
         token: ${{ secrets.PIPELINE_DISPATCH_TOKEN || secrets.GITHUB_TOKEN }}
@@ -133,7 +145,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends azure-cli
         fi
       if: steps.scope.outputs.run == 'true'
-    - uses: actions/setup-node@v4
+    - uses: https://github.com/actions/setup-node@v4
       with:
         node-version: '20'
     - name: Resolve image source ref
@@ -361,6 +373,30 @@ jobs:
           APP_BUILD_ID=${{ env.ALIAS_TAG }}
         cache-from: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app
         cache-to: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app,mode=max
+    - name: Smoke-test the published image contents
+      if: steps.scope.outputs.run == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      env:
+        SMOKE_TAG: ${{ steps.fingerprint.outputs.proof_tag || env.ALIAS_TAG }}
+      run: |
+        set -euo pipefail
+        image="romainecr.azurecr.io/kill-me:$SMOKE_TAG"
+        docker pull "$image"
+        docker run --rm --network none --entrypoint node "$image" --test backend/version.test.js backend/routes/routes/exercise-defaults.test.js
+        docker run --rm --network none -e EXPECTED_BUILD_ID="$SMOKE_TAG" --entrypoint node "$image" --input-type=module -e '
+        import assert from "node:assert/strict";
+        import fs from "node:fs";
+        import { getVersionInfo } from "./backend/version.js";
+        const root="frontend/dist";
+        const html=fs.readFileSync(root+"/index.html","utf8");
+        assert.match(html, /<div id="root">/);
+        const assets=[...html.matchAll(/(?:src|href)="(\/assets\/[^\"]+)"/g)].map(m=>m[1]);
+        assert.ok(assets.some(p=>p.endsWith(".js")));
+        assert.ok(assets.some(p=>p.endsWith(".css")));
+        for(const asset of assets) assert.ok(fs.statSync(root+asset).size>0,asset);
+        const bundle=fs.readdirSync(root+"/assets").filter(p=>p.endsWith(".js")).map(p=>fs.readFileSync(root+"/assets/"+p,"utf8")).join("\n");
+        assert.ok(bundle.includes(process.env.EXPECTED_BUILD_ID),"compiled image fingerprint");
+        assert.deepEqual(getVersionInfo({APP_VERSION:"1.2.3",APP_BUILD_ID:process.env.EXPECTED_BUILD_ID}),{version:"1.2.3",deployedAt:null,buildId:process.env.EXPECTED_BUILD_ID});
+        console.log("Published image backend tests, compiled frontend assets and fingerprint verified");'
     - name: Bump image tag in k8s/values.yaml
       if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/main')
       run: |
@@ -384,9 +420,23 @@ jobs:
         branch="FORGEJO-3-image-$GITHUB_RUN_ID"
         git switch -c "$branch"
         git push origin "$branch"
-        jq -n --arg head "$branch" --argjson label "$RELEASE_NONE_LABEL_ID" '{head:$head,base:"main",labels:[$label],title:"Deploy validated kill-me image",body:"https://openproject.romaine.life/wp/FORGEJO-3"}' > /tmp/image-pr.json
+        jq -n --arg head "$branch" --argjson release_label "$RELEASE_NONE_LABEL_ID" '{head:$head,base:"main",labels:[$release_label],title:"Deploy validated kill-me image",body:"https://openproject.romaine.life/wp/FORGEJO-3"}' > /tmp/image-pr.json
         pr="$(printf 'header = "Authorization: token %s"\n' "$TOKEN" | curl --config - --fail --silent --show-error -X POST -H 'Content-Type: application/json' --data-binary @/tmp/image-pr.json "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/pulls" | jq -r .number)"
-        jq -n --arg head "$(git rev-parse HEAD)" '{Do:"squash",merge_when_checks_succeed:true,delete_branch_after_merge:true,head_commit_id:$head}' > /tmp/image-merge.json
+        head=$(git rev-parse HEAD)
+        passed=false
+        for n in $(seq 1 60); do
+          statuses=$(printf 'Authorization: token %s\n' "$TOKEN" | curl --fail-with-body -sS --header @- "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/commits/$head/status")
+          state=$(echo "$statuses" | jq -r '
+            [.statuses[]? | select(.context == "CI / checks (pull_request)" or .context == "CI / image (pull_request)" or .context == "Infrastructure / Plan (pull_request)")]
+            | group_by(.context) | map(max_by(.updated_at))
+            | if any(.[]; .status == "failure" or .status == "error") then "failure"
+              elif length == 3 and all(.[]; .status == "success") then "success" else "pending" end')
+          if [ "$state" = failure ]; then echo "Image pin PR $pr failed required checks"; exit 1; fi
+          if [ "$state" = success ]; then passed=true; break; fi
+          sleep 30
+        done
+        if [ "$passed" != true ]; then echo "Image pin PR $pr did not finish all required checks"; exit 1; fi
+        jq -n --arg head "$head" '{Do:"squash",delete_branch_after_merge:true,head_commit_id:$head}' > /tmp/image-merge.json
         printf 'header = "Authorization: token %s"\n' "$TOKEN" | curl --config - --fail-with-body --silent --show-error -X POST -H 'Content-Type: application/json' --data-binary @/tmp/image-merge.json "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/pulls/$pr/merge"
 
       env:
