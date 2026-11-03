@@ -9,7 +9,7 @@ agonizing set of leg extensions under hypnotherapy coaching.
 
 Agent pods are not expected to have Docker. Do not report missing local Docker
 as a blocker. Run available repo checks first, then use PR CI as the normal
-container build gate: `.github/workflows/docker-build-check.yaml` builds the
+container build gate: `.forgejo/workflows/ci.yaml` builds the
 app image. Same-repo PRs and manual dispatches publish the canonical
 content-fingerprint tag (`romainecr.azurecr.io/kill-me:app-<sha256>`); fork PRs
 stay build-only with `push: false`. Release/deploy workflows publish or reuse
@@ -175,7 +175,7 @@ pod in the `kill-me` namespace, served from `workout.romaine.life` via HTTPRoute
 on the shared Envoy Gateway. The prior shared-API-at-`api.romaine.life/workout`
 mount was retired when the api repo was archived and deleted on 2026-04-20.
 
-See also: **pipeline-templates** for reusable GitHub Actions workflows, and
+See also: **pipeline-templates** for Forgejo Actions workflows, and
 **shell-config** for the global Claude config chain and DevOps tooling.
 
 ## Data Model (Cosmos DB)
@@ -316,7 +316,7 @@ is typically `C:\Program Files\Google\Chrome\Application\chrome.exe` or Edge's
 Application releases use immutable Git tags (`vMAJOR.MINOR.PATCH`) as their source
 of truth. Every PR carries exactly one `release:major`, `release:minor`,
 `release:patch`, or `release:none` label. On merge, `build-and-deploy.yaml` applies
-that bump to the latest tag, creates the GitHub release, and records the version,
+that bump to the latest tag, creates the Forgejo release, and records the version,
 deployment time, and content-fingerprint image tag in `k8s/values.yaml`.
 
 The public `/api/version` endpoint returns that runtime metadata with `no-store`

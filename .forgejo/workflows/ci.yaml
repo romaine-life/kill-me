@@ -1,0 +1,410 @@
+name: CI
+'on':
+  pull_request:
+    types:
+    - opened
+    - synchronize
+    - reopened
+    - labeled
+    - unlabeled
+  push:
+    branches:
+    - main
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: Git ref to validate or prebuild
+        required: false
+        type: string
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  checks:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+    - name: Use the home Forgejo address for Git
+      shell: pwsh
+      env:
+        HOME_FORGEJO_IP: ${{ vars.HOME_FORGEJO_IP }}
+      run: |
+        if(-not $env:HOME_FORGEJO_IP){throw 'HOME_FORGEJO_IP is not configured'}
+        $count=if($env:GIT_CONFIG_COUNT){[int]$env:GIT_CONFIG_COUNT}else{0}
+        "GIT_CONFIG_KEY_$count=http.curloptResolve" | Add-Content $env:GITHUB_ENV
+        "GIT_CONFIG_VALUE_$count=forgejo.romaine.life:443:$env:HOME_FORGEJO_IP" | Add-Content $env:GITHUB_ENV
+        "GIT_CONFIG_COUNT=$($count+1)" | Add-Content $env:GITHUB_ENV
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Resolve checked source
+      id: checked-source
+      shell: pwsh
+      env:
+        INPUT_REF: ${{ inputs.git_ref }}
+      run: |
+        $ErrorActionPreference='Stop'
+        $PSNativeCommandUseErrorActionPreference=$false
+        $sha=git rev-parse HEAD
+        if($env:INPUT_REF){
+          $sha=git rev-parse --verify --end-of-options "$env:INPUT_REF^{commit}" 2>$null
+          if($LASTEXITCODE){$sha=git rev-parse --verify --end-of-options "refs/remotes/origin/$env:INPUT_REF^{commit}" 2>$null}
+          if($LASTEXITCODE){throw "Cannot resolve requested source: $env:INPUT_REF"}
+          git checkout --detach $sha
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+        }
+        "sha=$sha" | Add-Content $env:GITHUB_OUTPUT
+        Write-Host "Checked source $sha"
+    - uses: https://github.com/opentofu/setup-opentofu@v2
+      with:
+        tofu_version: 1.11.0
+        tofu_wrapper: false
+    - name: Repository conventions and OpenTofu format
+      run: |
+        $ErrorActionPreference='Stop'
+        $bad=@(git ls-files '*.yml')
+        if($bad.Count){$bad;throw 'Use the .yaml extension'}
+        $bad=@(git ls-files '*_*' | Where-Object {$_ -notmatch 'PULL_REQUEST_TEMPLATE|ISSUE_TEMPLATE' -and $_ -notmatch '\.(md|js|py|webp|png|jpe?g|gif|svg|ico|txt)$'})
+        if($bad.Count){$bad;throw 'Use hyphens in filenames'}
+        foreach($path in (git grep -Il -- '')){
+          $data=[IO.File]::ReadAllBytes((Join-Path $PWD $path))
+          if($data.Length -and $data[-1] -ne 10){throw "Missing trailing newline: $path"}
+        }
+        tofu fmt -recursive -check
+        if($LASTEXITCODE){exit $LASTEXITCODE}
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - name: Semantic version rules
+      run: node --test scripts/next-app-version.test.mjs
+    - name: Removed MSAL surface
+      run: node scripts/check-removed-msal.mjs
+    - name: Image fingerprint contract
+      run: node scripts/check-image-fingerprint-config.mjs
+    - name: Require semantic release label
+      if: github.event_name == 'pull_request'
+      env:
+        TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PR: ${{ github.event.pull_request.number }}
+        HOME_FORGEJO_IP: ${{ vars.HOME_FORGEJO_IP }}
+      run: |
+        $cfg=@('silent','show-error','fail-with-body',("url = `"https://forgejo.romaine.life/api/v1/repos/$env:GITHUB_REPOSITORY/pulls/$env:PR`""),("resolve = `"forgejo.romaine.life:443:$env:HOME_FORGEJO_IP`""),("header = `"Authorization: token $env:TOKEN`""))
+        $r=($cfg -join [Environment]::NewLine) | curl.exe --config - | ConvertFrom-Json
+        if($LASTEXITCODE){exit $LASTEXITCODE}
+        $labels=@($r.labels.name | Where-Object {$_ -in @('release:major','release:minor','release:patch','release:none')})
+        if($labels.Count -ne 1){throw 'Exactly one release label is required'}
+    outputs:
+      source-sha: ${{ steps.checked-source.outputs.sha }}
+  image:
+    needs: checks
+    runs-on: ubuntu-latest
+    enable-openid-connect: true
+    steps:
+    - name: Resolve Forgejo on the home network
+      env:
+        HOME_FORGEJO_IP: ${{ vars.HOME_FORGEJO_IP }}
+      run: |
+        test -n "$HOME_FORGEJO_IP"
+        printf '%s forgejo.romaine.life\n' "$HOME_FORGEJO_IP" | sudo tee -a /etc/hosts >/dev/null
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.PIPELINE_DISPATCH_TOKEN || secrets.GITHUB_TOKEN }}
+        ref: ${{ needs.checks.outputs.source-sha }}
+    - name: Check image scope
+      id: scope
+      env:
+        BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+      run: |
+        if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" || git diff --name-only "$BASE" HEAD -- backend frontend Dockerfile .dockerignore scripts .forgejo | grep -q .; then
+          echo 'run=true' >> "$GITHUB_OUTPUT"
+        else
+          echo 'run=false' >> "$GITHUB_OUTPUT"
+        fi
+    - name: Install Azure CLI
+      run: |
+        if ! command -v az; then
+          sudo mkdir -p /etc/apt/keyrings
+          curl --fail --silent --show-error https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/keyrings/microsoft.gpg >/dev/null
+          echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ noble main' | sudo tee /etc/apt/sources.list.d/azure-cli.list >/dev/null
+          sudo apt-get update -o Dir::Etc::sourcelist=sources.list.d/azure-cli.list -o Dir::Etc::sourceparts=- -o APT::Get::List-Cleanup=0
+          sudo apt-get install -y --no-install-recommends azure-cli
+        fi
+      if: steps.scope.outputs.run == 'true'
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - name: Resolve image source ref
+      id: source
+      env:
+        INPUT_REF: ${{ needs.checks.outputs.source-sha }}
+        PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+      run: |
+        set -euo pipefail
+        git fetch --force --tags origin '+refs/heads/*:refs/remotes/origin/*'
+        if [ -n "${PR_HEAD_SHA}" ]; then
+          full_sha="${PR_HEAD_SHA}"
+        elif [ -n "${INPUT_REF}" ]; then
+          if full_sha="$(git rev-parse --verify "${INPUT_REF}^{commit}" 2>/dev/null)"; then
+            :
+          elif git show-ref --verify --quiet "refs/remotes/origin/${INPUT_REF}"; then
+            full_sha="$(git rev-parse "refs/remotes/origin/${INPUT_REF}^{commit}")"
+          elif git show-ref --verify --quiet "refs/tags/${INPUT_REF}"; then
+            full_sha="$(git rev-parse "refs/tags/${INPUT_REF}^{commit}")"
+          else
+            echo "::error::Unable to resolve git_ref '${INPUT_REF}' to a commit."
+            exit 1
+          fi
+        else
+          full_sha="$(git rev-parse HEAD)"
+        fi
+        git checkout --detach "$full_sha"
+        echo "Resolved image source -> ${full_sha}"
+        echo "sha=${full_sha}" >> "${GITHUB_OUTPUT}"
+      if: github.event_name == 'pull_request' && steps.scope.outputs.run == 'true'
+    - name: Set up Buildx
+      uses: https://github.com/docker/setup-buildx-action@v3
+      if: github.event_name == 'pull_request' && steps.scope.outputs.run == 'true'
+      with:
+        driver-opts: network=host
+    - name: Azure Login (OIDC)
+      if: github.event_name == 'pull_request' && steps.scope.outputs.run == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name
+        == github.repository)
+      uses: https://github.com/azure/login@v3
+      with:
+        client-id: ${{ vars.ARM_CLIENT_ID }}
+        tenant-id: ${{ vars.ARM_TENANT_ID }}
+        subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
+    - name: ACR login
+      if: github.event_name == 'pull_request' && steps.scope.outputs.run == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name
+        == github.repository)
+      run: |
+        az acr login --name romainecr
+    - name: Compute image fingerprint
+      id: fingerprint
+      shell: bash
+      run: |
+        set -euo pipefail
+        scripts/image-fingerprint.sh \
+          --image app \
+          --dockerfile Dockerfile \
+          --context . \
+          --paths 'Dockerfile .dockerignore backend frontend'
+      if: github.event_name == 'pull_request' && steps.scope.outputs.run == 'true'
+    - name: Check ACR candidate image
+      id: candidate
+      if: github.event_name == 'pull_request' && steps.scope.outputs.run == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name
+        == github.repository)
+      shell: bash
+      run: |
+        set -euo pipefail
+        tag="${{ steps.fingerprint.outputs.proof_tag }}"
+        if az acr repository show-tags \
+            --name romainecr \
+            --repository kill-me \
+            --query "[?@=='${tag}'] | [0]" \
+            --output tsv | grep -qx "${tag}"; then
+          echo "hit=true" >>"${GITHUB_OUTPUT}"
+          echo "Found reusable image romainecr.azurecr.io/kill-me:${tag}"
+        else
+          echo "hit=false" >>"${GITHUB_OUTPUT}"
+          echo "No reusable image found for app fingerprint ${{ steps.fingerprint.outputs.fingerprint }}"
+        fi
+    - name: Build and push candidate image
+      if: github.event_name == 'pull_request' && steps.scope.outputs.run == 'true' && ((github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name
+        == github.repository) && steps.candidate.outputs.hit != 'true')
+      uses: https://github.com/docker/build-push-action@v6
+      with:
+        context: .
+        file: Dockerfile
+        push: true
+        load: false
+        tags: romainecr.azurecr.io/kill-me:${{ steps.fingerprint.outputs.proof_tag }}
+        build-args: |
+          APP_BUILD_ID=${{ steps.fingerprint.outputs.proof_tag }}
+        cache-from: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app
+        cache-to: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app,mode=max
+    - name: Tag app image by commit
+      if: github.event_name == 'pull_request' && steps.scope.outputs.run == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name
+        == github.repository)
+      shell: bash
+      run: |
+        set -euo pipefail
+        canonical='${{ steps.fingerprint.outputs.proof_tag }}'
+        commit_tag="sha-${{ steps.source.outputs.sha }}"
+        az acr import --name romainecr \
+          --source "romainecr.azurecr.io/kill-me:${canonical}" \
+          --image "kill-me:${commit_tag}" \
+          --force
+        echo "Tagged romainecr.azurecr.io/kill-me:${commit_tag} -> ${canonical}"
+    - name: Build image without pushing
+      if: github.event_name == 'pull_request' && steps.scope.outputs.run == 'true' && (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name
+        != github.repository)
+      uses: https://github.com/docker/build-push-action@v6
+      with:
+        context: .
+        file: Dockerfile
+        push: false
+        load: false
+        build-args: |
+          APP_BUILD_ID=${{ steps.fingerprint.outputs.proof_tag }}
+    - name: Resolve requested ref
+      env:
+        INPUT_REF: ${{ needs.checks.outputs.source-sha }}
+      run: |
+        set -euo pipefail
+        git fetch --force --tags origin '+refs/heads/*:refs/remotes/origin/*'
+
+        target_ref="${INPUT_REF:-$GITHUB_SHA}"
+        if full_sha="$(git rev-parse --verify "${target_ref}^{commit}" 2>/dev/null)"; then
+          :
+        elif git show-ref --verify --quiet "refs/remotes/origin/${target_ref}"; then
+          full_sha="$(git rev-parse "refs/remotes/origin/${target_ref}^{commit}")"
+        elif git show-ref --verify --quiet "refs/tags/${target_ref}"; then
+          full_sha="$(git rev-parse "refs/tags/${target_ref}^{commit}")"
+        else
+          echo "::error::Unable to resolve git_ref '${target_ref}' to a commit."
+          exit 1
+        fi
+
+        git checkout --detach "$full_sha"
+        echo "Resolved ${target_ref} -> ${full_sha}"
+        echo "SOURCE_SHA=${full_sha}" >> "$GITHUB_ENV"
+      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true'
+    - name: Resolve semantic application version
+      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      env:
+        TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        existing_tag="$(git tag --points-at "$SOURCE_SHA" --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1)"
+        latest_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1)"
+        create_release=false
+        release_title="Versioned application release"
+        if [ -n "$existing_tag" ]; then
+          app_version="${existing_tag#v}"
+        elif [ -z "$latest_tag" ]; then
+          app_version=1.0.0
+          create_release=true
+        else
+          pull="$(printf 'header = "Authorization: token %s"\n' "$TOKEN" | curl --config - --fail --silent --show-error "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/commits/$SOURCE_SHA/pull")"
+          labels="$(jq '[.labels[].name | select(startswith("release:"))]' <<< "$pull")"
+          test "$(jq length <<< "$labels")" -eq 1
+          bump="$(jq -r '.[0] | sub("^release:";"")' <<< "$labels")"
+          release_title="$(jq -r .title <<< "$pull")"
+          app_version="$(node scripts/next-app-version.mjs "${latest_tag#v}" "$bump")"
+          if [ "$bump" != none ]; then create_release=true; fi
+        fi
+        echo "APP_VERSION=$app_version" >> "$GITHUB_ENV"
+        echo "APP_DEPLOYED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+        echo "CREATE_FORGEJO_RELEASE=$create_release" >> "$GITHUB_ENV"
+        echo "RELEASE_TITLE=$release_title" >> "$GITHUB_ENV"
+    - name: Azure Login (OIDC)
+      uses: https://github.com/azure/login@v3
+      with:
+        client-id: ${{ vars.ARM_CLIENT_ID }}
+        tenant-id: ${{ vars.ARM_TENANT_ID }}
+        subscription-id: ${{ vars.ARM_SUBSCRIPTION_ID }}
+      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true'
+    - name: ACR login
+      run: |
+        az acr login --name romainecr
+      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true'
+    - name: Set up Buildx
+      uses: https://github.com/docker/setup-buildx-action@v3
+      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true'
+      with:
+        driver-opts: network=host
+    - name: Compute image fingerprint
+      id: deploy-fingerprint
+      shell: bash
+      run: |
+        set -euo pipefail
+        fingerprint="$(scripts/image-fingerprint.sh \
+          --image app \
+          --dockerfile Dockerfile \
+          --context . \
+          --paths 'Dockerfile .dockerignore backend frontend' \
+          | tee /tmp/kill-me-image-fingerprint.txt \
+          | awk -F= '$1 == "fingerprint" { print $2 }')"
+        echo "ALIAS_TAG=app-${fingerprint}" >> "$GITHUB_ENV"
+      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true'
+    - name: Check existing image
+      id: image
+      shell: bash
+      run: |
+        set -euo pipefail
+        if az acr repository show-tags \
+            --name romainecr \
+            --repository kill-me \
+            --query "[?@=='${ALIAS_TAG}'] | [0]" \
+            --output tsv | grep -qx "${ALIAS_TAG}"; then
+          echo "exists=true" >>"${GITHUB_OUTPUT}"
+          echo "Found reusable image romainecr.azurecr.io/kill-me:${ALIAS_TAG}"
+        else
+          echo "exists=false" >>"${GITHUB_OUTPUT}"
+          echo "No reusable image found for app fingerprint ${{ steps.deploy-fingerprint.outputs.fingerprint }}"
+        fi
+      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true'
+    - name: Build and push image
+      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true' && (steps.image.outputs.exists != 'true')
+      uses: https://github.com/docker/build-push-action@v6
+      with:
+        context: .
+        file: Dockerfile
+        push: true
+        tags: romainecr.azurecr.io/kill-me:${{ env.ALIAS_TAG }}
+        build-args: |
+          APP_BUILD_ID=${{ env.ALIAS_TAG }}
+        cache-from: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app
+        cache-to: type=registry,ref=romainecr.azurecr.io/kill-me-build-cache:app,mode=max
+    - name: Bump image tag in k8s/values.yaml
+      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      run: |
+        set -euo pipefail
+        # Quote the tag so YAML never reinterprets image tags.
+        sed -i "s|^  tag: .*|  tag: \"${ALIAS_TAG}\"|" k8s/values.yaml
+        sed -i "s|^  version: .*|  version: \"${APP_VERSION}\"|" k8s/values.yaml
+        sed -i "s|^  deployedAt: .*|  deployedAt: \"${APP_DEPLOYED_AT}\"|" k8s/values.yaml
+    - name: Commit and push tag bump
+      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      run: |+
+        set -euo pipefail
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add k8s/values.yaml
+        if git diff --cached --quiet; then
+          echo "No values changes to commit"
+          exit 0
+        fi
+        git commit -m "chore: deploy kill-me v${APP_VERSION} as ${ALIAS_TAG}"
+        branch="FORGEJO-3-image-$GITHUB_RUN_ID"
+        git switch -c "$branch"
+        git push origin "$branch"
+        labels="$(printf 'header = "Authorization: token %s"\n' "$TOKEN" | curl --config - --fail --silent --show-error "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/labels?limit=100")"
+        label="$(jq -r '.[] | select(.name=="release:none") | .id' <<< "$labels")"
+        test -n "$label"
+        jq -n --arg head "$branch" --argjson label "$label" '{head:$head,base:"main",labels:[$label],title:"Deploy validated kill-me image",body:"https://openproject.romaine.life/wp/FORGEJO-3"}' > /tmp/image-pr.json
+        pr="$(printf 'header = "Authorization: token %s"\n' "$TOKEN" | curl --config - --fail --silent --show-error -X POST -H 'Content-Type: application/json' --data-binary @/tmp/image-pr.json "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/pulls" | jq -r .number)"
+        jq -n --arg head "$(git rev-parse HEAD)" '{Do:"squash",merge_when_checks_succeed:true,delete_branch_after_merge:true,head_commit_id:$head}' > /tmp/image-merge.json
+        printf 'header = "Authorization: token %s"\n' "$TOKEN" | curl --config - --fail-with-body --silent --show-error -X POST -H 'Content-Type: application/json' --data-binary @/tmp/image-merge.json "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/pulls/$pr/merge"
+
+      env:
+        TOKEN: ${{ secrets.PIPELINE_DISPATCH_TOKEN }}
+    - name: Publish semantic release
+      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/main' && env.CREATE_FORGEJO_RELEASE
+        == 'true')
+      env:
+        TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        jq -n --arg tag "v$APP_VERSION" --arg sha "$SOURCE_SHA" --arg title "$RELEASE_TITLE" '{tag_name:$tag,target_commitish:$sha,name:($tag+" "+$title),body:("Validated image source at "+$sha)}' > /tmp/release.json
+        printf 'header = "Authorization: token %s"\n' "$TOKEN" | curl --config - --fail-with-body --silent --show-error -X POST -H 'Content-Type: application/json' --data-binary @/tmp/release.json "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/releases"
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write

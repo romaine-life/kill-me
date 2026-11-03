@@ -2,8 +2,8 @@
 
 import fs from "node:fs";
 
-const dockerBuildCheck = fs.readFileSync(".github/workflows/docker-build-check.yaml", "utf8");
-const buildAndDeploy = fs.readFileSync(".github/workflows/build-and-deploy.yaml", "utf8");
+const dockerBuildCheck = fs.readFileSync(".forgejo/workflows/ci.yaml", "utf8");
+const buildAndDeploy = fs.readFileSync(".forgejo/workflows/ci.yaml", "utf8");
 const values = fs.readFileSync("k8s/values.yaml", "utf8");
 
 function assertIncludes(text, needle, label) {
