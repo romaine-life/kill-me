@@ -10,8 +10,8 @@ image:
 # The deploy workflow derives semantic versions from immutable Git release
 # tags, then records the version-to-image mapping here for the running pod.
 release:
-  version: "1.4.3"
-  deployedAt: "2026-09-16T18:58:32Z"
+  version: "1.4.4"
+  deployedAt: "2026-11-03T09:51:58Z"
 
 name: kill-me
 namespace: kill-me
