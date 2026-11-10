@@ -26,16 +26,6 @@ jobs:
       run:
         shell: pwsh
     steps:
-    - name: Use the home Forgejo address for Git
-      shell: pwsh
-      env:
-        HOME_FORGEJO_IP: ${{ vars.HOME_FORGEJO_IP }}
-      run: |
-        if(-not $env:HOME_FORGEJO_IP){throw 'HOME_FORGEJO_IP is not configured'}
-        $count=if($env:GIT_CONFIG_COUNT){[int]$env:GIT_CONFIG_COUNT}else{0}
-        "GIT_CONFIG_KEY_$count=http.curloptResolve" | Add-Content $env:GITHUB_ENV
-        "GIT_CONFIG_VALUE_$count=forgejo.romaine.life:443:$env:HOME_FORGEJO_IP" | Add-Content $env:GITHUB_ENV
-        "GIT_CONFIG_COUNT=$($count+1)" | Add-Content $env:GITHUB_ENV
     - uses: https://github.com/actions/checkout@v4
       with:
         fetch-depth: 0
@@ -100,9 +90,8 @@ jobs:
       env:
         TOKEN: ${{ secrets.GITHUB_TOKEN }}
         PR: ${{ github.event.pull_request.number }}
-        HOME_FORGEJO_IP: ${{ vars.HOME_FORGEJO_IP }}
       run: |
-        $cfg=@('silent','show-error','fail-with-body',("url = `"https://forgejo.romaine.life/api/v1/repos/$env:GITHUB_REPOSITORY/pulls/$env:PR`""),("resolve = `"forgejo.romaine.life:443:$env:HOME_FORGEJO_IP`""),("header = `"Authorization: token $env:TOKEN`""))
+        $cfg=@('silent','show-error','fail-with-body',("url = `"https://forgejo.romaine.life/api/v1/repos/$env:GITHUB_REPOSITORY/pulls/$env:PR`""),("header = `"Authorization: token $env:TOKEN`""))
         $r=($cfg -join [Environment]::NewLine) | curl.exe --config - | ConvertFrom-Json
         if($LASTEXITCODE){exit $LASTEXITCODE}
         $labels=@($r.labels.name | Where-Object {$_ -in @('release:major','release:minor','release:patch','release:none')})
@@ -114,12 +103,6 @@ jobs:
     runs-on: ubuntu-latest
     enable-openid-connect: true
     steps:
-    - name: Resolve Forgejo on the home network
-      env:
-        HOME_FORGEJO_IP: ${{ vars.HOME_FORGEJO_IP }}
-      run: |
-        test -n "$HOME_FORGEJO_IP"
-        printf '%s forgejo.romaine.life\n' "$HOME_FORGEJO_IP" | sudo tee -a /etc/hosts >/dev/null
     - uses: https://github.com/actions/checkout@v4
       with:
         fetch-depth: 0
