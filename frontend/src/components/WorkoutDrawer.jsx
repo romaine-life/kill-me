@@ -73,7 +73,7 @@ export function LogTab({
   const [selectedDay, setSelectedDay] = useState(currentDay);
   const [selectedDate, setSelectedDate] = useState(todayLocal());
   const [selectedTime, setSelectedTime] = useState(nowLocalTime());
-  const [mode, setMode] = useState('quick');
+  const [mode, setMode] = useState('detailed');
   const [exercises, setExercises] = useState([]);
   const [completedExercises, setCompletedExercises] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -157,7 +157,7 @@ export function LogTab({
       }
       setSelectedDate(initialDate || todayLocal());
       setSelectedTime(nowLocalTime());
-      setMode('quick');
+      setMode('detailed');
       setConfirmDelete(false);
     }
   }, [viewWorkout, initialDay, initialDate, currentDay]);
