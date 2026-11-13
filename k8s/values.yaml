@@ -11,7 +11,7 @@ image:
 # tags, then records the version-to-image mapping here for the running pod.
 release:
   version: "1.4.5"
-  deployedAt: "2026-11-13T09:59:38Z"
+  deployedAt: "2026-11-13T10:32:02Z"
 
 name: kill-me
 namespace: kill-me
