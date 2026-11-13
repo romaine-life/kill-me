@@ -1,5 +1,5 @@
 name: CI
-'on':
+on:
   pull_request:
     types:
     - opened
@@ -18,9 +18,79 @@ name: CI
         type: string
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: romaine-life/pipeline-templates/actions/check-fetches@main
+    - id: diff
+      env:
+        EVENT: ${{ github.event_name }}
+        BASE: ${{ github.event.pull_request.base.sha }}
+      run: |
+        if [ "$EVENT" != pull_request ]; then
+          echo code=true >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        files=$(git diff --name-only "$BASE...HEAD")
+        if grep -qvE '\.md$|^docs/|^LICENSE$' <<< "$files" || grep -qE '^(backend|frontend|scripts)/|^Dockerfile$|^\.dockerignore$' <<< "$files"; then
+          echo code=true >> "$GITHUB_OUTPUT"
+        fi
+  conventions:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Resolve checked source
+      env:
+        INPUT_REF: ${{ inputs.git_ref }}
+      run: |
+        set -euo pipefail
+        if [ -n "$INPUT_REF" ]; then
+          sha=$(git rev-parse --verify --end-of-options "$INPUT_REF^{commit}" 2>/dev/null) \
+            || sha=$(git rev-parse --verify --end-of-options "refs/remotes/origin/$INPUT_REF^{commit}" 2>/dev/null) \
+            || { echo "::error::Cannot resolve requested source: $INPUT_REF"; exit 1; }
+          git checkout --detach "$sha"
+        fi
+        echo "Checked source $(git rev-parse HEAD)"
+    - name: Repository conventions
+      run: |
+        set -euo pipefail
+        bad=$(git ls-files '*.yml')
+        if [ -n "$bad" ]; then echo "$bad"; echo '::error::Use the .yaml extension'; exit 1; fi
+        bad=$(git ls-files '*_*' | grep -viE 'PULL_REQUEST_TEMPLATE|ISSUE_TEMPLATE' | grep -viE '\.(md|js|py|webp|png|jpe?g|gif|svg|ico|txt)$' || true)
+        if [ -n "$bad" ]; then echo "$bad"; echo '::error::Use hyphens in filenames'; exit 1; fi
+        git grep -Il -z '' | while IFS= read -r -d '' path; do
+          if [ -s "$path" ] && [ "$(tail -c1 "$path" | od -An -tx1 | tr -d ' \n')" != 0a ]; then
+            echo "::error::Missing trailing newline: $path"
+            exit 1
+          fi
+        done
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - name: Removed MSAL surface
+      run: node scripts/check-removed-msal.mjs
+    - name: Require semantic release label
+      if: github.event_name == 'pull_request'
+      env:
+        TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PR: ${{ github.event.pull_request.number }}
+      run: |
+        set -euo pipefail
+        pull="$(printf 'header = "Authorization: token %s"\n' "$TOKEN" | curl --config - --fail-with-body --silent --show-error "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/pulls/$PR")"
+        count="$(jq '[.labels[]?.name | ascii_downcase | select(IN("release:major", "release:minor", "release:patch", "release:none"))] | length' <<< "$pull")"
+        if [ "$count" -ne 1 ]; then echo '::error::Exactly one release label is required'; exit 1; fi
   checks:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: windows-latest
     defaults:
       run:
@@ -51,17 +121,8 @@ jobs:
       with:
         tofu_version: 1.11.0
         tofu_wrapper: false
-    - name: Repository conventions and OpenTofu format
+    - name: OpenTofu format
       run: |
-        $ErrorActionPreference='Stop'
-        $bad=@(git ls-files '*.yml')
-        if($bad.Count){$bad;throw 'Use the .yaml extension'}
-        $bad=@(git ls-files '*_*' | Where-Object {$_ -notmatch 'PULL_REQUEST_TEMPLATE|ISSUE_TEMPLATE' -and $_ -notmatch '\.(md|js|py|webp|png|jpe?g|gif|svg|ico|txt)$'})
-        if($bad.Count){$bad;throw 'Use hyphens in filenames'}
-        foreach($path in (git grep -Il -- '')){
-          $data=[IO.File]::ReadAllBytes((Join-Path $PWD $path))
-          if($data.Length -and $data[-1] -ne 10){throw "Missing trailing newline: $path"}
-        }
         tofu fmt -recursive -check
         if($LASTEXITCODE){exit $LASTEXITCODE}
     - uses: actions/setup-node@v4
@@ -69,8 +130,6 @@ jobs:
         node-version: '20'
     - name: Semantic version rules
       run: node --test scripts/next-app-version.test.mjs
-    - name: Removed MSAL surface
-      run: node scripts/check-removed-msal.mjs
     - name: Image fingerprint contract
       run: node scripts/check-image-fingerprint-config.mjs
     - name: Backend tests
@@ -85,21 +144,10 @@ jobs:
         if($LASTEXITCODE){exit $LASTEXITCODE}
         npm run lint --prefix frontend
         if($LASTEXITCODE){exit $LASTEXITCODE}
-    - name: Require semantic release label
-      if: github.event_name == 'pull_request'
-      env:
-        TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        PR: ${{ github.event.pull_request.number }}
-      run: |
-        $cfg=@('silent','show-error','fail-with-body',("url = `"https://forgejo.romaine.life/api/v1/repos/$env:GITHUB_REPOSITORY/pulls/$env:PR`""),("header = `"Authorization: token $env:TOKEN`""))
-        $r=($cfg -join [Environment]::NewLine) | curl.exe --config - | ConvertFrom-Json
-        if($LASTEXITCODE){exit $LASTEXITCODE}
-        $labels=@($r.labels.name | Where-Object {$_ -in @('release:major','release:minor','release:patch','release:none')})
-        if($labels.Count -ne 1){throw 'Exactly one release label is required'}
     outputs:
       source-sha: ${{ steps.checked-source.outputs.sha }}
   image:
-    needs: checks
+    needs: [checks, conventions]
     runs-on: ubuntu-latest
     enable-openid-connect: true
     steps:
@@ -267,7 +315,7 @@ jobs:
         echo "SOURCE_SHA=${full_sha}" >> "$GITHUB_ENV"
       if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true'
     - name: Resolve semantic application version
-      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      if: github.event_name != 'pull_request' && !inputs.git_ref && steps.scope.outputs.run == 'true' && github.ref == 'refs/heads/main'
       env:
         TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: bash
@@ -382,7 +430,7 @@ jobs:
         assert.deepEqual(getVersionInfo({APP_VERSION:"1.2.3",APP_BUILD_ID:process.env.EXPECTED_BUILD_ID}),{version:"1.2.3",deployedAt:null,buildId:process.env.EXPECTED_BUILD_ID});
         console.log("Published image backend tests, compiled frontend assets and fingerprint verified");'
     - name: Bump image tag in k8s/values.yaml
-      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      if: github.event_name != 'pull_request' && !inputs.git_ref && steps.scope.outputs.run == 'true' && github.ref == 'refs/heads/main'
       run: |
         set -euo pipefail
         # Quote the tag so YAML never reinterprets image tags.
@@ -390,7 +438,7 @@ jobs:
         sed -i "s|^  version: .*|  version: \"${APP_VERSION}\"|" k8s/values.yaml
         sed -i "s|^  deployedAt: .*|  deployedAt: \"${APP_DEPLOYED_AT}\"|" k8s/values.yaml
     - name: Commit and push tag bump
-      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      if: github.event_name != 'pull_request' && !inputs.git_ref && steps.scope.outputs.run == 'true' && github.ref == 'refs/heads/main'
       run: |+
         set -euo pipefail
         git config user.name "github-actions[bot]"
@@ -411,10 +459,10 @@ jobs:
         for n in $(seq 1 60); do
           statuses=$(printf 'Authorization: token %s\n' "$TOKEN" | curl --fail-with-body -sS --header @- "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/commits/$head/status")
           state=$(echo "$statuses" | jq -r '
-            [.statuses[]? | select(.context == "CI / checks (pull_request)" or .context == "CI / image (pull_request)" or .context == "Infrastructure / Plan (pull_request)")]
+            [.statuses[]? | select(.context == "CI / changes (pull_request)" or .context == "CI / conventions (pull_request)" or .context == "CI / checks (pull_request)" or .context == "CI / image (pull_request)" or .context == "Infrastructure / Plan (pull_request)")]
             | group_by(.context) | map(max_by(.updated_at))
             | if any(.[]; .status == "failure" or .status == "error") then "failure"
-              elif length == 3 and all(.[]; .status == "success") then "success" else "pending" end')
+              elif length == 5 and all(.[]; .status == "success") then "success" else "pending" end')
           if [ "$state" = failure ]; then echo "Image pin PR $pr failed required checks"; exit 1; fi
           if [ "$state" = success ]; then passed=true; break; fi
           sleep 30
@@ -427,8 +475,7 @@ jobs:
         TOKEN: ${{ secrets.PIPELINE_DISPATCH_TOKEN }}
         RELEASE_NONE_LABEL_ID: ${{ vars.RELEASE_NONE_LABEL_ID }}
     - name: Publish semantic release
-      if: github.event_name != 'pull_request' && steps.scope.outputs.run == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/main' && env.CREATE_FORGEJO_RELEASE
-        == 'true')
+      if: github.event_name != 'pull_request' && !inputs.git_ref && steps.scope.outputs.run == 'true' && github.ref == 'refs/heads/main' && env.CREATE_FORGEJO_RELEASE == 'true'
       env:
         TOKEN: ${{ secrets.GITHUB_TOKEN }}
       shell: bash

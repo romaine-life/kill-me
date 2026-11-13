@@ -245,12 +245,13 @@ starting a dev server on a branch would push a half-written migration to product
 Application images are rebuilt only when application or infrastructure source changes.
 Database writes and backups never trigger an application deployment.
 
-| Workflow | Trigger | What it does |
-| -------- | ------- | ------------ |
-| `build-and-deploy.yaml` | App source push to main / manual | Creates the next semantic release when required, builds or reuses the fingerprinted image, and records the deployed version/image/time in Helm values |
-| `docker-build-check.yaml` | PR / manual | Verifies the container build and publishes the canonical fingerprint tag when permitted |
-| `tofu.yml` | Push/PR touching `tofu/` | Plan on PR, apply on main merge |
-| `lint.yaml` | PR to main | Repository lint checks |
+| Workflow / job | Trigger | What it does |
+| -------------- | ------- | ------------ |
+| `ci.yaml` `changes` | PR / push to main / manual | Checks CI fetches nothing from the internet; on a PR, decides whether anything but documentation (`*.md`, `docs/`, `LICENSE`) changed; any change under `backend/`, `frontend/` or `scripts/`, or to `Dockerfile` or `.dockerignore`, counts as code because the image and its fingerprint read those, Markdown included |
+| `ci.yaml` `conventions` | PR / push to main / manual | File-name and trailing-newline rules, the removed-MSAL guard and, on a PR, exactly one release label; runs on every PR, documentation-only included |
+| `ci.yaml` `checks` | Same, skipped on documentation-only PRs | Windows: OpenTofu format, version-rule, fingerprint-contract, backend and frontend tests and lint |
+| `ci.yaml` `image` | Same, after `checks` and `conventions` pass; skipped on documentation-only PRs | On a PR, builds and publishes the fingerprinted candidate image; on main, creates the next semantic release when required, builds or reuses the image and records the deployed version/image/time in Helm values |
+| `tofu.yaml` `Plan` | Every PR, push to main and manual dispatch; its steps run only when `tofu/` or `.forgejo/` changed | Plan on a PR; plan and apply on a push to main or a dispatch |
 
 ## Development
 
@@ -315,7 +316,7 @@ is typically `C:\Program Files\Google\Chrome\Application\chrome.exe` or Edge's
 
 Application releases use immutable Git tags (`vMAJOR.MINOR.PATCH`) as their source
 of truth. Every PR carries exactly one `release:major`, `release:minor`,
-`release:patch`, or `release:none` label. On merge, `build-and-deploy.yaml` applies
+`release:patch`, or `release:none` label. On merge, the `image` job in `ci.yaml` applies
 that bump to the latest tag, creates the Forgejo release, and records the version,
 deployment time, and content-fingerprint image tag in `k8s/values.yaml`.
 
