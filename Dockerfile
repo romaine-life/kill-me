@@ -1,10 +1,11 @@
 # ── Stage 1: build the Vite frontend ──────────────────────────────────────
-FROM node:20-alpine AS frontend-builder
+FROM artifacts.home.romaine.life/dockerhub/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS frontend-builder
 
 WORKDIR /build/frontend
 
 # Install frontend deps first (cache layer — only invalidated on lockfile change).
 COPY frontend/package*.json ./
+ENV NPM_CONFIG_REGISTRY=https://artifacts.home.romaine.life/npm/npm/
 RUN npm ci
 
 # Copy frontend source, then build.
@@ -19,11 +20,12 @@ ENV APP_BUILD_ID=$APP_BUILD_ID
 RUN npm run build
 
 # ── Stage 2: runtime — Node + Express serves frontend/dist + /api ────────
-FROM node:20-alpine
+FROM artifacts.home.romaine.life/dockerhub/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
 
 WORKDIR /app
 
 COPY backend/package*.json backend/
+ARG NPM_CONFIG_REGISTRY=https://artifacts.home.romaine.life/npm/npm/
 RUN cd backend && npm install --omit=dev
 
 # Bring the built frontend and the backend source into the runtime image.
