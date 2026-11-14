@@ -451,7 +451,7 @@ jobs:
         branch="FORGEJO-3-image-$GITHUB_RUN_ID"
         git switch -c "$branch"
         git push origin "$branch"
-        jq -n --arg head "$branch" --argjson release_label "$RELEASE_NONE_LABEL_ID" '{head:$head,base:"main",labels:[$release_label],title:"Deploy validated kill-me image",body:"https://openproject.romaine.life/wp/FORGEJO-3"}' > /tmp/image-pr.json
+        jq -n --arg head "$branch" --argjson release_label "$RELEASE_NONE_LABEL_ID" '{head:$head,base:"main",labels:[$release_label],title:"Deploy validated kill-me image",body:"https://openproject.home.romaine.life/wp/FORGEJO-3"}' > /tmp/image-pr.json
         pr="$(printf 'header = "Authorization: token %s"\n' "$TOKEN" | curl --config - --fail --silent --show-error -X POST -H 'Content-Type: application/json' --data-binary @/tmp/image-pr.json "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/pulls" | jq -r .number)"
         head=$(git rev-parse HEAD)
         passed=false
