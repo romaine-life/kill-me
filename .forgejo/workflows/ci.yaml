@@ -39,7 +39,7 @@ jobs:
           exit 0
         fi
         files=$(git diff --name-only "$BASE...HEAD")
-        if grep -qvE '\.md$|^docs/|^LICENSE$' <<< "$files" || grep -qE '^(backend|frontend|scripts)/|^Dockerfile$|^\.dockerignore$' <<< "$files"; then
+        if grep -qvE '\.md$|^docs/|^LICENSE$|^k8s/values\.yaml$' <<< "$files" || grep -qE '^(backend|frontend|scripts)/|^Dockerfile$|^\.dockerignore$' <<< "$files"; then
           echo code=true >> "$GITHUB_OUTPUT"
         fi
   conventions:
@@ -78,6 +78,8 @@ jobs:
         node-version: '20'
     - name: Removed MSAL surface
       run: node scripts/check-removed-msal.mjs
+    - name: Image fingerprint contract
+      run: node scripts/check-image-fingerprint-config.mjs
     - name: Require semantic release label
       if: github.event_name == 'pull_request'
       env:
@@ -130,8 +132,6 @@ jobs:
         node-version: '20'
     - name: Semantic version rules
       run: node --test scripts/next-app-version.test.mjs
-    - name: Image fingerprint contract
-      run: node scripts/check-image-fingerprint-config.mjs
     - name: Backend tests
       run: |
         npm test --prefix backend
@@ -462,7 +462,7 @@ jobs:
             [.statuses[]? | select(.context == "CI / changes (pull_request)" or .context == "CI / conventions (pull_request)" or .context == "CI / checks (pull_request)" or .context == "CI / image (pull_request)" or .context == "Infrastructure / Plan (pull_request)")]
             | group_by(.context) | map(max_by(.updated_at))
             | if any(.[]; .status == "failure" or .status == "error") then "failure"
-              elif length == 5 and all(.[]; .status == "success") then "success" else "pending" end')
+              elif length == 5 and all(.[]; .status == "success" or (.status == "skipped" and (.context == "CI / checks (pull_request)" or .context == "CI / image (pull_request)"))) then "success" else "pending" end')
           if [ "$state" = failure ]; then echo "Image pin PR $pr failed required checks"; exit 1; fi
           if [ "$state" = success ]; then passed=true; break; fi
           sleep 30
