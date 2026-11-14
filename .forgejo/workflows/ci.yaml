@@ -73,7 +73,7 @@ jobs:
             exit 1
           fi
         done
-    - uses: actions/setup-node@v4
+    - uses: romaine-life/pipeline-templates/actions/setup-node@main
       with:
         node-version: '20'
     - name: Removed MSAL surface
@@ -119,15 +119,14 @@ jobs:
         }
         "sha=$sha" | Add-Content $env:GITHUB_OUTPUT
         Write-Host "Checked source $sha"
-    - uses: opentofu/setup-opentofu@v2
+    - uses: romaine-life/pipeline-templates/actions/setup-opentofu@main
       with:
-        tofu_version: 1.11.0
-        tofu_wrapper: false
+        tofu-version: 1.11.0
     - name: OpenTofu format
       run: |
         tofu fmt -recursive -check
         if($LASTEXITCODE){exit $LASTEXITCODE}
-    - uses: actions/setup-node@v4
+    - uses: romaine-life/pipeline-templates/actions/setup-node@main
       with:
         node-version: '20'
     - name: Semantic version rules
@@ -170,7 +169,7 @@ jobs:
         fi
     - uses: romaine-life/pipeline-templates/actions/azure-cli@main
       if: steps.scope.outputs.run == 'true'
-    - uses: actions/setup-node@v4
+    - uses: romaine-life/pipeline-templates/actions/setup-node@main
       with:
         node-version: '20'
     - name: Resolve image source ref
