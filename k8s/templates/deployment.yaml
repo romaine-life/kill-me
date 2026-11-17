@@ -30,13 +30,13 @@ spec:
         azure.workload.identity/use: "true"
       annotations:
         romaine.life/app-version: {{ .Values.release.version | quote }}
-        romaine.life/build-id: {{ .Values.image.tag | quote }}
+        romaine.life/build-id: {{ .Values.image | quote }}
     spec:
       serviceAccountName: {{ .Values.serviceAccount }}
       containers:
         - name: {{ include "kill-me.resourceName" . }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: {{ .Values.image | quote }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
           ports:
             # When a live-preview edge fronts the backend, the edge owns the
             # "http" served port and the backend's own port is renamed to an
@@ -53,8 +53,6 @@ spec:
               value: {{ .Values.release.version | quote }}
             - name: APP_DEPLOYED_AT
               value: {{ .Values.release.deployedAt | quote }}
-            - name: APP_BUILD_ID
-              value: {{ .Values.image.tag | quote }}
             - name: AZURE_APP_CONFIG_ENDPOINT
               value: https://infra-appconfig.azconfig.io
             # Pending migrations apply here and nowhere else. Local development points at

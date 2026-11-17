@@ -8,12 +8,9 @@ agonizing set of leg extensions under hypnotherapy coaching.
 ## Container Build Verification
 
 Agent pods are not expected to have Docker. Do not report missing local Docker
-as a blocker. Run available repo checks first, then use PR CI as the normal
-container build gate: `.forgejo/workflows/ci.yaml` builds the
-app image. Same-repo PRs and manual dispatches publish the canonical
-content-fingerprint tag (`romainecr.azurecr.io/kill-me:app-<sha256>`); fork PRs
-stay build-only with `push: false`. Release/deploy workflows publish or reuse
-that same fingerprint tag and bump `k8s/values.yaml` to it.
+as a blocker. Run available repo checks first (`ci-check` runs the suites' local
+checks), then use PR CI as the container build gate: the web-app suite builds the image
+and runs its `--self-test` on a PR. Only a merge to main publishes an image.
 
 ## The 17-Day Synergy System
 
@@ -245,13 +242,15 @@ starting a dev server on a branch would push a half-written migration to product
 Application images are rebuilt only when application or infrastructure source changes.
 Database writes and backups never trigger an application deployment.
 
-| Workflow / job | Trigger | What it does |
-| -------------- | ------- | ------------ |
-| `ci.yaml` `changes` | PR / push to main / manual | Checks CI fetches nothing from the internet; on a PR, decides whether anything but documentation (`*.md`, `docs/`, `LICENSE`) changed; any change under `backend/`, `frontend/` or `scripts/`, or to `Dockerfile` or `.dockerignore`, counts as code because the image and its fingerprint read those, Markdown included |
-| `ci.yaml` `conventions` | PR / push to main / manual | File-name and trailing-newline rules, the removed-MSAL guard and, on a PR, exactly one release label; runs on every PR, documentation-only included |
-| `ci.yaml` `checks` | Same, skipped on documentation-only PRs | Windows: OpenTofu format, version-rule, fingerprint-contract, backend and frontend tests and lint |
-| `ci.yaml` `image` | Same, after `checks` and `conventions` pass; skipped on documentation-only PRs | On a PR, builds and publishes the fingerprinted candidate image; on main, creates the next semantic release when required, builds or reuses the image and records the deployed version/image/time in Helm values |
-| `tofu.yaml` `Plan` | Every PR, push to main and manual dispatch; its steps run only when `tofu/` or `.forgejo/` changed | Plan on a PR; plan and apply on a push to main or a dispatch |
+CI comes from pipeline-templates' suites (its `fleet.json` entry); each check runs on a PR
+only when the files it reads changed.
+
+| Suite / workflow | On a PR | On a merge to main |
+| ---------------- | ------- | ------------------ |
+| `web-app` | Backend and frontend tests and lint (the backend's lint is the removed-MSAL guard); the image built and run with `--self-test` | The next release, `v1.5.N`: the image pushed to romainecr and a pin PR that records the image, version and release time in `k8s/values.yaml` |
+| `cluster-service` | The chart in `k8s/` rendered and checked against the Kubernetes schemas, its images named by digest | Nothing |
+| `tofu` | Format, validate and plan | Apply |
+| `checks.yaml` (this repo) | File-name and trailing-newline conventions, on every PR | Nothing |
 
 ## Development
 
@@ -314,16 +313,14 @@ is typically `C:\Program Files\Google\Chrome\Application\chrome.exe` or Edge's
 
 ### Application releases and deployed version
 
-Application releases use immutable Git tags (`vMAJOR.MINOR.PATCH`) as their source
-of truth. Every PR carries exactly one `release:major`, `release:minor`,
-`release:patch`, or `release:none` label. On merge, the `image` job in `ci.yaml` applies
-that bump to the latest tag, creates the Forgejo release, and records the version,
-deployment time, and content-fingerprint image tag in `k8s/values.yaml`.
+Each merge that changes the application releases the next `v1.5.N`, numbered like every
+home release (decision record 0005). The release's pin PR records the image (by tag and
+digest), the version and the release time in `k8s/values.yaml`.
 
 The public `/api/version` endpoint returns that runtime metadata with `no-store`
 caching. The frontend shows the semantic version and deployment time at the bottom
 of the shared sidebar (also used by the mobile drawer). It polls the endpoint and
-compares the running image fingerprint with the build identity compiled into the
+compares the running image's release tag with the build identity compiled into the
 bundle; an old browser tab gets an explicit reload action after a new deployment.
 Git SHAs remain CI/debugging metadata and are not presented as application versions.
 

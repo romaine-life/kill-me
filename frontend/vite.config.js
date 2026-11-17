@@ -10,9 +10,8 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-// CI passes the immutable source-content fingerprint used as the image tag.
-// Unlike a PR commit SHA, it remains correct when the exact image is reused
-// after merge. Local development deliberately uses a distinct identity.
+// The image's release tag (v1.5.N), which the server reports too, so an open tab can tell
+// a newer release is serving. Local development deliberately uses a distinct identity.
 const getBuildId = () => process.env.APP_BUILD_ID || 'dev'
 
 // Ask the OS for a free port instead of hardcoding one, so parallel worktrees /

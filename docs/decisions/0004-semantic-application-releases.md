@@ -1,6 +1,6 @@
 # 0004: Give deployed application builds semantic release identity
 
-- Status: Accepted
+- Status: Superseded by [0005](0005-releases-numbered-by-merge.md)
 - Date: 2026-08-27
 - Deciders: Nelson
 

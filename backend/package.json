@@ -10,7 +10,8 @@
     "dev": "node --watch server.js",
     "test": "node --test",
     "migrate:dry-run": "node migrations/dry-run.js",
-    "migrate": "node migrations/apply.js"
+    "migrate": "node migrations/apply.js",
+    "lint": "node ../scripts/check-removed-msal.mjs"
   },
   "license": "MIT",
   "dependencies": {

@@ -5,9 +5,6 @@ Read `CLAUDE.md` for the project architecture and domain notes.
 ## Container Build Verification
 
 Agent pods are not expected to have Docker. Do not report missing local Docker
-as a blocker. Run available repo checks first, then use PR CI as the normal
-container build gate: `.forgejo/workflows/ci.yaml` builds the
-app image. Same-repo PRs and manual dispatches publish the canonical
-content-fingerprint tag (`romainecr.azurecr.io/kill-me:app-<sha256>`); fork PRs
-stay build-only with `push: false`. Release/deploy workflows publish or reuse
-that same fingerprint tag and bump `k8s/values.yaml` to it.
+as a blocker. Run available repo checks first (`ci-check` runs the suites' local
+checks), then use PR CI as the container build gate: the web-app suite builds the image
+and runs its `--self-test` on a PR. Only a merge to main publishes an image.
