@@ -52,7 +52,7 @@ spec:
             - name: APP_VERSION
               value: {{ .Values.release.version | quote }}
             - name: APP_DEPLOYED_AT
-              value: {{ .Values.release.deployedAt | quote }}
+              value: {{ .Values.release.date | quote }}
             - name: AZURE_APP_CONFIG_ENDPOINT
               value: https://infra-appconfig.azconfig.io
             # Pending migrations apply here and nowhere else. Local development points at

@@ -1,11 +1,11 @@
 # The image by release tag and digest, and the release it is, both written by the suite's
-# pin PR on each release (pipeline-templates fleet.json: pinFields).
+# pin PR on each release: each field under release is named for what it takes.
 image: romainecr.azurecr.io/kill-me:v1.5.1@sha256:b45f9d69c4d41432fbd5427c0731842dd193bfd84e90148066315523db2a30ad
 imagePullPolicy: IfNotPresent
 
 release:
   version: "1.5.1"
-  deployedAt: "2026-11-18T05:40:55Z"
+  date: "2026-11-18T05:40:55Z"
 
 name: kill-me
 namespace: kill-me
