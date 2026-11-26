@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getVersionInfo } from './version.js';
+import { errorText, log } from './log.js';
 
 // The image's self-test: the compiled frontend is complete (its page, scripts and styles)
 // and carries the image's own build id, so the update-available check compares the right
@@ -21,8 +22,8 @@ try {
     .map((p) => fs.readFileSync(path.join(root, 'assets', p), 'utf8')).join('\n');
   assert.ok(bundle.includes(buildId), `the bundle carries build id ${buildId}`);
   assert.deepEqual(getVersionInfo({ APP_VERSION: '1.5.3', APP_BUILD_ID: buildId }), { version: '1.5.3', deployedAt: null, buildId });
-  console.log(`kill-me self-test passed: ${assets.length} assets, build id ${buildId}`);
+  log.info('kill-me self-test passed', { assets: assets.length, build_id: buildId });
 } catch (error) {
-  console.error('kill-me self-test failed:', error.message);
+  log.error('kill-me self-test failed', { error: errorText(error, { stack: false }) });
   process.exitCode = 1;
 }

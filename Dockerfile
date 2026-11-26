@@ -24,9 +24,10 @@ FROM artifacts.home.romaine.life/dockerhub/library/node:20-alpine@sha256:fb4cd12
 
 WORKDIR /app
 
-COPY backend/package*.json backend/
+# @romaine-life/logline comes from Forgejo's npm registry (backend/.npmrc), read with CI's sign-in.
+COPY backend/package*.json backend/.npmrc backend/
 ARG NPM_CONFIG_REGISTRY=https://artifacts.home.romaine.life/npm/npm/
-RUN cd backend && npm ci --omit=dev
+RUN --mount=type=secret,id=FORGEJO_PACKAGES_TOKEN,env=FORGEJO_PACKAGES_TOKEN cd backend && npm ci --omit=dev
 
 # Bring the built frontend and the backend source into the runtime image.
 COPY --from=frontend-builder /build/frontend/dist frontend/dist

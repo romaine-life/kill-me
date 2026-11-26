@@ -11,6 +11,8 @@
 // The frontend stores nothing — the cookie is the durable session state,
 // owned by auth.romaine.life.
 
+import { errorText, log } from './log.js';
+
 const AUTH_URL = 'https://auth.romaine.life';
 const SESSION_CACHE_TTL_MS = 60_000;
 const AUTH_REQUEST_TIMEOUT_MS = 5_000;
@@ -44,7 +46,7 @@ async function fetchSessionFromAuth(cookie) {
     const body = await res.json();
     return body?.user ?? null;
   } catch (err) {
-    console.warn('[auth] get-session call failed:', err.message);
+    log.warn('auth get-session call failed', { error: errorText(err, { stack: false }) });
     return null;
   }
 }

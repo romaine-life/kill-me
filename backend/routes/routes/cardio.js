@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { errorText, log } from '../../log.js';
 
 /**
  * Cardio session + treadmill template routes.
@@ -47,7 +48,7 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
       const { resources: sessions } = await container.items.query(querySpec).fetchAll();
       res.json({ sessions });
     } catch (error) {
-      console.error('Error fetching cardio sessions:', error);
+      log.error('fetching cardio sessions failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to fetch cardio sessions', message: error.message });
     }
   });
@@ -83,7 +84,7 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
       const { resource } = await container.items.create(doc);
       res.status(201).json({ session: resource });
     } catch (error) {
-      console.error('Error logging cardio session:', error);
+      log.error('logging cardio session failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to log cardio session', message: error.message });
     }
   });
@@ -122,7 +123,7 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
       const { resource } = await container.item(id, existing.userId).replace(updated);
       res.json({ session: resource });
     } catch (error) {
-      console.error('Error updating cardio session:', error);
+      log.error('updating cardio session failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to update cardio session', message: error.message });
     }
   });
@@ -150,7 +151,7 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
       if (error.code === 404) {
         return res.status(404).json({ error: 'Cardio session not found' });
       }
-      console.error('Error deleting cardio session:', error);
+      log.error('deleting cardio session failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to delete cardio session', message: error.message });
     }
   });
@@ -168,7 +169,7 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
       const { resources } = await container.items.query(querySpec).fetchAll();
       res.json({ templates: resources.map(shapeTemplate) });
     } catch (error) {
-      console.error('Error fetching cardio templates:', error);
+      log.error('fetching cardio templates failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to fetch cardio templates', message: error.message });
     }
   });
@@ -204,7 +205,7 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
       const { resource } = await container.items.upsert(doc);
       res.status(201).json({ template: shapeTemplate(resource) });
     } catch (error) {
-      console.error('Error creating cardio template:', error);
+      log.error('creating cardio template failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to create cardio template', message: error.message });
     }
   });
@@ -241,7 +242,7 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
       const { resource } = await container.item(existing.id, existing.userId).replace(updated);
       res.json({ template: shapeTemplate(resource) });
     } catch (error) {
-      console.error('Error updating cardio template:', error);
+      log.error('updating cardio template failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to update cardio template', message: error.message });
     }
   });
@@ -270,7 +271,7 @@ export function createCardioRoutes({ container, requireAuth, requireAdmin }) {
       if (error.code === 404) {
         return res.status(404).json({ error: 'Cardio template not found' });
       }
-      console.error('Error deleting cardio template:', error);
+      log.error('deleting cardio template failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to delete cardio template', message: error.message });
     }
   });

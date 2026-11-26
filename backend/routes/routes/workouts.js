@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { errorText, log } from '../../log.js';
 import { ExerciseDefaultError, withNewExerciseDefault } from './exercise-defaults.js';
 
 /**
@@ -67,7 +68,7 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
       const model = await activeModel();
       res.json({ model: { version: model.version, name: model.name, days: model.days } });
     } catch (error) {
-      console.error('Error fetching workout model:', error);
+      log.error('fetching workout model failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to fetch workout model', message: error.message });
     }
   });
@@ -79,7 +80,7 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
       if (!day) return unknownDay(res, model, req.params.daySlug);
       res.json({ workoutDay: day });
     } catch (error) {
-      console.error('Error fetching workout day:', error);
+      log.error('fetching workout day failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to fetch workout day', message: error.message });
     }
   });
@@ -94,7 +95,7 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
         .fetchAll();
       res.json({ exercises });
     } catch (error) {
-      console.error('Error fetching all exercises:', error);
+      log.error('fetching all exercises failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to fetch exercises', message: error.message });
     }
   });
@@ -117,7 +118,7 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
 
       res.json({ exercises });
     } catch (error) {
-      console.error('Error fetching exercises:', error);
+      log.error('fetching exercises failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to fetch exercises', message: error.message });
     }
   });
@@ -132,7 +133,7 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
         .fetchAll();
       res.json({ workouts });
     } catch (error) {
-      console.error('Error fetching logged workouts:', error);
+      log.error('fetching logged workouts failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to fetch logged workouts', message: error.message });
     }
   });
@@ -160,7 +161,7 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
 
       res.json({ currentDaySlug: daySlug });
     } catch (error) {
-      console.error('Error fetching current day:', error);
+      log.error('fetching current day failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to fetch current day', message: error.message });
     }
   });
@@ -229,7 +230,7 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
 
       res.status(201).json({ workout: resource, advancedTo });
     } catch (error) {
-      console.error('Error logging workout:', error);
+      log.error('logging workout failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to log workout', message: error.message });
     }
   });
@@ -281,7 +282,7 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
       const { resource } = await container.item(id, existing.userId).replace(updated);
       res.json({ workout: resource });
     } catch (error) {
-      console.error('Error updating workout:', error);
+      log.error('updating workout failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to update workout', message: error.message });
     }
   });
@@ -305,7 +306,7 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
       res.status(204).send();
     } catch (error) {
       if (error.code === 404) return res.status(404).json({ error: 'Workout not found' });
-      console.error('Error deleting workout:', error);
+      log.error('deleting workout failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to delete workout', message: error.message });
     }
   });
@@ -329,7 +330,7 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
 
       res.json({ currentDaySlug: resource.currentDaySlug });
     } catch (error) {
-      console.error('Error updating current day:', error);
+      log.error('updating current day failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to update current day', message: error.message });
     }
   });
@@ -367,7 +368,7 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
       const { resource } = await container.items.upsert(exerciseDoc);
       res.status(201).json({ exercise: resource });
     } catch (error) {
-      console.error('Error creating exercise:', error);
+      log.error('creating exercise failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to create exercise', message: error.message });
     }
   });
@@ -405,7 +406,7 @@ export function createWorkoutRoutes({ container, requireAuth, requireAdmin }) {
       if (error instanceof ExerciseDefaultError) {
         return res.status(400).json({ error: error.message });
       }
-      console.error('Error updating exercise default:', error);
+      log.error('updating exercise default failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to update exercise default', message: error.message });
     }
   });

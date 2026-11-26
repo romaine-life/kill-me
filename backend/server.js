@@ -8,7 +8,6 @@
 import 'dotenv/config';
 import express from 'express';
 import helmet from 'helmet';
-import morgan from 'morgan';
 import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +22,7 @@ import { createRequireAuth, requireAdmin, currentCaller } from './auth.js';
 import { fetchConfig } from './config.js';
 import { runMigrations, pendingMigrations } from './migrations/runner.js';
 import { getVersionInfo } from './version.js';
+import { errorText, log, requestLog } from './log.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FRONTEND_DIR = path.join(__dirname, '..', 'frontend', 'dist');
@@ -35,7 +35,7 @@ let serverReady = false;
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
-app.use(morgan('combined'));
+app.use(requestLog());
 
 app.use((req, res, next) => {
   if (serverReady || req.path === '/health') return next();
@@ -86,11 +86,11 @@ async function start() {
   } else {
     const pending = await pendingMigrations({ container: workoutContainer });
     if (pending.length > 0) {
-      console.warn(
-        `[kill-me] ${pending.length} migration(s) pending and not applied here: ` +
-        `${pending.map((m) => m.file).join(', ')}. ` +
-        `Preview with \`npm run migrate:dry-run\`; they apply on deploy.`
-      );
+      log.warn('migrations pending and not applied here; they apply on deploy', {
+        count: pending.length,
+        files: pending.map((m) => m.file).join(','),
+        preview: 'npm run migrate:dry-run',
+      });
     }
   }
 
@@ -134,12 +134,12 @@ async function start() {
   });
 
   serverReady = true;
-  console.log(`[kill-me] ready on port ${PORT}`);
+  log.info('kill-me ready', { port: PORT });
 }
 
 app.listen(PORT, () => {
   start().catch((err) => {
-    console.error('[kill-me] fatal startup error:', err);
+    log.error('kill-me startup failed', { error: errorText(err) });
     process.exit(1);
   });
 });

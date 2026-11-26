@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { errorText, log } from '../../log.js';
 import { randomUUID } from 'node:crypto';
 
 /**
@@ -89,7 +90,7 @@ export function createSorenessRoutes({ container, requireAuth, requireAdmin }) {
       const { resources: entries } = await container.items.query(querySpec).fetchAll();
       res.json({ entries });
     } catch (error) {
-      console.error('Error fetching soreness entries:', error);
+      log.error('fetching soreness entries failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to fetch soreness entries', message: error.message });
     }
   });
@@ -113,7 +114,7 @@ export function createSorenessRoutes({ container, requireAuth, requireAdmin }) {
       const { resource } = await container.items.create(doc);
       res.status(201).json({ entry: resource });
     } catch (error) {
-      console.error('Error creating soreness entry:', error);
+      log.error('creating soreness entry failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to create soreness entry', message: error.message });
     }
   });
@@ -146,7 +147,7 @@ export function createSorenessRoutes({ container, requireAuth, requireAdmin }) {
       if (error.code === 404) {
         return res.status(404).json({ error: 'Soreness entry not found' });
       }
-      console.error('Error updating soreness entry:', error);
+      log.error('updating soreness entry failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to update soreness entry', message: error.message });
     }
   });
@@ -167,7 +168,7 @@ export function createSorenessRoutes({ container, requireAuth, requireAdmin }) {
       if (error.code === 404) {
         return res.status(404).json({ error: 'Soreness entry not found' });
       }
-      console.error('Error deleting soreness entry:', error);
+      log.error('deleting soreness entry failed', { error: errorText(error) });
       res.status(500).json({ error: 'Failed to delete soreness entry', message: error.message });
     }
   });
